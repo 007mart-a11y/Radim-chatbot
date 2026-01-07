@@ -1,57 +1,47 @@
-export default async (request) => {
+import OpenAI from "openai";
+
+const client = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY
+});
+
+export async function handler(event) {
   try {
-    const { message } = await request.json();
-    if (!message?.trim()) {
-      return Response.json({ reply: "Napište prosím dotaz." }, { status: 200 });
-    }
+    const { message } = JSON.parse(event.body);
 
-    const apiKey = process.env.OPENAI_API_KEY;
-    const vectorStoreId = process.env.OPENAI_VECTOR_STORE_ID;
+    // vytvoří thread
+    const thread = await client.beta.threads.create();
 
-    if (!apiKey) {
-      return Response.json({ reply: "Chybí OPENAI_API_KEY v Netlify Environment variables." }, { status: 200 });
-    }
-    if (!vectorStoreId) {
-      return Response.json({ reply: "Chybí OPENAI_VECTOR_STORE_ID v Netlify Environment variables." }, { status: 200 });
-    }
-
-    const system = `
-Jsi virtuální asistent obce Radim u Jičína.
-PRAVIDLA:
-1) Odpovídej jen z informací nalezených pomocí file_search (znalostní báze obce Radim).
-2) Když informaci nenajdeš nebo si nejsi jistý, NEHÁDEJ. Napiš, že to v podkladech nemáš, a pošli relevantní odkaz (nebo doporuč kontakt na úřad).
-3) Když se uživatel ptá "kde najdu ...", primárně pošli odkaz.
-4) Buď stručný, věcný, profesionální. Piš česky.
-`.trim();
-
-    const resp = await fetch("https://api.openai.com/v1/responses", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${apiKey}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        model: "gpt-4o-mini",
-        input: [
-          { role: "system", content: system },
-          { role: "user", content: message }
-        ],
-        tools: [
-          { type: "file_search", vector_store_ids: [vectorStoreId] }
-        ],
-        temperature: 0.2
-      })
+    // pošle zprávu uživatele
+    await client.beta.threads.messages.create(thread.id, {
+      role: "user",
+      content: message
     });
 
-    const data = await resp.json();
-    if (!resp.ok) {
-      return Response.json({ reply: `Chyba OpenAI: ${JSON.stringify(data)}` }, { status: 200 });
-    }
+    // spustí asistenta
+    const run = await client.beta.threads.runs.create(thread.id, {
+      assistant_id: process.env.OPENAI_ASSISTANT_ID
+    });
 
-    const reply = data?.output_text || "Nemám odpověď.";
-    return Response.json({ reply }, { status: 200 });
+    // čeká na dokončení
+    let status;
+    do {
+      await new Promise(r => setTimeout(r, 500));
+      status = await client.beta.threads.runs.retrieve(thread.id, run.id);
+    } while (status.status !== "completed");
 
-  } catch (e) {
-    return Response.json({ reply: `Server error: ${String(e)}` }, { status: 200 });
+    // vezme odpověď
+    const messages = await client.beta.threads.messages.list(thread.id);
+    const reply = messages.data[0].content[0].text.value;
+
+    return {
+      statusCode: 200,
+      body: JSON.stringify({ reply })
+    };
+
+  } catch (err) {
+    return {
+      statusCode: 500,
+      body: JSON.stringify({ error: err.message })
+    };
   }
-};
+}
