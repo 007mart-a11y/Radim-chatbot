@@ -1,0 +1,33 @@
+name: Build KB monthly
+
+on:
+  schedule:
+    - cron: "0 3 1 * *"   # každý 1. den v měsíci ve 3:00
+  workflow_dispatch:
+
+jobs:
+  build-kb:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build knowledge base
+        run: node scripts/build_kb.js
+
+      - name: Commit kb.json
+        run: |
+          git config user.name "radim-bot"
+          git config user.email "bot@users.noreply.github.com"
+          git add kb/kb.json
+          git commit -m "Auto update knowledge base" || echo "No changes"
+          git push
