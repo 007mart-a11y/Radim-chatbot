@@ -3,9 +3,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build:kb": "node scripts/build_kb.js"
+    "build": "node scripts/build-kb.js"
   },
   "dependencies": {
+    "openai": "^4.1.0",
     "cheerio": "^1.0.0-rc.12",
     "pdf-parse": "^1.1.1"
   }
