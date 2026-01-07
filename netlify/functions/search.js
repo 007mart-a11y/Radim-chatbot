@@ -4,50 +4,46 @@ const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
 });
 
-export default async (req) => {
+export async function handler(event) {
   try {
-    const { message } = JSON.parse(req.body);
+    const { message } = JSON.parse(event.body || "{}");
 
-    // 1️⃣ vytvoříme response přes Assistant + File Search
+    if (!message) {
+      return {
+        statusCode: 400,
+        body: JSON.stringify({ error: "Chybí dotaz" })
+      };
+    }
+
     const response = await client.responses.create({
       model: "gpt-4.1-mini",
       input: message,
-      tools: [{ type: "file_search" }],
-      metadata: {
-        assistant_id: process.env.OPENAI_ASSISTANT_ID
-      }
+      tools: [
+        {
+          type: "file_search",
+          vector_store_ids: [process.env.VECTOR_STORE_ID]
+        }
+      ]
     });
 
-    // 2️⃣ VYTÁHNEME TEXT SPRÁVNĚ
-    let answer = "";
-
-    for (const item of response.output) {
-      if (item.type === "message") {
-        for (const part of item.content) {
-          if (part.type === "output_text") {
-            answer += part.text;
-          }
-        }
-      }
-    }
-
-    // 3️⃣ KDYŽ NIC NENAJDE → ŘEKNE NEVÍM
-    if (!answer.trim()) {
-      answer = "Tuto informaci nemám ve znalostní bázi obce Radim.";
-    }
+    const outputText =
+      response.output_text ||
+      response.output?.[0]?.content?.[0]?.text ||
+      "";
 
     return {
       statusCode: 200,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: answer })
+      body: JSON.stringify({
+        answer: outputText,
+        raw: response
+      })
     };
-
   } catch (err) {
     return {
       statusCode: 500,
       body: JSON.stringify({
-        error: err.message || "Chyba serveru"
+        error: err.message
       })
     };
   }
-};
+}
