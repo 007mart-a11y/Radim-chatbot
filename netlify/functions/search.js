@@ -1,52 +1,57 @@
-const OpenAI = require("openai");
+import OpenAI from "openai";
 
 const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-exports.handler = async (event) => {
+export async function handler(event) {
+  if (event.httpMethod !== "POST") {
+    return {
+      statusCode: 405,
+      body: JSON.stringify({ error: "Použij POST" }),
+    };
+  }
+
   try {
-    if (event.httpMethod !== "POST") {
-      return {
-        statusCode: 405,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reply: "Použij POST." }),
-      };
-    }
+    const { message } = JSON.parse(event.body);
 
-    const body = JSON.parse(event.body || "{}");
-    const userMessage = body.message;
+    // vytvoření threadu
+    const thread = await client.beta.threads.create();
 
-    if (!userMessage) {
-      return {
-        statusCode: 400,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reply: "Chybí dotaz (message)." }),
-      };
-    }
-
-    const r = await client.responses.create({
-      model: "gpt-4.1-mini",
-      input: [
-        { role: "system", content: "Jsi oficiální asistent obce Radim. Odpovídej česky, věcně a stručně." },
-        { role: "user", content: userMessage },
-      ],
+    // zpráva od uživatele
+    await client.beta.threads.messages.create(thread.id, {
+      role: "user",
+      content: message,
     });
 
-    const text = r.output_text || "Omlouvám se, nenašel jsem odpověď.";
+    // spuštění asistenta (!!! TADY SE POUŽÍVÁ ZNALOSTNÍ BÁZE !!!)
+    const run = await client.beta.threads.runs.create(thread.id, {
+      assistant_id: process.env.OPENAI_ASSISTANT_ID,
+    });
+
+    // čekání na dokončení
+    let status;
+    do {
+      await new Promise(r => setTimeout(r, 1000));
+      status = await client.beta.threads.runs.retrieve(thread.id, run.id);
+    } while (status.status !== "completed");
+
+    // načtení odpovědi
+    const messages = await client.beta.threads.messages.list(thread.id);
+    const answer = messages.data.find(m => m.role === "assistant");
 
     return {
       statusCode: 200,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ reply: text }),
+      body: JSON.stringify({
+        reply: answer.content[0].text.value,
+      }),
     };
+
   } catch (err) {
     return {
       statusCode: 500,
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        reply: "Interní chyba serveru.",
-        error: err.message,
+        error: err.message || "Chyba serveru",
       }),
     };
   }
