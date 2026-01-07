@@ -1,79 +1,96 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="cs">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta charset="UTF-8" />
   <title>Asistent obce Radim</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <style>
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; margin: 0; padding: 24px; }
-    .wrap { max-width: 720px; margin: 0 auto; }
-    h1 { margin: 0 0 16px; }
-    #chat { border: 1px solid #ddd; border-radius: 12px; padding: 12px; min-height: 220px; }
-    .msg { margin: 10px 0; }
-    .err { color: #b00020; white-space: pre-wrap; }
-    form { display: flex; gap: 8px; margin-top: 12px; }
-    input { flex: 1; padding: 12px; border-radius: 10px; border: 1px solid #ccc; }
-    button { padding: 12px 16px; border-radius: 10px; border: 0; cursor: pointer; }
+    body {
+      font-family: Arial, sans-serif;
+      background: #f6f6f6;
+      margin: 0;
+      padding: 20px;
+    }
+    #chat {
+      max-width: 700px;
+      margin: auto;
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+    }
+    .msg {
+      margin-bottom: 10px;
+    }
+    .user {
+      font-weight: bold;
+    }
+    .bot {
+      color: #003366;
+    }
+    form {
+      display: flex;
+      margin-top: 20px;
+    }
+    input {
+      flex: 1;
+      padding: 10px;
+      font-size: 16px;
+    }
+    button {
+      padding: 10px 16px;
+      font-size: 16px;
+    }
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <h1>Asistent obce Radim</h1>
 
-    <div id="chat">
-      <div class="msg"><b>Radim:</b> Dobrý den, jak vám mohu pomoci?</div>
-    </div>
+<div id="chat">
+  <div class="msg bot">Dobrý den, jsem asistent obce Radim. Jak vám mohu pomoci?</div>
+</div>
 
-    <form id="chatForm">
-      <input id="chatInput" placeholder="Napište dotaz…" autocomplete="off" />
-      <button type="submit">Odeslat</button>
-    </form>
-  </div>
+<form id="chatForm">
+  <input id="question" placeholder="Napište dotaz…" autocomplete="off" />
+  <button type="submit">Odeslat</button>
+</form>
 
-  <script>
-    const form = document.getElementById("chatForm");
-    const input = document.getElementById("chatInput");
-    const chat  = document.getElementById("chat");
+<script>
+const chat = document.getElementById("chat");
+const form = document.getElementById("chatForm");
+const input = document.getElementById("question");
 
-    function addMsg(label, text, cls="msg") {
-      const div = document.createElement("div");
-      div.className = cls;
-      div.innerHTML = `<b>${label}:</b> ${text}`;
-      chat.appendChild(div);
-      chat.scrollTop = chat.scrollHeight;
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
+
+  const message = input.value.trim();
+  if (!message) return;
+
+  chat.innerHTML += `<div class="msg user">Vy: ${message}</div>`;
+  input.value = "";
+
+  try {
+    const res = await fetch("/.netlify/functions/search", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ message })
+    });
+
+    const data = await res.json();
+
+    if (!data.answer) {
+      chat.innerHTML += `<div class="msg bot">⚠️ Server nevrátil žádnou odpověď.</div>`;
+      return;
     }
 
-    form.addEventListener("submit", async (e) => {
-      e.preventDefault();
+    chat.innerHTML += `<div class="msg bot">Radim: ${data.answer}</div>`;
+    chat.scrollTop = chat.scrollHeight;
 
-      const message = input.value.trim();
-      if (!message) return;
+  } catch (err) {
+    chat.innerHTML += `<div class="msg bot">❌ Chyba spojení se serverem.</div>`;
+  }
+});
+</script>
 
-      addMsg("Vy", message);
-      input.value = "";
-
-      try {
-        const res = await fetch("/.netlify/functions/search", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message })
-        });
-
-        const text = await res.text();
-
-        let data;
-        try {
-          data = JSON.parse(text);
-        } catch {
-          addMsg("Chyba", "Server nevrátil JSON:\n\n" + text, "err");
-          return;
-        }
-
-        addMsg("Radim", data.reply ?? "(bez odpovědi)");
-      } catch (err) {
-        addMsg("Fetch error", err.message, "err");
-      }
-    });
-  </script>
 </body>
 </html>
