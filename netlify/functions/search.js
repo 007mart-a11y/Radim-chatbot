@@ -1,69 +1,53 @@
 import OpenAI from "openai";
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+const client = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY
 });
 
 export default async (req) => {
   try {
-    if (req.method !== "POST") {
-      return new Response(JSON.stringify({ error: "Only POST allowed" }), {
-        status: 405,
-      });
-    }
+    const { message } = JSON.parse(req.body);
 
-    const { message } = await req.json();
-    if (!message) {
-      return new Response(JSON.stringify({ error: "No message" }), {
-        status: 400,
-      });
-    }
-
-    // 1️⃣ Thread
-    const thread = await openai.beta.threads.create();
-
-    // 2️⃣ User message
-    await openai.beta.threads.messages.create(thread.id, {
-      role: "user",
-      content: message,
-    });
-
-    // 3️⃣ RUN – POVOLEN FILE SEARCH (TO JE TEN ROZDÍL)
-    const run = await openai.beta.threads.runs.create(thread.id, {
-      assistant_id: process.env.OPENAI_ASSISTANT_ID,
+    // 1️⃣ vytvoříme response přes Assistant + File Search
+    const response = await client.responses.create({
+      model: "gpt-4.1-mini",
+      input: message,
       tools: [{ type: "file_search" }],
+      metadata: {
+        assistant_id: process.env.OPENAI_ASSISTANT_ID
+      }
     });
 
-    // 4️⃣ Wait
-    let status;
-    do {
-      await new Promise((r) => setTimeout(r, 500));
-      status = await openai.beta.threads.runs.retrieve(thread.id, run.id);
-    } while (status.status === "queued" || status.status === "in_progress");
+    // 2️⃣ VYTÁHNEME TEXT SPRÁVNĚ
+    let answer = "";
 
-    if (status.status !== "completed") {
-      return new Response(
-        JSON.stringify({ error: "Run failed", status: status.status }),
-        { status: 500 }
-      );
+    for (const item of response.output) {
+      if (item.type === "message") {
+        for (const part of item.content) {
+          if (part.type === "output_text") {
+            answer += part.text;
+          }
+        }
+      }
     }
 
-    // 5️⃣ Get assistant reply
-    const messages = await openai.beta.threads.messages.list(thread.id);
+    // 3️⃣ KDYŽ NIC NENAJDE → ŘEKNE NEVÍM
+    if (!answer.trim()) {
+      answer = "Tuto informaci nemám ve znalostní bázi obce Radim.";
+    }
 
-    const assistantMsg = messages.data.find(
-      (m) => m.role === "assistant"
-    );
+    return {
+      statusCode: 200,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: answer })
+    };
 
-    const reply =
-      assistantMsg?.content?.[0]?.text?.value ||
-      "Asistent nevrátil žádnou odpověď.";
-
-    return new Response(JSON.stringify({ reply }), { status: 200 });
   } catch (err) {
-    return new Response(
-      JSON.stringify({ error: err.message }),
-      { status: 500 }
-    );
+    return {
+      statusCode: 500,
+      body: JSON.stringify({
+        error: err.message || "Chyba serveru"
+      })
+    };
   }
 };
