@@ -1,50 +1,50 @@
-const OpenAI = require("openai");
+import OpenAI from "openai";
 
-exports.handler = async (event) => {
+const client = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+export default async (req) => {
+  if (req.method !== "POST") {
+    return new Response(
+      JSON.stringify({ error: "Use POST" }),
+      { status: 405 }
+    );
+  }
+
   try {
-    // povolíme jen POST
-    if (event.httpMethod !== "POST") {
-      return {
-        statusCode: 405,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ error: "Use POST" }),
-      };
-    }
+    const { question } = JSON.parse(req.body);
 
-    const body = JSON.parse(event.body || "{}");
-    const question = body.question;
+    const thread = await client.beta.threads.create();
 
-    if (!question) {
-      return {
-        statusCode: 400,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ error: "Missing question" }),
-      };
-    }
-
-    const client = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
+    await client.beta.threads.messages.create(thread.id, {
+      role: "user",
+      content: question,
     });
 
-    const response = await client.responses.create({
-      model: "gpt-4.1-mini",
-      input: question,
+    const run = await client.beta.threads.runs.create(thread.id, {
+      assistant_id: process.env.ASSISTANT_ID,
     });
 
-    return {
-      statusCode: 200,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        answer: response.output_text,
-      }),
-    };
+    // čekání na dokončení
+    let status;
+    do {
+      await new Promise(r => setTimeout(r, 1000));
+      status = await client.beta.threads.runs.retrieve(thread.id, run.id);
+    } while (status.status !== "completed");
+
+    const messages = await client.beta.threads.messages.list(thread.id);
+    const answer = messages.data[0].content[0].text.value;
+
+    return new Response(
+      JSON.stringify({ answer }),
+      { status: 200 }
+    );
+
   } catch (err) {
-    return {
-      statusCode: 500,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        error: err.message,
-      }),
-    };
+    return new Response(
+      JSON.stringify({ error: err.message }),
+      { status: 500 }
+    );
   }
 };
