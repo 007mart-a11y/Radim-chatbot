@@ -1,47 +1,51 @@
 import OpenAI from "openai";
 
-const client = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-});
-
-export async function handler(event) {
+export default async (req, context) => {
   try {
-    const { message } = JSON.parse(event.body);
+    const query =
+      req.queryStringParameters?.q ||
+      JSON.parse(req.body || "{}")?.q;
 
-    // vytvoří thread
-    const thread = await client.beta.threads.create();
+    if (!query) {
+      return {
+        statusCode: 400,
+        body: JSON.stringify({ error: "Missing query" }),
+      };
+    }
 
-    // pošle zprávu uživatele
-    await client.beta.threads.messages.create(thread.id, {
-      role: "user",
-      content: message
+    const client = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
     });
 
-    // spustí asistenta
-    const run = await client.beta.threads.runs.create(thread.id, {
-      assistant_id: process.env.OPENAI_ASSISTANT_ID
+    const response = await client.responses.create({
+      model: "gpt-4.1-mini",
+      input: `Odpověz jako Asistent obce Radim na dotaz: ${query}`,
     });
 
-    // čeká na dokončení
-    let status;
-    do {
-      await new Promise(r => setTimeout(r, 500));
-      status = await client.beta.threads.runs.retrieve(thread.id, run.id);
-    } while (status.status !== "completed");
-
-    // vezme odpověď
-    const messages = await client.beta.threads.messages.list(thread.id);
-    const reply = messages.data[0].content[0].text.value;
+    const text =
+      response.output_text ||
+      "Omlouvám se, odpověď se nepodařilo získat.";
 
     return {
       statusCode: 200,
-      body: JSON.stringify({ reply })
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        answer: text,
+      }),
     };
-
   } catch (err) {
+    console.error("FUNCTION ERROR:", err);
+
     return {
       statusCode: 500,
-      body: JSON.stringify({ error: err.message })
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        error: err.message || "Unknown server error",
+      }),
     };
   }
-}
+};
