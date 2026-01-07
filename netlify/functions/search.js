@@ -1,58 +1,80 @@
 import OpenAI from "openai";
 
-const client = new OpenAI({
+const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-export async function handler(event) {
-  if (event.httpMethod !== "POST") {
-    return {
-      statusCode: 405,
-      body: JSON.stringify({ error: "Použij POST" }),
-    };
-  }
-
+export default async (req) => {
   try {
-    const { message } = JSON.parse(event.body);
+    if (req.method !== "POST") {
+      return new Response(
+        JSON.stringify({ error: "Only POST allowed" }),
+        { status: 405 }
+      );
+    }
 
-    // vytvoření threadu
-    const thread = await client.beta.threads.create();
+    const { message } = await req.json();
 
-    // zpráva od uživatele
-    await client.beta.threads.messages.create(thread.id, {
+    if (!message) {
+      return new Response(
+        JSON.stringify({ error: "No message provided" }),
+        { status: 400 }
+      );
+    }
+
+    // 1️⃣ vytvoření threadu
+    const thread = await openai.beta.threads.create();
+
+    // 2️⃣ přidání zprávy uživatele
+    await openai.beta.threads.messages.create(thread.id, {
       role: "user",
       content: message,
     });
 
-    // spuštění asistenta (!!! TADY SE POUŽÍVÁ ZNALOSTNÍ BÁZE !!!)
-    const run = await client.beta.threads.runs.create(thread.id, {
+    // 3️⃣ spuštění asistenta (TVŮJ ASSISTANT_ID)
+    const run = await openai.beta.threads.runs.create(thread.id, {
       assistant_id: process.env.OPENAI_ASSISTANT_ID,
     });
 
-    // čekání na dokončení
-    let status;
+    // 4️⃣ čekání na dokončení
+    let runStatus;
     do {
-      await new Promise(r => setTimeout(r, 1000));
-      status = await client.beta.threads.runs.retrieve(thread.id, run.id);
-    } while (status.status !== "completed");
+      await new Promise((r) => setTimeout(r, 500));
+      runStatus = await openai.beta.threads.runs.retrieve(
+        thread.id,
+        run.id
+      );
+    } while (runStatus.status === "queued" || runStatus.status === "in_progress");
 
-    // načtení odpovědi
-    const messages = await client.beta.threads.messages.list(thread.id);
-    const answer = messages.data.find(m => m.role === "assistant");
+    if (runStatus.status !== "completed") {
+      return new Response(
+        JSON.stringify({ error: "Run failed", status: runStatus.status }),
+        { status: 500 }
+      );
+    }
 
-    return {
-      statusCode: 200,
-      body: JSON.stringify({
-        reply: answer.content[0].text.value,
-      }),
-    };
+    // 5️⃣ NAČTENÍ ODPOVĚDI ASISTENTA (TO TADY CELÝ DEN CHYBĚLO)
+    const messages = await openai.beta.threads.messages.list(thread.id);
 
+    const assistantMessage = messages.data.find(
+      (m) => m.role === "assistant"
+    );
+
+    const text =
+      assistantMessage?.content?.[0]?.text?.value ||
+      "Asistent nevrátil žádnou odpověď.";
+
+    return new Response(
+      JSON.stringify({ reply: text }),
+      { status: 200 }
+    );
   } catch (err) {
-    return {
-      statusCode: 500,
-      body: JSON.stringify({
-        error: err.message || "Chyba serveru",
+    return new Response(
+      JSON.stringify({
+        error: "Internal error",
+        details: err.message,
       }),
-    };
+      { status: 500 }
+    );
   }
-}
+};
