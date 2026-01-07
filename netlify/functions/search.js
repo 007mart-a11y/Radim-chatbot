@@ -1,70 +1,57 @@
-// netlify/functions/search.js
-exports.handler = async (event) => {
+export default async (request) => {
   try {
-    const { q } = JSON.parse(event.body || "{}");
-    const query = (q || "").toLowerCase().trim();
-
-    if (!query) {
-      return json({ ok: false, message: "Chybí dotaz." }, 400);
+    const { message } = await request.json();
+    if (!message?.trim()) {
+      return Response.json({ reply: "Napište prosím dotaz." }, { status: 200 });
     }
 
-    // ✅ Sem si dáš seznam stránek obce Radim (můžeš postupně rozšiřovat)
-    // TIP: klidně sem dej 50–200 URL z menu webu, a bude to trefovat dobře.
-    const PAGES = [
-      { title: "Obec Radim - hlavní stránka", url: "https://www.obec-radim.cz" },
-      { title: "Úřední deska", url: "https://www.obec-radim.cz/uredni-deska" },
-      { title: "Kontakty", url: "https://www.obec-radim.cz/kontakty" },
-      { title: "Územní plán", url: "https://www.obec-radim.cz/uzemni-plan" },
-      { title: "Poplatky", url: "https://www.obec-radim.cz/poplatky" },
-      { title: "Svoz odpadu", url: "https://www.obec-radim.cz/odpad" },
-      { title: "Zastupitelstvo", url: "https://www.obec-radim.cz/zastupitelstvo" },
-    ];
+    const apiKey = process.env.OPENAI_API_KEY;
+    const vectorStoreId = process.env.OPENAI_VECTOR_STORE_ID;
 
-    // jednoduché skórování podle slov v dotazu
-    const words = query.split(/\s+/).filter(Boolean);
-
-    const scored = PAGES.map((p) => {
-      const hay = (p.title + " " + p.url).toLowerCase();
-      let score = 0;
-      for (const w of words) {
-        if (hay.includes(w)) score += 2;
-      }
-      // bonusy na typické dotazy
-      if (query.includes("úřední") && hay.includes("kontakt")) score += 1;
-      if (query.includes("územní") && hay.includes("uzemni")) score += 3;
-      return { ...p, score };
-    }).sort((a, b) => b.score - a.score);
-
-    const best = scored[0];
-
-    if (!best || best.score === 0) {
-      return json({
-        ok: true,
-        found: false,
-        answer:
-          "Tuhle informaci nemám jistě. Pošli mi prosím přesnější dotaz (např. název formuláře / odboru), nebo mrkni na hlavní web obce.",
-        links: [{ title: "Obec Radim (hlavní web)", url: "https://www.obec-radim.cz" }],
-      });
+    if (!apiKey) {
+      return Response.json({ reply: "Chybí OPENAI_API_KEY v Netlify Environment variables." }, { status: 200 });
+    }
+    if (!vectorStoreId) {
+      return Response.json({ reply: "Chybí OPENAI_VECTOR_STORE_ID v Netlify Environment variables." }, { status: 200 });
     }
 
-    return json({
-      ok: true,
-      found: true,
-      answer: `Našel jsem nejbližší relevantní stránku:`,
-      links: scored.slice(0, 3).filter(x => x.score > 0).map(x => ({ title: x.title, url: x.url })),
+    const system = `
+Jsi virtuální asistent obce Radim u Jičína.
+PRAVIDLA:
+1) Odpovídej jen z informací nalezených pomocí file_search (znalostní báze obce Radim).
+2) Když informaci nenajdeš nebo si nejsi jistý, NEHÁDEJ. Napiš, že to v podkladech nemáš, a pošli relevantní odkaz (nebo doporuč kontakt na úřad).
+3) Když se uživatel ptá "kde najdu ...", primárně pošli odkaz.
+4) Buď stručný, věcný, profesionální. Piš česky.
+`.trim();
+
+    const resp = await fetch("https://api.openai.com/v1/responses", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        input: [
+          { role: "system", content: system },
+          { role: "user", content: message }
+        ],
+        tools: [
+          { type: "file_search", vector_store_ids: [vectorStoreId] }
+        ],
+        temperature: 0.2
+      })
     });
+
+    const data = await resp.json();
+    if (!resp.ok) {
+      return Response.json({ reply: `Chyba OpenAI: ${JSON.stringify(data)}` }, { status: 200 });
+    }
+
+    const reply = data?.output_text || "Nemám odpověď.";
+    return Response.json({ reply }, { status: 200 });
+
   } catch (e) {
-    return json({ ok: false, message: "Chyba serveru", error: String(e) }, 500);
+    return Response.json({ reply: `Server error: ${String(e)}` }, { status: 200 });
   }
 };
-
-function json(data, statusCode = 200) {
-  return {
-    statusCode,
-    headers: {
-      "Content-Type": "application/json; charset=utf-8",
-      "Access-Control-Allow-Origin": "*",
-    },
-    body: JSON.stringify(data),
-  };
-}
