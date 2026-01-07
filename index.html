@@ -6,77 +6,63 @@
   <style>
     body {
       font-family: Arial, sans-serif;
-      background: #f5f5f5;
-      padding: 40px;
+      background: #f4f4f4;
+      padding: 20px;
     }
     #chat {
       background: white;
-      padding: 20px;
-      border-radius: 8px;
+      padding: 15px;
+      border-radius: 5px;
       max-width: 600px;
-      margin: auto;
-    }
-    .msg {
       margin-bottom: 10px;
     }
-    .radim {
-      font-weight: bold;
-    }
     input {
-      width: 100%;
+      width: 480px;
       padding: 10px;
-      margin-top: 10px;
     }
     button {
-      margin-top: 10px;
       padding: 10px;
-      width: 100%;
     }
   </style>
 </head>
 <body>
 
-<div id="chat">
-  <div id="messages">
-    <div class="msg"><span class="radim">Radim:</span> Dobrý den, jak vám mohu pomoci?</div>
-  </div>
+<h1>Asistent obce Radim</h1>
 
-  <input id="input" placeholder="Napište dotaz..." />
-  <button onclick="send()">Odeslat</button>
-</div>
+<div id="chat"></div>
+
+<form id="chat-form">
+  <input id="chat-input" placeholder="Napište dotaz..." />
+  <button type="submit">Odeslat</button>
+</form>
 
 <script>
-  function addMessage(author, text) {
-    const div = document.createElement("div");
-    div.className = "msg";
-    div.innerHTML = `<span class="radim">${author}:</span> ${text}`;
-    document.getElementById("messages").appendChild(div);
-  }
+const form = document.getElementById("chat-form");
+const input = document.getElementById("chat-input");
+const chat = document.getElementById("chat");
 
-  function send() {
-    const inputEl = document.getElementById("input");
-    const input = inputEl.value.trim();
-    if (!input) return;
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
 
-    addMessage("Vy", input);
-    inputEl.value = "";
+  const question = input.value.trim();
+  if (!question) return;
 
-    fetch("/.netlify/functions/search", {
+  chat.innerHTML += `<p><strong>Vy:</strong> ${question}</p>`;
+  input.value = "";
+
+  try {
+    const res = await fetch("/.netlify/functions/search", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({ message: input })
-    })
-      .then(res => res.json())
-      .then(data => {
-        addMessage("Radim", data.answer || "Bez odpovědi.");
-      })
-      .catch(err => {
-        console.error(err);
-        addMessage("Radim", "Chyba serveru.");
-      });
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question })
+    });
+
+    const data = await res.json();
+    chat.innerHTML += `<p><strong>Radim:</strong> ${data.answer}</p>`;
+  } catch (err) {
+    chat.innerHTML += `<p><strong>Radim:</strong> Chyba serveru</p>`;
   }
+});
 </script>
 
 </body>
