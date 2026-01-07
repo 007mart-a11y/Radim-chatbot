@@ -1,77 +1,85 @@
-// netlify/functions/chat.js
-exports.handler = async (event) => {
-  const headers = {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers": "Content-Type",
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Content-Type": "application/json; charset=utf-8",
-  };
+import fs from "fs";
+import path from "path";
 
-  if (event.httpMethod === "OPTIONS") {
-    return { statusCode: 204, headers, body: "" };
-  }
-  if (event.httpMethod !== "POST") {
-    return { statusCode: 405, headers, body: JSON.stringify({ error: "Use POST" }) };
-  }
-
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
-    return { statusCode: 500, headers, body: JSON.stringify({ error: "Missing OPENAI_API_KEY" }) };
-  }
-
+export async function handler(event) {
   try {
-    const body = JSON.parse(event.body || "{}");
-    const message = (body.message || "").trim();
-    const history = Array.isArray(body.history) ? body.history : [];
+    const { message } = JSON.parse(event.body || "{}");
 
     if (!message) {
-      return { statusCode: 400, headers, body: JSON.stringify({ error: "Missing message" }) };
+      return {
+        statusCode: 400,
+        body: JSON.stringify({ error: "Chybí zpráva uživatele." })
+      };
     }
 
-    const SYSTEM_PROMPT = `
-Jsi oficiální virtuální asistent obce Radim (okres Jičín).
-Odpovídáš česky, slušně, věcně a přehledně.
+    // ===============================
+    // NAČTENÍ KNOWLEDGE BASE
+    // ===============================
+    let kbText = "";
+    try {
+      const kbPath = path.join(process.cwd(), "kb", "kb.json");
+      const raw = fs.readFileSync(kbPath, "utf8");
+      const kb = JSON.parse(raw);
 
-ZÁKLADNÍ INFORMACE:
-- Obec: Radim (okres Jičín)
-- Starostka: Zdeňka Stříbrná
-- Pomáháš s informacemi o úřadu, úředních hodinách, kontaktech,
-  obecních akcích, hlášeních, historii obce a orientaci na webu obce.
+      if (kb.chunks && Array.isArray(kb.chunks)) {
+        kbText = kb.chunks
+          .slice(0, 15)
+          .map(c => `• ${c.text}`)
+          .join("\n");
+      }
+    } catch (e) {
+      console.warn("KB se nepodařilo načíst:", e.message);
+    }
 
-PRAVIDLA:
-- Když si nejsi jistý/á, řekni to a doporuč ověřit na webu obce nebo na OÚ.
-- Nevymýšlej si konkrétní data, vyhlášky ani termíny.
-- Odpovídej stručně, ideálně v bodech.
+    // ===============================
+    // PROMPT PRO CHATBOTA
+    // ===============================
+    const systemPrompt = `
+Jsi oficiální virtuální asistent obce Radim u Jičína.
+
+Odpovídej:
+- česky
+- věcně, slušně a srozumitelně
+- pouze na základě dostupných informací
+- pokud si nejsi jistý, řekni to a doporuč kontaktovat obecní úřad
+
+INFORMACE Z WEBU A DOKUMENTŮ OBCE:
+${kbText}
 `;
 
-    const messages = [
-      { role: "system", content: SYSTEM_PROMPT },
-      ...history,
-      { role: "user", content: message }
-    ];
-
-    const r = await fetch("https://api.openai.com/v1/chat/completions", {
+    // ===============================
+    // VOLÁNÍ OPENAI
+    // ===============================
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${apiKey}`,
         "Content-Type": "application/json",
+        "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`
       },
       body: JSON.stringify({
         model: "gpt-4o-mini",
-        messages
-      }),
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: message }
+        ],
+        temperature: 0.2
+      })
     });
 
-    const data = await r.json();
+    const data = await response.json();
 
-    if (!r.ok) {
-      return { statusCode: r.status, headers, body: JSON.stringify({ error: data }) };
-    }
+    return {
+      statusCode: 200,
+      body: JSON.stringify({
+        reply: data.choices?.[0]?.message?.content || "Omlouvám se, odpověď se nepodařilo získat."
+      })
+    };
 
-    const reply = data?.choices?.[0]?.message?.content || "Bez odpovědi.";
-    return { statusCode: 200, headers, body: JSON.stringify({ reply }) };
-
-  } catch (e) {
-    return { statusCode: 500, headers, body: JSON.stringify({ error: String(e) }) };
+  } catch (error) {
+    console.error(error);
+    return {
+      statusCode: 500,
+      body: JSON.stringify({ error: "Interní chyba serveru." })
+    };
   }
-};
+}
