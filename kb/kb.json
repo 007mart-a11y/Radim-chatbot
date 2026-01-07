@@ -1,42 +1,34 @@
 {
-  "general": {
-    "name": "Obec Radim",
-    "region_note": "Radim u Jičína",
-    "source_note": "Informace jsou připravené pro chatbot obce Radim."
-  },
-
-  "office": {
-    "address": {
-      "name": "Obec Radim",
-      "street": "Radim 8",
-      "zip": "507 12",
-      "city": "Radim"
+  "version": 1,
+  "site": "https://www.obec-radim.cz",
+  "entries": [
+    {
+      "id": "kontakty",
+      "title": "Kontakty a adresa obce Radim",
+      "url": "https://www.obec-radim.cz/",
+      "answer": "Obec Radim, Radim 8, 507 12 Radim. Datová schránka: szfj9sk. Tel.: +420 731 409 498, +420 725 867 505. E-maily: urad@obec-radim.cz, ucetni@obec-radim.cz, zpravodaj@obec-radim.cz. Č.ú.: 5503257329/0800.",
+      "keywords": ["kontakt", "kontakty", "telefon", "email", "e-mail", "datová schránka", "datovka", "adresa", "radim 8", "účet", "cislo uctu", "číslo účtu"]
     },
-    "office_hours": {
-      "day": "Středa",
-      "from": "16:00",
-      "to": "19:00",
-      "note": "Úřední hodiny probíhají jednou týdně."
+    {
+      "id": "uredni_hodiny",
+      "title": "Úřední hodiny obecního úřadu Radim",
+      "url": "https://www.obec-radim.cz/urad/",
+      "answer": "Úřední hodiny obecního úřadu Radim: středa 16:00–19:00.",
+      "keywords": ["úřední hodiny", "uredni hodiny", "kdy je otevřeno", "otevřeno", "úřad", "obecní úřad", "kdy je úřad", "kdy na úřad"]
     },
-    "contacts": {
-      "phone": ["+420 731 409 498", "+420 725 867 505"],
-      "email": ["urad@obec-radim.cz", "ucetni@obec-radim.cz", "zpravodaj@obec-radim.cz"],
-      "data_box": "szfj9sk",
-      "bank_account": "5503257329/0800"
+    {
+      "id": "uzemni_plan",
+      "title": "Územní a rozvojový plán (územní plán) obce Radim",
+      "url": "https://www.obec-radim.cz/urad/uzemni-a-rozvojovy-plan/",
+      "answer": "Územní plán / územní a rozvojový plán obce Radim najdete na stránce níže.",
+      "keywords": ["územní plán", "uzemni plan", "územní a rozvojový plán", "uzemni", "rozvojovy plan", "regulativy", "výkres", "mapa", "plán"]
+    },
+    {
+      "id": "program_rozvoje",
+      "title": "Program rozvoje obce Radim",
+      "url": "https://www.obec-radim.cz/modules/file_storage/download.php?file=67081de0%7C278",
+      "answer": "Program rozvoje obce Radim je ke stažení zde (PDF).",
+      "keywords": ["program rozvoje", "rozvoj obce", "strategie", "plán rozvoje", "pdf", "program"]
     }
-  },
-
-  "links": {
-    "web_home": "https://www.obec-radim.cz/",
-    "office": "https://www.obec-radim.cz/urad/",
-    "contacts": "https://www.obec-radim.cz/kontakty/",
-    "zoning_plan_page": "https://www.obec-radim.cz/urad/uzemni-a-rozvojovy-plan/",
-    "zoning_plan_pdf": "https://www.obec-radim.cz/modules/file_storage/download.php?file=bb2963ca%7C276",
-    "development_program_pdf": "https://www.obec-radim.cz/modules/file_storage/download.php?file=67081de0%7C278"
-  },
-
-  "notes": {
-    "waste": "Poplatky a termíny svozu odpadu se mohou měnit. Pokud nejsou v databázi uvedeny přesně, chatbot pošle odkaz na web obce nebo doporučí kontaktovat úřad.",
-    "zoning_plan": "Územní plán je typicky publikovaný jako stránka + dokumenty (PDF) a mapové podklady. Chatbot má posílat přímé odkazy."
-  }
+  ]
 }
