@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
-import cheerio from "cheerio";
+import * as cheerio from "cheerio";
 import pdfParse from "pdf-parse";
 
 const ROOT = "https://www.obec-radim.cz";
