@@ -1,51 +1,41 @@
 import OpenAI from "openai";
 
-export default async (req, context) => {
+export default async (request, context) => {
   try {
-    const query =
-      req.queryStringParameters?.q ||
-      JSON.parse(req.body || "{}")?.q;
+    const url = new URL(request.url);
+    let q = url.searchParams.get("q");
 
-    if (!query) {
-      return {
-        statusCode: 400,
-        body: JSON.stringify({ error: "Missing query" }),
-      };
+    // podporujeme i POST { "q": "..." }
+    if (!q && request.method === "POST") {
+      const body = await request.json().catch(() => ({}));
+      q = body?.q;
     }
 
-    const client = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
-    });
+    if (!q) {
+      return new Response(JSON.stringify({ error: "Missing query ?q=" }), {
+        status: 400,
+        headers: { "content-type": "application/json; charset=utf-8" },
+      });
+    }
 
-    const response = await client.responses.create({
+    const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+    const resp = await client.responses.create({
       model: "gpt-4.1-mini",
-      input: `Odpověz jako Asistent obce Radim na dotaz: ${query}`,
+      input: `Odpověz jako Asistent obce Radim na dotaz: ${q}`,
     });
 
-    const text =
-      response.output_text ||
-      "Omlouvám se, odpověď se nepodařilo získat.";
-
-    return {
-      statusCode: 200,
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        answer: text,
-      }),
-    };
+    return new Response(JSON.stringify({ answer: resp.output_text || "" }), {
+      status: 200,
+      headers: { "content-type": "application/json; charset=utf-8" },
+    });
   } catch (err) {
-    console.error("FUNCTION ERROR:", err);
-
-    return {
-      statusCode: 500,
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        error: err.message || "Unknown server error",
-      }),
-    };
+    return new Response(
+      JSON.stringify({ error: err?.message || "Server error" }),
+      {
+        status: 500,
+        headers: { "content-type": "application/json; charset=utf-8" },
+      }
+    );
   }
 };
