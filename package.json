@@ -1,4 +1,12 @@
 {
   "name": "radim-chatbot",
-  "private": true
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:kb": "node scripts/build_kb.js"
+  },
+  "dependencies": {
+    "cheerio": "^1.0.0-rc.12",
+    "pdf-parse": "^1.1.1"
+  }
 }
