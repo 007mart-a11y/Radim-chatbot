@@ -2,190 +2,108 @@
 <html lang="cs">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Virtuální asistent obce Radim</title>
-
   <style>
     body {
-      margin: 0;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+      font-family: Arial, sans-serif;
       background: #0b1220;
-      color: #fff;
+      color: white;
+      margin: 0;
+      padding: 0;
       display: flex;
       justify-content: center;
       align-items: center;
       height: 100vh;
     }
 
-    .chat-container {
-      width: 100%;
-      max-width: 420px;
-      height: 90vh;
-      background: #0f172a;
-      border-radius: 16px;
+    .chat {
+      width: 420px;
+      background: #111a2f;
+      border-radius: 12px;
+      padding: 16px;
       display: flex;
       flex-direction: column;
-      overflow: hidden;
-      box-shadow: 0 20px 50px rgba(0,0,0,.6);
+      gap: 10px;
     }
 
-    .chat-header {
-      padding: 16px;
-      font-weight: 600;
-      background: linear-gradient(135deg,#2563eb,#1e40af);
-      text-align: center;
-    }
-
-    .chat-messages {
+    .messages {
       flex: 1;
-      padding: 16px;
       overflow-y: auto;
+      font-size: 14px;
     }
 
-    .message {
-      margin-bottom: 12px;
-      max-width: 85%;
-      line-height: 1.4;
-      font-size: 14px;
-      padding: 10px 12px;
-      border-radius: 12px;
-      white-space: pre-wrap;
+    .msg {
+      margin-bottom: 8px;
+      padding: 8px 10px;
+      border-radius: 8px;
     }
 
     .user {
-      background: #22c55e;
-      color: #000;
-      margin-left: auto;
+      background: #1f6fff;
+      align-self: flex-end;
     }
 
     .bot {
-      background: #1e293b;
-      color: #e5e7eb;
-      margin-right: auto;
+      background: #1b8f3a;
+      align-self: flex-start;
     }
 
-    .chat-input {
-      display: flex;
-      padding: 12px;
-      gap: 8px;
-      background: #020617;
-    }
-
-    .chat-input input {
-      flex: 1;
+    input {
       padding: 10px;
       border-radius: 8px;
       border: none;
       outline: none;
-      font-size: 14px;
     }
 
-    .chat-input button {
-      padding: 10px 14px;
+    button {
+      padding: 10px;
       border-radius: 8px;
       border: none;
-      background: #22c55e;
-      font-weight: 600;
+      background: #00c853;
+      font-weight: bold;
       cursor: pointer;
-    }
-
-    .hint {
-      font-size: 12px;
-      opacity: 0.6;
-      padding: 8px 16px;
-      text-align: center;
     }
   </style>
 </head>
 <body>
 
-<div class="chat-container">
-  <div class="chat-header">
-    Virtuální asistent obce Radim
-  </div>
+<div class="chat">
+  <div class="messages" id="messages"></div>
 
-  <div class="chat-messages" id="messages">
-    <div class="message bot">
-      Ahoj 👋  
-      Jsem virtuální asistent obce Radim.  
-      Odpovídám pouze z oficiálních informací obce.  
-      Pokud něco nenajdu, pošlu ti přímý odkaz na web.
-    </div>
-  </div>
-
-  <div class="hint">
-    Příklad: „úřední hodiny“, „kde najdu územní plán“
-  </div>
-
-  <div class="chat-input">
-    <input id="input" type="text" placeholder="Napiš dotaz…" />
-    <button onclick="sendMessage()">Odeslat</button>
-  </div>
+  <input id="question" placeholder="Napište dotaz (např. úřední hodiny)" />
+  <button onclick="send()">Odeslat</button>
 </div>
 
 <script>
-const KB = {
-  uredni_hodiny: {
-    keywords: ["úřední hodiny", "hodiny úřadu", "kdy má otevřeno", "otevírací doba"],
-    answer:
-`Úřední hodiny obecního úřadu Radim jsou obvykle:
+  const messages = document.getElementById("messages");
+  const input = document.getElementById("question");
 
-📅 Pondělí: 8:00–12:00, 13:00–17:00
-📅 Středa: 8:00–12:00, 13:00–17:00
-
-⚠️ Doporučuji ověřit aktuální stav na oficiální stránce obce.`,
-    link: "https://www.obec-radim.cz"
-  },
-
-  uzemni_plan: {
-    keywords: ["územní plán", "kde najdu územní plán", "uzemni plan"],
-    answer:
-`Územní plán obce Radim je zveřejněn na webu obce v sekci dokumenty.
-
-Pokud hledáš konkrétní výkres nebo textovou část, použij přímý odkaz níže.`,
-    link: "https://www.obec-radim.cz/uzemni-plan"
+  function addMessage(text, cls) {
+    const div = document.createElement("div");
+    div.className = "msg " + cls;
+    div.innerHTML = text;
+    messages.appendChild(div);
+    messages.scrollTop = messages.scrollHeight;
   }
-};
 
-function addMessage(text, type) {
-  const msg = document.createElement("div");
-  msg.className = "message " + type;
-  msg.textContent = text;
-  document.getElementById("messages").appendChild(msg);
-  document.getElementById("messages").scrollTop =
-    document.getElementById("messages").scrollHeight;
-}
+  async function send() {
+    const q = input.value.trim();
+    if (!q) return;
 
-function sendMessage() {
-  const input = document.getElementById("input");
-  const text = input.value.trim();
-  if (!text) return;
+    addMessage(q, "user");
+    input.value = "";
 
-  addMessage(text, "user");
-  input.value = "";
+    try {
+      const res = await fetch(
+        `/.netlify/functions/search?q=${encodeURIComponent(q)}`
+      );
+      const data = await res.json();
 
-  const lower = text.toLowerCase();
-  let found = false;
-
-  for (const key in KB) {
-    const item = KB[key];
-    if (item.keywords.some(k => lower.includes(k))) {
-      addMessage(item.answer + "\n\n🔗 " + item.link, "bot");
-      found = true;
-      break;
+      addMessage(data.answer || "Nemám odpověď.", "bot");
+    } catch (e) {
+      addMessage("Chyba při spojení se serverem.", "bot");
     }
   }
-
-  if (!found) {
-    addMessage(
-`Tuhle informaci nemám přesně ověřenou.
-
-👉 Doporučuji navštívit oficiální web obce Radim:
-🔗 https://www.obec-radim.cz`,
-      "bot"
-    );
-  }
-}
 </script>
 
 </body>
