@@ -2,108 +2,61 @@
 <html lang="cs">
 <head>
   <meta charset="UTF-8" />
-  <title>Virtuální asistent obce Radim</title>
+  <title>Asistent obce Radim</title>
   <style>
     body {
       font-family: Arial, sans-serif;
-      background: #0b1220;
-      color: white;
-      margin: 0;
-      padding: 0;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
+      background: #f4f4f4;
+      padding: 20px;
     }
-
-    .chat {
-      width: 420px;
-      background: #111a2f;
-      border-radius: 12px;
-      padding: 16px;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
+    #chat {
+      max-width: 600px;
+      margin: auto;
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
     }
-
-    .messages {
-      flex: 1;
-      overflow-y: auto;
-      font-size: 14px;
+    #messages {
+      min-height: 200px;
+      margin-bottom: 10px;
     }
-
     .msg {
-      margin-bottom: 8px;
-      padding: 8px 10px;
-      border-radius: 8px;
+      margin-bottom: 10px;
     }
-
     .user {
-      background: #1f6fff;
-      align-self: flex-end;
-    }
-
-    .bot {
-      background: #1b8f3a;
-      align-self: flex-start;
-    }
-
-    input {
-      padding: 10px;
-      border-radius: 8px;
-      border: none;
-      outline: none;
-    }
-
-    button {
-      padding: 10px;
-      border-radius: 8px;
-      border: none;
-      background: #00c853;
       font-weight: bold;
-      cursor: pointer;
     }
   </style>
 </head>
 <body>
 
-<div class="chat">
-  <div class="messages" id="messages"></div>
-
-  <input id="question" placeholder="Napište dotaz (např. úřední hodiny)" />
+<div id="chat">
+  <h2>Asistent obce Radim</h2>
+  <div id="messages"></div>
+  <input id="input" type="text" placeholder="Zeptejte se..." style="width: 100%;" />
   <button onclick="send()">Odeslat</button>
 </div>
 
 <script>
+async function send() {
+  const input = document.getElementById("input");
   const messages = document.getElementById("messages");
-  const input = document.getElementById("question");
+  const question = input.value.trim();
+  if (!question) return;
 
-  function addMessage(text, cls) {
-    const div = document.createElement("div");
-    div.className = "msg " + cls;
-    div.innerHTML = text;
-    messages.appendChild(div);
-    messages.scrollTop = messages.scrollHeight;
-  }
+  messages.innerHTML += `<div class="msg"><span class="user">Vy:</span> ${question}</div>`;
+  input.value = "";
 
-  async function send() {
-    const q = input.value.trim();
-    if (!q) return;
+  const res = await fetch("/.netlify/functions/search", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ question })
+  });
 
-    addMessage(q, "user");
-    input.value = "";
+  const data = await res.json();
 
-    try {
-      const res = await fetch(
-        `/.netlify/functions/search?q=${encodeURIComponent(q)}`
-      );
-      const data = await res.json();
-
-      addMessage(data.answer || "Nemám odpověď.", "bot");
-    } catch (e) {
-      addMessage("Chyba při spojení se serverem.", "bot");
-    }
-  }
+  messages.innerHTML += `<div class="msg"><span class="user">Radim:</span> ${data.answer || data.error}</div>`;
+}
 </script>
 
 </body>
