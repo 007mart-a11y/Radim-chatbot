@@ -1,51 +1,53 @@
-import OpenAI from "openai";
+const OpenAI = require("openai");
 
 const client = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
+  apiKey: process.env.OPENAI_API_KEY,
 });
 
-export default async (req) => {
+exports.handler = async (event) => {
   try {
-    const body = JSON.parse(req.body || "{}");
+    if (event.httpMethod !== "POST") {
+      return {
+        statusCode: 405,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reply: "Použij POST." }),
+      };
+    }
+
+    const body = JSON.parse(event.body || "{}");
     const userMessage = body.message;
 
     if (!userMessage) {
-      return new Response(
-        JSON.stringify({ reply: "Chybí dotaz." }),
-        { status: 400 }
-      );
+      return {
+        statusCode: 400,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reply: "Chybí dotaz (message)." }),
+      };
     }
 
-    const response = await client.responses.create({
+    const r = await client.responses.create({
       model: "gpt-4.1-mini",
       input: [
-        {
-          role: "system",
-          content: "Jsi oficiální asistent obce Radim. Odpovídej stručně, věcně a česky."
-        },
-        {
-          role: "user",
-          content: userMessage
-        }
-      ]
+        { role: "system", content: "Jsi oficiální asistent obce Radim. Odpovídej česky, věcně a stručně." },
+        { role: "user", content: userMessage },
+      ],
     });
 
-    const text =
-      response.output_text ||
-      "Omlouvám se, nenašel jsem odpověď.";
+    const text = r.output_text || "Omlouvám se, nenašel jsem odpověď.";
 
-    return new Response(
-      JSON.stringify({ reply: text }),
-      { headers: { "Content-Type": "application/json" } }
-    );
-
+    return {
+      statusCode: 200,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reply: text }),
+    };
   } catch (err) {
-    return new Response(
-      JSON.stringify({
+    return {
+      statusCode: 500,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
         reply: "Interní chyba serveru.",
-        error: err.message
+        error: err.message,
       }),
-      { status: 500 }
-    );
+    };
   }
-};
+}
