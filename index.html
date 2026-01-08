@@ -188,6 +188,51 @@ button.send{
   100%{transform:translateX(0)}
 }
 
+/* === LOADING + FEEDBACK (NOVÉ) === */
+.loading-bar{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:10px 12px;
+  margin:0 14px 10px 14px;
+  border-radius:12px;
+  background:rgba(0,0,0,0.05);
+  font-size:13px;
+  color:var(--muted);
+}
+.loading-bar .dot{
+  width:10px;height:10px;border-radius:50%;
+  background:currentColor;
+  animation:pulse 1s infinite;
+}
+@keyframes pulse{
+  0%,100%{opacity:.25; transform:scale(.9)}
+  50%{opacity:1; transform:scale(1.1)}
+}
+
+.feedback{
+  margin:0 14px 10px 14px;
+  padding:12px;
+  border-radius:14px;
+  background:rgba(0,0,0,0.04);
+  border:1px solid var(--border);
+  font-size:13px;
+  color:var(--text);
+}
+.feedback-q{ margin-bottom:10px; font-weight:600; }
+.feedback-actions{ display:flex; gap:8px; }
+.feedback-actions button{
+  padding:8px 10px;
+  border-radius:10px;
+  border:1px solid var(--border);
+  background:#fff;
+  cursor:pointer;
+  font-weight:600;
+}
+.feedback-actions button:hover{
+  border-color:#cbd5e1;
+}
+
 /* MOBILE */
 @media(max-width:480px){
   .chat-widget{right:12px;left:12px;bottom:12px;width:auto;height:80vh}
@@ -217,6 +262,20 @@ button.send{
 
   <div id="chat" class="chat"></div>
 
+  <!-- NOVÉ: loading + feedback -->
+  <div id="loadingBar" class="loading-bar" hidden>
+    <span class="dot"></span>
+    <span>Generuje se odpověď…</span>
+  </div>
+
+  <div id="feedbackBox" class="feedback" hidden>
+    <div class="feedback-q">Našli jste odpověď na otázku?</div>
+    <div class="feedback-actions">
+      <button type="button" id="feedbackYes">Ano</button>
+      <button type="button" id="feedbackNo">Ne</button>
+    </div>
+  </div>
+
   <div class="row">
     <input id="q" type="text" placeholder="Napište dotaz…" />
     <button id="send" class="send">›</button>
@@ -245,6 +304,19 @@ const widget=document.getElementById("widget");
 const fab=document.getElementById("fab");
 const hint=document.getElementById("radim-hint");
 
+// NOVÉ prvky
+const loadingBar=document.getElementById("loadingBar");
+const feedbackBox=document.getElementById("feedbackBox");
+const feedbackYes=document.getElementById("feedbackYes");
+const feedbackNo=document.getElementById("feedbackNo");
+
+// nastavení kontaktu (DOPLŇ)
+const OFFICE_PHONE = "DOPLŇ_TEL_NA_ÚŘAD";     // např. "+420 123 456 789"
+const OFFICE_EMAIL = "DOPLŇ_EMAIL_ÚŘADU";     // volitelné, klidně nechej prázdné
+
+let userQuestionCount = 0;       // kolik dotazů uživatel poslal
+let awaitingFeedback = false;    // aby se feedback nespustil víckrát najednou
+
 function openChat(){
   widget.style.display="flex";
   fab.style.display="none";
@@ -267,17 +339,64 @@ function linkify(t){
 function addMessage(who,text,cls){
   const d=document.createElement("div");
   d.className="msg "+cls;
-  d.innerHTML=`<strong>${who}:</strong> ${linkify(text.replace(/$begin:math:text$\\d\+\:\\d\+†source$end:math:text$/g,""))}`;
+  d.innerHTML=`<strong>${who}:</strong> ${linkify(text.replace(/\d+\:\d+†source/g,""))}`;
   chatEl.appendChild(d);
   chatEl.scrollTop=chatEl.scrollHeight;
 }
 
+function showLoading(on){
+  loadingBar.hidden = !on;
+  // když se zapne loading, schováme feedback (ať se nepřekrývá)
+  if(on) feedbackBox.hidden = true;
+  // držíme scroll u spodku
+  chatEl.scrollTop = chatEl.scrollHeight;
+}
+
+function showFeedback(){
+  if(userQuestionCount < 2) return;       // až po 2. dotazu
+  if(awaitingFeedback) return;            // už čekáme na feedback
+  awaitingFeedback = true;
+  feedbackBox.hidden = false;
+  chatEl.scrollTop = chatEl.scrollHeight;
+}
+
+function hideFeedback(){
+  feedbackBox.hidden = true;
+  awaitingFeedback = false;
+}
+
+feedbackYes.onclick = () => {
+  hideFeedback();
+  addMessage("Radim","Super 🙂 Jsem rád, že jsem pomohl. Kdykoliv se zeptejte znovu.","bot");
+};
+
+feedbackNo.onclick = () => {
+  hideFeedback();
+  let msg = "Mrzí mě to. Zkuste prosím dotaz upřesnit (např. místo, termín, název dokumentu).\n\n";
+  msg += "Je možné, že tato informace není dostupná na webu obce. V takovém případě doporučuji obrátit se přímo na obecní úřad.";
+  if(OFFICE_PHONE && !OFFICE_PHONE.includes("DOPLŇ")){
+    msg += `\nTelefon: ${OFFICE_PHONE}`;
+  }
+  if(OFFICE_EMAIL && !OFFICE_EMAIL.includes("DOPLŇ")){
+    msg += `\nE-mail: ${OFFICE_EMAIL}`;
+  }
+  addMessage("Radim",msg,"bot");
+};
+
 async function ask(){
   const q=input.value.trim();
   if(!q) return;
+
+  // NOVÉ: při novém dotazu schovej feedback (pokud visí)
+  feedbackBox.hidden = true;
+
   addMessage("Vy",q,"me");
   input.value="";
   send.disabled=true;
+  userQuestionCount++;
+
+  // NOVÉ: ukaž loading lištu
+  showLoading(true);
 
   try{
     const r=await fetch("/.netlify/functions/search",{
@@ -287,9 +406,15 @@ async function ask(){
     });
     const j=await r.json();
     addMessage("Radim",j.answer||"Bez odpovědi","bot");
+
+    // NOVÉ: po odpovědi (od 2. dotazu) ukaž feedback lištu
+    showFeedback();
+
   }catch(e){
     addMessage("Radim","Chyba spojení.","bot");
   }finally{
+    // NOVÉ: schovej loading
+    showLoading(false);
     send.disabled=false;
   }
 }
