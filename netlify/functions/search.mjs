@@ -28,7 +28,9 @@ export default async function handler(request, context) {
       return json({ ok: false, error: "Use POST" }, 405);
     }
 
-    const { query } = await request.json().catch(() => ({}));
+    const body = await request.json().catch(() => ({}));
+    const query = body?.query;
+
     if (!query || typeof query !== "string") {
       return json({ ok: false, error: "Missing 'query' (string) in JSON body." }, 400);
     }
@@ -55,11 +57,11 @@ export default async function handler(request, context) {
       assistant_id: assistantId,
     });
 
-    // 4) Poll run status
+    // 4) Poll run status (max ~30s)
     let status = run.status;
     let lastError = null;
 
-    for (let i = 0; i < 60; i++) { // ~60 * 500ms = 30s max
+    for (let i = 0; i < 60; i++) {
       const r = await client.beta.threads.runs.retrieve(thread.id, run.id);
       status = r.status;
       lastError = r.last_error ?? null;
@@ -82,19 +84,22 @@ export default async function handler(request, context) {
       );
     }
 
-    // 5) Read last assistant message
+    // 5) Read messages and extract assistant text safely
     const msgs = await client.beta.threads.messages.list(thread.id, { limit: 20 });
     const assistantMsg = msgs.data.find((m) => m.role === "assistant");
 
-    const text =
-      assistantMsg?.content
-        ?.map((c) => (c.type === "text" ? c.text.value : ""))
-        .join("\n")
-        .trim() || "";
+    let text = "";
+    if (assistantMsg && Array.isArray(assistantMsg.content)) {
+      for (const part of assistantMsg.content) {
+        if (part?.type === "text" && part?.text?.value) {
+          text += part.text.value + "\n";
+        }
+      }
+    }
+    text = text.trim();
 
     return json({ ok: true, answer: text });
   } catch (err) {
-    // Vždy vrať validní JSON
     return json(
       {
         ok: false,
