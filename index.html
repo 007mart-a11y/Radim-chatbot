@@ -7,522 +7,248 @@
 
 <style>
 :root{
-  --bg: #f4f6fb;
-  --card: #ffffff;
-  --text: #0f172a;
-  --muted: #475569;
-  --border: #e5e7eb;
-
-  --brand: #1e3a8a;      /* hlavní modrá */
-  --brand-2:#1d4ed8;     /* akcent */
-  --me: #dbeafe;         /* bublina uživatele */
-  --bot: #ffffff;        /* bublina bota */
-  --shadow: 0 18px 50px rgba(2, 6, 23, .16);
+  --bg:#f4f6fb;
+  --card:#ffffff;
+  --text:#0f172a;
+  --muted:#475569;
+  --border:#e5e7eb;
+  --brand:#1e3a8a;
+  --brand-2:#1d4ed8;
+  --me:#dbeafe;
+  --shadow:0 18px 50px rgba(2,6,23,.16);
 }
 
-*{ box-sizing:border-box; }
-body{
-  margin:0;
-  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-  background: transparent;
-  color: var(--text);
-}
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:transparent}
 
 /* === WIDGET === */
 .chat-widget{
-  position: fixed;
-  right: 24px;
-  bottom: 24px;
-
-  width: 380px;
-  height: 600px;
-
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 18px;
-  box-shadow: var(--shadow);
-
+  position:fixed;
+  right:24px;
+  bottom:24px;
+  width:380px;
+  height:600px;
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:18px;
+  box-shadow:var(--shadow);
   display:flex;
   flex-direction:column;
   overflow:hidden;
   z-index:9999;
-
-  transform-origin: bottom right;
-  transition: height .22s ease, width .22s ease, transform .22s ease;
-}
-
-/* collapsed = jen hlavička */
-.chat-widget.collapsed{
-  height: 56px;
-  width: 240px;
 }
 
 /* HLAVIČKA */
 .chat-header{
-  padding: 12px 14px;
-  background: linear-gradient(135deg, var(--brand), #15306f);
+  padding:12px 14px;
+  background:linear-gradient(135deg,var(--brand),#15306f);
   color:#fff;
   cursor:pointer;
-  user-select:none;
   display:flex;
-  align-items:center;
   justify-content:space-between;
-  gap:10px;
-}
-
-.header-left{
-  display:flex;
   align-items:center;
-  gap:10px;
-  min-width:0;
 }
 
-.brandmark{
-  width: 34px;
-  height: 34px;
-  border-radius: 10px;
-  background: rgba(255,255,255,.14);
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  font-size: 18px;
-}
+.header-left{display:flex;gap:10px;align-items:center}
+.brandmark{width:34px;height:34px;border-radius:10px;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;font-size:18px}
+.header-title{font-weight:700;font-size:15px}
+.header-sub{font-size:11px;opacity:.85}
 
-.header-titles{
-  display:flex;
-  flex-direction:column;
-  line-height:1.1;
-  min-width:0;
-}
+.header-right{display:flex;align-items:center;gap:10px}
+.chip{font-size:11px;padding:4px 8px;border-radius:999px;background:rgba(255,255,255,.15)}
+.toggle{font-size:18px}
 
-.header-title{
-  font-weight: 750;
-  font-size: 14.5px;
-  white-space:nowrap;
-  overflow:hidden;
-  text-overflow:ellipsis;
-}
-
-.header-subtitle{
-  font-size: 11.5px;
-  opacity: .85;
-  white-space:nowrap;
-  overflow:hidden;
-  text-overflow:ellipsis;
-}
-
-.header-right{
-  display:flex;
-  align-items:center;
-  gap:10px;
-}
-
-.chip{
-  font-size: 11px;
-  padding: 4px 8px;
-  border-radius: 999px;
-  background: rgba(255,255,255,.14);
-  border: 1px solid rgba(255,255,255,.18);
-  display:flex;
-  align-items:center;
-  gap:6px;
-}
-.dot{
-  width:7px;height:7px;border-radius:50%;
-  background:#34d399;
-  box-shadow: 0 0 0 3px rgba(52,211,153,.18);
-}
-
-.toggle{
-  font-size: 18px;
-  opacity:.95;
-}
-
-/* tělo chatu */
+/* CHAT */
 .chat{
+  flex:1;
+  padding:14px;
+  background:var(--bg);
+  overflow-y:auto;
   display:flex;
   flex-direction:column;
   gap:10px;
-  padding: 14px;
-  overflow-y:auto;
-  flex:1;
-  background: var(--bg);
 }
 
-/* hezčí scrollbar (jen webkit) */
-.chat::-webkit-scrollbar{ width:10px; }
-.chat::-webkit-scrollbar-thumb{
-  background: rgba(15,23,42,.12);
-  border-radius: 999px;
-  border: 2px solid rgba(244,246,251,1);
-}
-
-/* bubliny */
+/* ZPRÁVY */
 .msg{
-  max-width: 86%;
-  padding: 10px 12px;
-  border-radius: 14px;
-  font-size: 14px;
-  line-height: 1.45;
-  white-space: pre-wrap;
-  pointer-events:auto;
-  position:relative;
+  max-width:86%;
+  padding:10px 12px;
+  border-radius:14px;
+  font-size:14px;
+  line-height:1.45;
+  white-space:pre-wrap;
 }
 
-.msg strong{ font-weight: 700; }
-
-.msg a{
-  color: var(--brand-2);
-  text-decoration: underline;
-  pointer-events:auto;
-  cursor:pointer;
-  word-break: break-word;
-}
-
-/* user */
 .me{
-  background: var(--me);
   align-self:flex-end;
-  border-bottom-right-radius: 6px;
-  box-shadow: 0 6px 14px rgba(2,6,23,.06);
+  background:var(--me);
+  border-bottom-right-radius:6px;
 }
 
-/* bot */
 .bot{
-  background: var(--bot);
-  border: 1px solid var(--border);
   align-self:flex-start;
-  border-bottom-left-radius: 6px;
-  box-shadow: 0 10px 24px rgba(2,6,23,.07);
+  background:#fff;
+  border:1px solid var(--border);
+  border-bottom-left-radius:6px;
 }
 
-/* poznámka */
+.msg a{color:var(--brand-2);word-break:break-word}
+
+/* POZNÁMKA */
 .ai-note{
-  font-size: 11.5px;
-  color: #854d0e;
-  background: #fef3c7;
-  border: 1px solid #fde68a;
-  border-radius: 12px;
-  padding: 10px 12px;
+  font-size:11.5px;
+  background:#fef3c7;
+  border:1px solid #fde68a;
+  color:#92400e;
+  border-radius:12px;
+  padding:10px 12px;
 }
 
-/* feedback */
-.feedback{
-  display:flex;
-  gap:8px;
-  margin-top: 8px;
-}
-
-.feedback button{
-  flex:1;
-  font-size: 13px;
-  padding: 8px;
-  border-radius: 12px;
-  border: 1px solid #c7d2fe;
-  background: #eef2ff;
-  cursor:pointer;
-  transition: transform .06s ease, background .12s ease;
-}
-.feedback button:active{ transform: scale(.98); }
-.feedback button.clicked{
-  background: var(--brand);
-  border-color: rgba(255,255,255,.25);
-  color:#fff;
-}
-
-/* input řádek */
+/* INPUT */
 .row{
   display:flex;
-  border-top: 1px solid var(--border);
-  background: #fff;
-  padding: 10px;
-  gap: 8px;
+  gap:8px;
+  padding:10px;
+  border-top:1px solid var(--border);
 }
 
 input{
   flex:1;
-  padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  font-size: 14px;
-  outline:none;
-  background:#fff;
-}
-input:focus{
-  border-color: rgba(29,78,216,.55);
-  box-shadow: 0 0 0 4px rgba(29,78,216,.12);
+  padding:10px 12px;
+  border-radius:12px;
+  border:1px solid var(--border);
+  font-size:14px;
 }
 
 button.send{
-  width: 44px;
-  border: 0;
-  border-radius: 12px;
-  background: var(--brand);
+  width:44px;
+  border:0;
+  border-radius:12px;
+  background:var(--brand);
   color:#fff;
-  font-weight: 800;
+  font-weight:700;
   cursor:pointer;
-  transition: transform .06s ease, background .12s ease;
-}
-button.send:hover{ background:#15306f; }
-button.send:active{ transform: scale(.98); }
-button:disabled{ opacity:.6; cursor:not-allowed; }
-
-/* typing */
-.typing{
-  font-size: 13px;
-  color: var(--muted);
-  background: #ffffff;
-  border: 1px dashed #cbd5e1;
-  align-self:flex-start;
-}
-.dots{
-  display:inline-flex;
-  gap:4px;
-  margin-left: 6px;
-  vertical-align: middle;
-}
-.dots span{
-  width:6px;height:6px;border-radius:50%;
-  background: rgba(71,85,105,.55);
-  animation: bounce 1.1s infinite ease-in-out;
-}
-.dots span:nth-child(2){ animation-delay: .12s; }
-.dots span:nth-child(3){ animation-delay: .24s; }
-@keyframes bounce{
-  0%, 80%, 100%{ transform: translateY(0); opacity:.55; }
-  40%{ transform: translateY(-4px); opacity:1; }
 }
 
-/* collapsed schová tělo + input */
-.chat-widget.collapsed .chat,
-.chat-widget.collapsed .row{
-  display:none;
+/* === FLOATING BUBBLE === */
+.radim-fab{
+  position:fixed;
+  right:24px;
+  bottom:24px;
+  width:58px;
+  height:58px;
+  border-radius:999px;
+  border:0;
+  cursor:pointer;
+  background:linear-gradient(135deg,var(--brand),#15306f);
+  color:#fff;
+  box-shadow:var(--shadow);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  z-index:10000;
 }
 
-/* mobil: skoro fullscreen */
-@media (max-width: 480px){
-  .chat-widget{
-    right: 12px;
-    left: 12px;
-    bottom: 12px;
-    width: auto;
-    height: 78vh;
-    border-radius: 18px;
-  }
-  .chat-widget.collapsed{
-    height: 56px;
-    width: auto;
-  }
+.radim-fab span{font-size:20px}
+
+/* MOBILE */
+@media(max-width:480px){
+  .chat-widget{right:12px;left:12px;bottom:12px;width:auto;height:80vh}
+  .radim-fab{right:12px;bottom:12px}
 }
 </style>
 </head>
 
 <body>
 
-<div id="widget" class="chat-widget">
-  <div class="chat-header" onclick="toggleWidget()">
+<!-- CHAT -->
+<div id="widget" class="chat-widget" style="display:none">
+  <div class="chat-header" onclick="closeChat()">
     <div class="header-left">
       <div class="brandmark">🏛️</div>
-      <div class="header-titles">
+      <div>
         <div class="header-title">Asistent obce Radim</div>
-        <div class="header-subtitle">Informace z oficiálního webu</div>
+        <div class="header-sub">Oficiální informace</div>
       </div>
     </div>
-
     <div class="header-right">
-      <div class="chip"><span class="dot"></span>Online</div>
-      <span id="arrow" class="toggle">⌄</span>
+      <div class="chip">Online</div>
+      <span class="toggle">⌄</span>
     </div>
   </div>
 
   <div id="chat" class="chat"></div>
 
   <div class="row">
-    <input id="q" type="text" placeholder="Napište dotaz…" autocomplete="off" />
-    <button id="send" class="send" aria-label="Odeslat">›</button>
+    <input id="q" type="text" placeholder="Napište dotaz…" />
+    <button id="send" class="send">›</button>
   </div>
 </div>
 
+<!-- BUBBLE -->
+<button id="fab" class="radim-fab" onclick="openChat()">
+  <span>🏛️</span>
+</button>
+
 <script>
-const chatEl = document.getElementById("chat");
-const inputEl = document.getElementById("q");
-const sendBtn = document.getElementById("send");
-const widget = document.getElementById("widget");
-const arrow = document.getElementById("arrow");
+const chatEl=document.getElementById("chat");
+const input=document.getElementById("q");
+const send=document.getElementById("send");
+const widget=document.getElementById("widget");
+const fab=document.getElementById("fab");
 
-let aiNoteShown = false;
-let questionCount = 0;
-let feedbackShown = false;
-let typingEl = null;
-
-function toggleWidget() {
-  widget.classList.toggle("collapsed");
-  arrow.textContent = widget.classList.contains("collapsed") ? "⌃" : "⌄";
-  if (!widget.classList.contains("collapsed")) {
-    setTimeout(() => inputEl.focus(), 80);
-  }
+function openChat(){
+  widget.style.display="flex";
+  fab.style.display="none";
+  setTimeout(()=>input.focus(),100);
+}
+function closeChat(){
+  widget.style.display="none";
+  fab.style.display="flex";
 }
 
-/* ochrana proti HTML + převod URL na <a> */
-function escapeHtml(s) {
-  return String(s)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g,m=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;" }[m]));
+}
+function linkify(t){
+  const s=escapeHtml(t);
+  return s.replace(/(https?:\/\/[^\s]+)/g,u=>`<a href="${u}" target="_blank">${u}</a>`);
+}
+function addMessage(who,text,cls){
+  const d=document.createElement("div");
+  d.className="msg "+cls;
+  d.innerHTML=`<strong>${who}:</strong> ${linkify(text.replace(/$begin:math:text$\\d\+\:\\d\+†source$end:math:text$/g,""))}`;
+  chatEl.appendChild(d);
+  chatEl.scrollTop=chatEl.scrollHeight;
 }
 
-function linkify(text) {
-  const safe = escapeHtml(text);
-  const urlRegex = /(https?:\/\/[^\s]+)/g;
-  return safe.replace(urlRegex, (url) =>
-    `<a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>`
-  );
-}
+async function ask(){
+  const q=input.value.trim();
+  if(!q) return;
+  addMessage("Vy",q,"me");
+  input.value="";
+  send.disabled=true;
 
-/* odstraní interní citace typu (4:3†source) */
-function stripInternalCitations(text){
-  return String(text).replace(/\(\d+:\d+†source\)/g, "").replace(/\s{2,}/g," ").trim();
-}
-
-function addMessage(who, text, cls) {
-  const div = document.createElement("div");
-  div.className = "msg " + cls;
-
-  const safeWho = escapeHtml(who);
-  const cleaned = stripInternalCitations(text);
-
-  div.innerHTML = `<strong>${safeWho}:</strong> ${linkify(cleaned)}`;
-
-  chatEl.appendChild(div);
-  chatEl.scrollTop = chatEl.scrollHeight;
-}
-
-function addAiNoteOnce() {
-  if (aiNoteShown) return;
-  aiNoteShown = true;
-
-  const div = document.createElement("div");
-  div.className = "ai-note";
-  div.textContent =
-    "Upozornění: Odpovědi jsou generovány umělou inteligencí a mají informativní charakter. Pro oficiální a závazné informace doporučujeme ověřit údaje na webu obce Radim.";
-  chatEl.appendChild(div);
-  chatEl.scrollTop = chatEl.scrollHeight;
-}
-
-/* typing */
-function showTyping() {
-  if (typingEl) return;
-  typingEl = document.createElement("div");
-  typingEl.className = "msg bot typing";
-  typingEl.innerHTML = `
-    <strong>Radim:</strong> Hledám odpověď
-    <span class="dots"><span></span><span></span><span></span></span>
-  `;
-  chatEl.appendChild(typingEl);
-  chatEl.scrollTop = chatEl.scrollHeight;
-}
-function hideTyping() {
-  if (!typingEl) return;
-  typingEl.remove();
-  typingEl = null;
-}
-
-function addFeedbackOnce() {
-  if (feedbackShown) return;
-  feedbackShown = true;
-
-  const label = document.createElement("div");
-  label.className = "ai-note";
-  label.textContent = "Vyřešili jste svůj dotaz?";
-
-  const wrap = document.createElement("div");
-  wrap.className = "feedback";
-
-  const yes = document.createElement("button");
-  const no = document.createElement("button");
-
-  yes.textContent = "Ano";
-  no.textContent = "Ne";
-
-  yes.onclick = () => {
-    yes.classList.add("clicked");
-    no.disabled = true;
-    yes.disabled = true;
-    addMessage("Radim", "Jsem rád, že jsem pomohl. Pokud budete potřebovat ještě něco dalšího, jsem vám k dispozici.", "bot");
-  };
-
-  no.onclick = () => {
-    no.classList.add("clicked");
-    yes.disabled = true;
-    no.disabled = true;
-    addMessage("Radim", "Mrzí mě, že se dotaz nepovedlo vyřešit. Můžete ho prosím upřesnit (co přesně hledáte / jaká část chybí)?", "bot");
-  };
-
-  wrap.appendChild(yes);
-  wrap.appendChild(no);
-
-  chatEl.appendChild(label);
-  chatEl.appendChild(wrap);
-  chatEl.scrollTop = chatEl.scrollHeight;
-}
-
-async function ask() {
-  const query = inputEl.value.trim();
-  if (!query) return;
-
-  if (widget.classList.contains("collapsed")) toggleWidget();
-
-  addMessage("Vy", query, "me");
-  inputEl.value = "";
-  sendBtn.disabled = true;
-  questionCount++;
-
-  try {
-    addAiNoteOnce();
-    showTyping();
-
-    const res = await fetch("/.netlify/functions/search", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ message: query })
+  try{
+    const r=await fetch("/.netlify/functions/search",{
+      method:"POST",
+      headers:{ "content-type":"application/json" },
+      body:JSON.stringify({ message:q })
     });
-
-    const raw = await res.text();
-    let data;
-    try { data = JSON.parse(raw); }
-    catch { throw new Error("Server nevrátil JSON."); }
-
-    hideTyping();
-
-    if (!res.ok || !data.ok) {
-      addMessage("Radim", data?.error || "Chyba serveru", "bot");
-      return;
-    }
-
-    addMessage("Radim", data.answer || "(bez odpovědi)", "bot");
-
-    if (questionCount === 2) addFeedbackOnce();
-
-  } catch (e) {
-    hideTyping();
-    addMessage("Radim", "Chyba: " + e.message, "bot");
-  } finally {
-    sendBtn.disabled = false;
-    inputEl.focus();
+    const j=await r.json();
+    addMessage("Radim",j.answer||"Bez odpovědi","bot");
+  }catch(e){
+    addMessage("Radim","Chyba spojení.","bot");
+  }finally{
+    send.disabled=false;
   }
 }
+
+send.onclick=ask;
+input.addEventListener("keydown",e=>e.key==="Enter"&&ask());
 
 // init
-sendBtn.addEventListener("click", ask);
-inputEl.addEventListener("keydown", e => {
-  if (e.key === "Enter") ask();
-});
-
-// první zpráva
-addMessage("Radim", "Ahoj! Zeptej se mě na cokoliv ohledně obce Radim.", "bot");
-addAiNoteOnce();
+addMessage("Radim","Ahoj! Zeptej se mě na cokoliv ohledně obce Radim.","bot");
 </script>
 
 </body>
