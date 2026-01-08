@@ -63,6 +63,16 @@ body {
   font-size: 14px;
   line-height: 1.35;
   white-space: pre-wrap;
+
+  /* ✅ KLÍČOVÝ FIX – povolení klikání */
+  pointer-events: auto;
+}
+
+.msg a {
+  color: #1e40af;
+  text-decoration: underline;
+  pointer-events: auto;
+  cursor: pointer;
 }
 
 .me {
@@ -167,7 +177,10 @@ function toggleWidget() {
 function addMessage(who, text, cls) {
   const div = document.createElement("div");
   div.className = "msg " + cls;
-  div.textContent = `${who}: ${text}`;
+
+  /* ✅ umožní HTML → klikací odkazy */
+  div.innerHTML = `<strong>${who}:</strong> ${text}`;
+
   chatEl.appendChild(div);
   chatEl.scrollTop = chatEl.scrollHeight;
 }
