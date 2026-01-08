@@ -1,69 +1,104 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="cs">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Asistent obce Radim</title>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #f4f4f4;
-      padding: 20px;
-    }
-    #chat {
-      background: white;
-      padding: 15px;
-      border-radius: 5px;
-      max-width: 600px;
-      margin-bottom: 10px;
-    }
-    input {
-      width: 480px;
-      padding: 10px;
-    }
-    button {
-      padding: 10px;
-    }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 0; background: #f6f7f9; }
+    .wrap { max-width: 900px; margin: 0 auto; padding: 24px; }
+    h1 { margin: 0 0 16px; font-size: 44px; letter-spacing: -0.5px; }
+    .card { background: #fff; border: 1px solid #e7e9ee; border-radius: 14px; padding: 16px; box-shadow: 0 1px 2px rgba(0,0,0,.04); }
+    .chat { display: flex; flex-direction: column; gap: 10px; min-height: 220px; }
+    .msg { padding: 10px 12px; border-radius: 12px; border: 1px solid #e7e9ee; white-space: pre-wrap; }
+    .me { background: #eef6ff; align-self: flex-start; }
+    .bot { background: #f7f7f7; align-self: flex-start; }
+    .row { display: flex; gap: 10px; margin-top: 14px; }
+    input { flex: 1; padding: 12px 12px; border-radius: 12px; border: 1px solid #cfd6e4; font-size: 16px; }
+    button { padding: 12px 14px; border-radius: 12px; border: 0; background: #111827; color: #fff; font-weight: 600; cursor: pointer; }
+    button:disabled { opacity: .6; cursor: not-allowed; }
+    .hint { margin-top: 10px; color: #6b7280; font-size: 13px; }
   </style>
 </head>
 <body>
+  <div class="wrap">
+    <h1>Asistent obce Radim</h1>
 
-<h1>Asistent obce Radim</h1>
+    <div class="card">
+      <div id="chat" class="chat"></div>
 
-<div id="chat"></div>
+      <div class="row">
+        <input id="q" type="text" placeholder="Napište dotaz..." autocomplete="off" />
+        <button id="send">Odeslat</button>
+      </div>
 
-<form id="chat-form">
-  <input id="chat-input" placeholder="Napište dotaz..." />
-  <button type="submit">Odeslat</button>
-</form>
+      <div class="hint">
+        Tip: zkus „Kdy jsou úřední hodiny obce Radim?“
+      </div>
+    </div>
+  </div>
 
-<script>
-const form = document.getElementById("chat-form");
-const input = document.getElementById("chat-input");
-const chat = document.getElementById("chat");
+  <script>
+    const chatEl = document.getElementById("chat");
+    const inputEl = document.getElementById("q");
+    const sendBtn = document.getElementById("send");
 
-form.addEventListener("submit", async (e) => {
-  e.preventDefault();
+    function addMessage(who, text, cls) {
+      const div = document.createElement("div");
+      div.className = "msg " + cls;
+      div.textContent = `${who}: ${text}`;
+      chatEl.appendChild(div);
+      chatEl.scrollTop = chatEl.scrollHeight;
+    }
 
-  const question = input.value.trim();
-  if (!question) return;
+    async function ask() {
+      const query = inputEl.value.trim();
+      if (!query) return;
 
-  chat.innerHTML += `<p><strong>Vy:</strong> ${question}</p>`;
-  input.value = "";
+      addMessage("Vy", query, "me");
+      inputEl.value = "";
+      inputEl.focus();
 
-  try {
-    const res = await fetch("/.netlify/functions/search", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ question })
+      sendBtn.disabled = true;
+
+      try {
+        const res = await fetch("/.netlify/functions/search", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ query })
+        });
+
+        // vždy si přečteme odpověď jako text, a pak teprve JSON (kvůli debug)
+        const raw = await res.text();
+        let data;
+        try { data = JSON.parse(raw); }
+        catch {
+          throw new Error("Server nevrátil JSON: " + raw.slice(0, 200));
+        }
+
+        if (!res.ok || !data.ok) {
+          const msg = data?.error || `Chyba serveru (${res.status})`;
+          addMessage("Radim", msg, "bot");
+          return;
+        }
+
+        // ✅ TADY je ten fix: bereme data.answer (ne data.message / data.text)
+        addMessage("Radim", data.answer || "(prázdná odpověď)", "bot");
+
+      } catch (e) {
+        addMessage("Radim", "Chyba: " + (e?.message || e), "bot");
+      } finally {
+        sendBtn.disabled = false;
+      }
+    }
+
+    sendBtn.addEventListener("click", ask);
+    inputEl.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") ask();
     });
 
-    const data = await res.json();
-    chat.innerHTML += `<p><strong>Radim:</strong> ${data.answer}</p>`;
-  } catch (err) {
-    chat.innerHTML += `<p><strong>Radim:</strong> Chyba serveru</p>`;
-  }
-});
-</script>
-
+    // úvodní zpráva
+    addMessage("Radim", "Ahoj! Zeptej se mě na cokoliv ohledně obce Radim.", "bot");
+  </script>
 </body>
 </html>
