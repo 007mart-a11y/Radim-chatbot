@@ -58,17 +58,16 @@
       addMessage("Vy", query, "me");
       inputEl.value = "";
       inputEl.focus();
-
       sendBtn.disabled = true;
 
       try {
         const res = await fetch("/.netlify/functions/search", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ query })
+          // 🔴 KLÍČOVÝ FIX – backend čeká "message"
+          body: JSON.stringify({ message: query })
         });
 
-        // vždy si přečteme odpověď jako text, a pak teprve JSON (kvůli debug)
         const raw = await res.text();
         let data;
         try { data = JSON.parse(raw); }
@@ -77,12 +76,10 @@
         }
 
         if (!res.ok || !data.ok) {
-          const msg = data?.error || `Chyba serveru (${res.status})`;
-          addMessage("Radim", msg, "bot");
+          addMessage("Radim", data?.error || `Chyba serveru (${res.status})`, "bot");
           return;
         }
 
-        // ✅ TADY je ten fix: bereme data.answer (ne data.message / data.text)
         addMessage("Radim", data.answer || "(prázdná odpověď)", "bot");
 
       } catch (e) {
@@ -97,7 +94,6 @@
       if (e.key === "Enter") ask();
     });
 
-    // úvodní zpráva
     addMessage("Radim", "Ahoj! Zeptej se mě na cokoliv ohledně obce Radim.", "bot");
   </script>
 </body>
