@@ -13,64 +13,47 @@
     }
 
     .wrap {
-      max-width: 720px;
+      max-width: 900px;
       margin: 0 auto;
       padding: 24px;
     }
 
     h1 {
       margin: 0 0 16px;
-      font-size: 36px;
+      font-size: 44px;
     }
 
     .card {
-      position: relative;
       background: #fff;
-      border: 1px solid #e5e7eb;
+      border: 1px solid #e7e9ee;
       border-radius: 14px;
       padding: 16px;
       box-shadow: 0 1px 2px rgba(0,0,0,.04);
-    }
-
-    .logo {
-      position: absolute;
-      top: 12px;
-      right: 12px;
-      width: 48px;
-      height: auto;
-    }
-
-    .notice {
-      background: #fff7ed;
-      border: 1px solid #fed7aa;
-      border-radius: 10px;
-      padding: 10px 12px;
-      font-size: 13px;
-      color: #7c2d12;
-      margin-bottom: 12px;
     }
 
     .chat {
       display: flex;
       flex-direction: column;
       gap: 10px;
-      min-height: 200px;
+      min-height: 220px;
     }
 
     .msg {
       padding: 10px 12px;
       border-radius: 12px;
-      border: 1px solid #e5e7eb;
+      border: 1px solid #e7e9ee;
       white-space: pre-wrap;
-      max-width: 95%;
+      max-width: 85%;
     }
 
     .me {
       background: #eef6ff;
+      align-self: flex-start;
     }
 
     .bot {
-      background: #f9fafb;
+      background: #f7f7f7;
+      align-self: flex-start;
     }
 
     .row {
@@ -84,14 +67,14 @@
       padding: 12px;
       border-radius: 12px;
       border: 1px solid #cfd6e4;
-      font-size: 15px;
+      font-size: 16px;
     }
 
     button {
       padding: 12px 14px;
       border-radius: 12px;
       border: 0;
-      background: #1f2937;
+      background: #111827;
       color: #fff;
       font-weight: 600;
       cursor: pointer;
@@ -99,25 +82,40 @@
 
     button:disabled {
       opacity: .6;
-    }
-
-    .feedback {
-      margin-top: 12px;
-      padding: 10px;
-      border-top: 1px solid #e5e7eb;
-      font-size: 14px;
-    }
-
-    .feedback button {
-      background: #e5e7eb;
-      color: #111827;
-      margin-right: 8px;
+      cursor: not-allowed;
     }
 
     .hint {
       margin-top: 10px;
       color: #6b7280;
       font-size: 13px;
+    }
+
+    /* 🔵 FEEDBACK BOX */
+    .feedback {
+      border: 1px solid #c7d2fe;
+      background: #eef2ff;
+      border-radius: 12px;
+      padding: 12px;
+      margin-top: 6px;
+    }
+
+    .feedback-title {
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .feedback-buttons {
+      display: flex;
+      gap: 10px;
+    }
+
+    .feedback-buttons button {
+      background: #2563eb;
+    }
+
+    .feedback-buttons button.no {
+      background: #6b7280;
     }
   </style>
 </head>
@@ -127,26 +125,11 @@
     <h1>Asistent obce Radim</h1>
 
     <div class="card">
-      <!-- ERB OBCE -->
-      <img src="/erb-radim.png" alt="Erb obce Radim" class="logo">
-
-      <!-- AI UPOZORNĚNÍ (JEN JEDNOU) -->
-      <div class="notice">
-        Upozornění: Odpovědi jsou generovány pomocí umělé inteligence a mají pouze informativní charakter.
-        Důležité informace si vždy ověřte na oficiálních stránkách obce.
-      </div>
-
       <div id="chat" class="chat"></div>
 
       <div class="row">
         <input id="q" type="text" placeholder="Napište dotaz..." autocomplete="off" />
         <button id="send">Odeslat</button>
-      </div>
-
-      <div id="feedback" class="feedback" style="display:none;">
-        <strong>Vyřešili jste svůj dotaz?</strong><br><br>
-        <button onclick="hideFeedback()">Ano</button>
-        <button onclick="hideFeedback()">Ne</button>
       </div>
 
       <div class="hint">
@@ -159,13 +142,9 @@
     const chatEl = document.getElementById("chat");
     const inputEl = document.getElementById("q");
     const sendBtn = document.getElementById("send");
-    const feedbackEl = document.getElementById("feedback");
 
     let realQuestionCount = 0;
-
-    function isGreeting(text) {
-      return /^(ahoj|dobrý den|čau|nazdar)$/i.test(text.trim());
-    }
+    let feedbackShown = false;
 
     function addMessage(who, text, cls) {
       const div = document.createElement("div");
@@ -175,8 +154,30 @@
       chatEl.scrollTop = chatEl.scrollHeight;
     }
 
-    function hideFeedback() {
-      feedbackEl.style.display = "none";
+    function isRealQuestion(text) {
+      const t = text.toLowerCase();
+      if (t.length < 6) return false;
+      if (["ahoj", "dobrý den", "cau", "čau"].includes(t)) return false;
+      return true;
+    }
+
+    function showFeedback() {
+      if (feedbackShown) return;
+      feedbackShown = true;
+
+      const box = document.createElement("div");
+      box.className = "feedback";
+
+      box.innerHTML = `
+        <div class="feedback-title">Vyřešili jste svůj dotaz?</div>
+        <div class="feedback-buttons">
+          <button onclick="this.parentElement.parentElement.remove()">Ano</button>
+          <button class="no" onclick="this.parentElement.parentElement.remove()">Ne</button>
+        </div>
+      `;
+
+      chatEl.appendChild(box);
+      chatEl.scrollTop = chatEl.scrollHeight;
     }
 
     async function ask() {
@@ -187,7 +188,7 @@
       inputEl.value = "";
       sendBtn.disabled = true;
 
-      if (!isGreeting(query)) {
+      if (isRealQuestion(query)) {
         realQuestionCount++;
       }
 
@@ -198,25 +199,32 @@
           body: JSON.stringify({ message: query })
         });
 
-        const data = await res.json();
+        const raw = await res.text();
+        const data = JSON.parse(raw);
 
         addMessage("Radim", data.answer || "(bez odpovědi)", "bot");
 
-        if (realQuestionCount >= 2) {
-          feedbackEl.style.display = "block";
+        if (realQuestionCount === 2) {
+          showFeedback();
         }
 
       } catch (e) {
-        addMessage("Radim", "Chyba spojení se serverem.", "bot");
+        addMessage("Radim", "Chyba serveru.", "bot");
       } finally {
         sendBtn.disabled = false;
       }
     }
 
     sendBtn.addEventListener("click", ask);
-    inputEl.addEventListener("keydown", e => e.key === "Enter" && ask());
+    inputEl.addEventListener("keydown", e => {
+      if (e.key === "Enter") ask();
+    });
 
-    addMessage("Radim", "Ahoj! Zeptej se mě na cokoliv ohledně obce Radim.", "bot");
+    addMessage(
+      "Radim",
+      "Ahoj! Zeptej se mě na cokoliv ohledně obce Radim.\n\nUpozornění: Odpovědi jsou generovány umělou inteligencí a mají informativní charakter. Důležité informace si vždy ověřte na oficiálním webu obce.",
+      "bot"
+    );
   </script>
 </body>
 </html>
