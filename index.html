@@ -11,7 +11,7 @@ body {
   background: transparent;
 }
 
-/* === PLATNÝ CHAT WIDGET === */
+/* === WIDGET === */
 .chat-widget {
   position: fixed;
   right: 24px;
@@ -26,6 +26,12 @@ body {
   overflow: hidden;
   border: 1px solid #e5e7eb;
   z-index: 9999;
+  transition: height .25s ease, width .25s ease;
+}
+
+.chat-widget.collapsed {
+  height: 48px;
+  width: 220px;
 }
 
 .chat-header {
@@ -33,7 +39,15 @@ body {
   color: #fff;
   padding: 12px 14px;
   font-weight: 700;
-  font-size: 16px;
+  font-size: 15px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+}
+
+.toggle {
+  font-size: 18px;
 }
 
 .chat {
@@ -74,6 +88,27 @@ body {
   padding: 8px;
 }
 
+.feedback {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.feedback button {
+  flex: 1;
+  font-size: 13px;
+  padding: 6px;
+  border-radius: 8px;
+  border: 1px solid #c7d2fe;
+  background: #eef2ff;
+  cursor: pointer;
+}
+
+.feedback button.clicked {
+  background: #1e3a8a;
+  color: #fff;
+}
+
 .row {
   display: flex;
   border-top: 1px solid #e5e7eb;
@@ -87,7 +122,7 @@ input {
   outline: none;
 }
 
-button {
+button.send {
   padding: 0 14px;
   border: 0;
   background: #1e3a8a;
@@ -98,21 +133,23 @@ button {
 
 button:disabled {
   opacity: .6;
-  cursor: not-allowed;
 }
 </style>
 </head>
 
 <body>
 
-<div class="chat-widget">
-  <div class="chat-header">Asistent obce Radim</div>
+<div id="widget" class="chat-widget">
+  <div class="chat-header" onclick="toggleWidget()">
+    Asistent obce Radim
+    <span id="arrow" class="toggle">⌄</span>
+  </div>
 
   <div id="chat" class="chat"></div>
 
   <div class="row">
     <input id="q" type="text" placeholder="Napište dotaz…" autocomplete="off" />
-    <button id="send">›</button>
+    <button id="send" class="send">›</button>
   </div>
 </div>
 
@@ -120,6 +157,15 @@ button:disabled {
 const chatEl = document.getElementById("chat");
 const inputEl = document.getElementById("q");
 const sendBtn = document.getElementById("send");
+const widget = document.getElementById("widget");
+const arrow = document.getElementById("arrow");
+
+let aiNoteShown = false;
+
+function toggleWidget() {
+  widget.classList.toggle("collapsed");
+  arrow.textContent = widget.classList.contains("collapsed") ? "⌃" : "⌄";
+}
 
 function addMessage(who, text, cls) {
   const div = document.createElement("div");
@@ -129,12 +175,40 @@ function addMessage(who, text, cls) {
   chatEl.scrollTop = chatEl.scrollHeight;
 }
 
-function addAiNote() {
+function addAiNoteOnce() {
+  if (aiNoteShown) return;
+  aiNoteShown = true;
+
   const div = document.createElement("div");
   div.className = "ai-note";
   div.textContent =
-    "Upozornění: Odpověď je generována umělou inteligencí a má informativní charakter. Pro oficiální a závazné informace doporučujeme ověřit údaje na oficiálním webu obce Radim.";
+    "Upozornění: Odpovědi jsou generovány umělou inteligencí a mají informativní charakter. Pro oficiální a závazné informace doporučujeme ověřit údaje na webu obce Radim.";
   chatEl.appendChild(div);
+}
+
+function addFeedback() {
+  const wrap = document.createElement("div");
+  wrap.className = "feedback";
+
+  const yes = document.createElement("button");
+  const no = document.createElement("button");
+
+  yes.textContent = "Ano";
+  no.textContent = "Ne";
+
+  yes.onclick = () => {
+    yes.classList.add("clicked");
+    no.disabled = true;
+  };
+
+  no.onclick = () => {
+    no.classList.add("clicked");
+    yes.disabled = true;
+  };
+
+  wrap.appendChild(yes);
+  wrap.appendChild(no);
+  chatEl.appendChild(wrap);
 }
 
 async function ask() {
@@ -149,19 +223,19 @@ async function ask() {
     const res = await fetch("/.netlify/functions/search", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ message: query }) // ⚠️ ponecháno
+      body: JSON.stringify({ message: query })
     });
 
-    const raw = await res.text();
-    const data = JSON.parse(raw);
+    const data = JSON.parse(await res.text());
 
     if (!res.ok || !data.ok) {
       addMessage("Radim", data?.error || "Chyba serveru", "bot");
       return;
     }
 
+    addAiNoteOnce();
     addMessage("Radim", data.answer || "(bez odpovědi)", "bot");
-    addAiNote();
+    addFeedback();
 
   } catch (e) {
     addMessage("Radim", "Chyba: " + e.message, "bot");
@@ -173,9 +247,9 @@ async function ask() {
 sendBtn.addEventListener("click", ask);
 inputEl.addEventListener("keydown", e => e.key === "Enter" && ask());
 
-// úvodní zpráva
+// automaticky otevřeno
 addMessage("Radim", "Ahoj! Zeptej se mě na cokoliv ohledně obce Radim.", "bot");
-addAiNote();
+addAiNoteOnce();
 </script>
 
 </body>
