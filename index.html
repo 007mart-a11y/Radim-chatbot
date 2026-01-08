@@ -19,9 +19,13 @@
 }
 
 *{box-sizing:border-box}
-body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:transparent}
+body{
+  margin:0;
+  font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+  background:transparent;
+}
 
-/* === WIDGET === */
+/* === CHAT WIDGET === */
 .chat-widget{
   position:fixed;
   right:24px;
@@ -32,7 +36,7 @@ body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-ser
   border:1px solid var(--border);
   border-radius:18px;
   box-shadow:var(--shadow);
-  display:flex;
+  display:none;
   flex-direction:column;
   overflow:hidden;
   z-index:9999;
@@ -50,12 +54,22 @@ body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-ser
 }
 
 .header-left{display:flex;gap:10px;align-items:center}
-.brandmark{width:34px;height:34px;border-radius:10px;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;font-size:18px}
+.brandmark{
+  width:34px;height:34px;border-radius:10px;
+  background:rgba(255,255,255,.15);
+  display:flex;align-items:center;justify-content:center;
+  font-size:18px;
+}
 .header-title{font-weight:700;font-size:15px}
 .header-sub{font-size:11px;opacity:.85}
 
 .header-right{display:flex;align-items:center;gap:10px}
-.chip{font-size:11px;padding:4px 8px;border-radius:999px;background:rgba(255,255,255,.15)}
+.chip{
+  font-size:11px;
+  padding:4px 8px;
+  border-radius:999px;
+  background:rgba(255,255,255,.15);
+}
 .toggle{font-size:18px}
 
 /* CHAT */
@@ -78,31 +92,18 @@ body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-ser
   line-height:1.45;
   white-space:pre-wrap;
 }
-
 .me{
   align-self:flex-end;
   background:var(--me);
   border-bottom-right-radius:6px;
 }
-
 .bot{
   align-self:flex-start;
   background:#fff;
   border:1px solid var(--border);
   border-bottom-left-radius:6px;
 }
-
 .msg a{color:var(--brand-2);word-break:break-word}
-
-/* POZNÁMKA */
-.ai-note{
-  font-size:11.5px;
-  background:#fef3c7;
-  border:1px solid #fde68a;
-  color:#92400e;
-  border-radius:12px;
-  padding:10px 12px;
-}
 
 /* INPUT */
 .row{
@@ -111,7 +112,6 @@ body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-ser
   padding:10px;
   border-top:1px solid var(--border);
 }
-
 input{
   flex:1;
   padding:10px 12px;
@@ -119,7 +119,6 @@ input{
   border:1px solid var(--border);
   font-size:14px;
 }
-
 button.send{
   width:44px;
   border:0;
@@ -148,13 +147,52 @@ button.send{
   justify-content:center;
   z-index:10000;
 }
-
 .radim-fab span{font-size:20px}
+
+/* === NÁPOVĚDA U BUBLINY === */
+.radim-hint{
+  position:fixed;
+  right:96px;
+  bottom:36px;
+  display:flex;
+  align-items:center;
+  gap:10px;
+  z-index:10001;
+  animation:hintFloat 3s ease-in-out infinite;
+}
+.radim-hint-text{
+  background:#ffffff;
+  border:1px solid var(--border);
+  border-radius:14px;
+  padding:10px 14px;
+  font-size:13px;
+  line-height:1.3;
+  box-shadow:var(--shadow);
+  color:var(--text);
+  white-space:nowrap;
+}
+.radim-hint-arrow{
+  font-size:22px;
+  color:var(--brand);
+  animation:arrowPulse 1.4s ease-in-out infinite;
+}
+
+@keyframes hintFloat{
+  0%{transform:translateY(0)}
+  50%{transform:translateY(-6px)}
+  100%{transform:translateY(0)}
+}
+@keyframes arrowPulse{
+  0%{transform:translateX(0)}
+  50%{transform:translateX(6px)}
+  100%{transform:translateX(0)}
+}
 
 /* MOBILE */
 @media(max-width:480px){
   .chat-widget{right:12px;left:12px;bottom:12px;width:auto;height:80vh}
   .radim-fab{right:12px;bottom:12px}
+  .radim-hint{display:none}
 }
 </style>
 </head>
@@ -162,7 +200,7 @@ button.send{
 <body>
 
 <!-- CHAT -->
-<div id="widget" class="chat-widget" style="display:none">
+<div id="widget" class="chat-widget">
   <div class="chat-header" onclick="closeChat()">
     <div class="header-left">
       <div class="brandmark">🏛️</div>
@@ -185,10 +223,19 @@ button.send{
   </div>
 </div>
 
-<!-- BUBBLE -->
+<!-- BUBBLINA -->
 <button id="fab" class="radim-fab" onclick="openChat()">
   <span>🏛️</span>
 </button>
+
+<!-- NÁPOVĚDA -->
+<div id="radim-hint" class="radim-hint">
+  <div class="radim-hint-text">
+    Chcete se na něco zeptat?<br>
+    <strong>Klikněte na bublinu</strong>
+  </div>
+  <div class="radim-hint-arrow">➜</div>
+</div>
 
 <script>
 const chatEl=document.getElementById("chat");
@@ -196,15 +243,18 @@ const input=document.getElementById("q");
 const send=document.getElementById("send");
 const widget=document.getElementById("widget");
 const fab=document.getElementById("fab");
+const hint=document.getElementById("radim-hint");
 
 function openChat(){
   widget.style.display="flex";
   fab.style.display="none";
+  hint.style.display="none";
   setTimeout(()=>input.focus(),100);
 }
 function closeChat(){
   widget.style.display="none";
   fab.style.display="flex";
+  hint.style.display="flex";
 }
 
 function escapeHtml(s){
@@ -247,7 +297,7 @@ async function ask(){
 send.onclick=ask;
 input.addEventListener("keydown",e=>e.key==="Enter"&&ask());
 
-// init
+// INIT
 addMessage("Radim","Ahoj! Zeptej se mě na cokoliv ohledně obce Radim.","bot");
 </script>
 
