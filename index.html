@@ -25,6 +25,9 @@ body{
   background:transparent;
 }
 
+/* DŮLEŽITÉ: aby hidden opravdu schoval prvky (author CSS jinak přebije UA) */
+[hidden]{ display:none !important; }
+
 /* === CHAT WIDGET === */
 .chat-widget{
   position:fixed;
@@ -188,7 +191,7 @@ button.send{
   100%{transform:translateX(0)}
 }
 
-/* === LOADING + FEEDBACK (NOVÉ) === */
+/* === LOADING + FEEDBACK === */
 .loading-bar{
   display:flex;
   align-items:center;
@@ -262,12 +265,13 @@ button.send{
 
   <div id="chat" class="chat"></div>
 
-  <!-- NOVÉ: loading + feedback -->
+  <!-- Loading lišta -->
   <div id="loadingBar" class="loading-bar" hidden>
     <span class="dot"></span>
     <span>Generuje se odpověď…</span>
   </div>
 
+  <!-- Feedback lišta -->
   <div id="feedbackBox" class="feedback" hidden>
     <div class="feedback-q">Našli jste odpověď na otázku?</div>
     <div class="feedback-actions">
@@ -304,18 +308,17 @@ const widget=document.getElementById("widget");
 const fab=document.getElementById("fab");
 const hint=document.getElementById("radim-hint");
 
-// NOVÉ prvky
 const loadingBar=document.getElementById("loadingBar");
 const feedbackBox=document.getElementById("feedbackBox");
 const feedbackYes=document.getElementById("feedbackYes");
 const feedbackNo=document.getElementById("feedbackNo");
 
-// nastavení kontaktu (DOPLŇ)
-const OFFICE_PHONE = "DOPLŇ_TEL_NA_ÚŘAD";     // např. "+420 123 456 789"
-const OFFICE_EMAIL = "DOPLŇ_EMAIL_ÚŘADU";     // volitelné, klidně nechej prázdné
+// DOPLŇ kontakt na úřad
+const OFFICE_PHONE = "DOPLŇ_TEL_NA_ÚŘAD"; // např. "+420 123 456 789"
+const OFFICE_EMAIL = "";                  // volitelné
 
-let userQuestionCount = 0;       // kolik dotazů uživatel poslal
-let awaitingFeedback = false;    // aby se feedback nespustil víckrát najednou
+let userQuestionCount = 0;
+let awaitingFeedback = false;
 
 function openChat(){
   widget.style.display="flex";
@@ -346,15 +349,13 @@ function addMessage(who,text,cls){
 
 function showLoading(on){
   loadingBar.hidden = !on;
-  // když se zapne loading, schováme feedback (ať se nepřekrývá)
   if(on) feedbackBox.hidden = true;
-  // držíme scroll u spodku
   chatEl.scrollTop = chatEl.scrollHeight;
 }
 
 function showFeedback(){
-  if(userQuestionCount < 2) return;       // až po 2. dotazu
-  if(awaitingFeedback) return;            // už čekáme na feedback
+  if(userQuestionCount < 2) return;
+  if(awaitingFeedback) return;
   awaitingFeedback = true;
   feedbackBox.hidden = false;
   chatEl.scrollTop = chatEl.scrollHeight;
@@ -377,7 +378,7 @@ feedbackNo.onclick = () => {
   if(OFFICE_PHONE && !OFFICE_PHONE.includes("DOPLŇ")){
     msg += `\nTelefon: ${OFFICE_PHONE}`;
   }
-  if(OFFICE_EMAIL && !OFFICE_EMAIL.includes("DOPLŇ")){
+  if(OFFICE_EMAIL){
     msg += `\nE-mail: ${OFFICE_EMAIL}`;
   }
   addMessage("Radim",msg,"bot");
@@ -387,7 +388,6 @@ async function ask(){
   const q=input.value.trim();
   if(!q) return;
 
-  // NOVÉ: při novém dotazu schovej feedback (pokud visí)
   feedbackBox.hidden = true;
 
   addMessage("Vy",q,"me");
@@ -395,7 +395,6 @@ async function ask(){
   send.disabled=true;
   userQuestionCount++;
 
-  // NOVÉ: ukaž loading lištu
   showLoading(true);
 
   try{
@@ -406,14 +405,10 @@ async function ask(){
     });
     const j=await r.json();
     addMessage("Radim",j.answer||"Bez odpovědi","bot");
-
-    // NOVÉ: po odpovědi (od 2. dotazu) ukaž feedback lištu
     showFeedback();
-
   }catch(e){
     addMessage("Radim","Chyba spojení.","bot");
   }finally{
-    // NOVÉ: schovej loading
     showLoading(false);
     send.disabled=false;
   }
@@ -422,7 +417,12 @@ async function ask(){
 send.onclick=ask;
 input.addEventListener("keydown",e=>e.key==="Enter"&&ask());
 
-// INIT
+// INIT – disclaimer + uvítání
+addMessage(
+  "Radim",
+  "Upozornění:\nOdpovědi tohoto asistenta jsou generovány umělou inteligencí na základě dostupných informací.\nPrávně závazné a oficiální informace si vždy ověřte na oficiálním webu obce Radim nebo přímo na obecním úřadě.",
+  "bot"
+);
 addMessage("Radim","Ahoj! Zeptej se mě na cokoliv ohledně obce Radim.","bot");
 </script>
 
