@@ -1,20 +1,56 @@
 export default async function handler(req) {
-  console.log("METHOD:", req.method);
-
-  let rawBody;
   try {
-    rawBody = await req.text();
-  } catch (e) {
-    console.log("BODY READ ERROR", e);
+    if (req.method !== "POST") {
+      return new Response(
+        JSON.stringify({ ok: false, error: "Method not allowed" }),
+        { status: 405 }
+      );
+    }
+
+    const body = await req.json();
+
+    if (!body.message) {
+      return new Response(
+        JSON.stringify({ ok: false, error: "Missing message" }),
+        { status: 400 }
+      );
+    }
+
+    const response = await fetch("https://api.openai.com/v1/threads/runs", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`,
+        "Content-Type": "application/json",
+        "OpenAI-Beta": "assistants=v2"
+      },
+      body: JSON.stringify({
+        assistant_id: process.env.ASSISTANT_ID,
+        thread: {
+          messages: [
+            {
+              role: "user",
+              content: body.message
+            }
+          ]
+        }
+      })
+    });
+
+    const data = await response.json();
+
+    return new Response(
+      JSON.stringify({ ok: true, data }),
+      { status: 200 }
+    );
+
+  } catch (err) {
+    return new Response(
+      JSON.stringify({
+        ok: false,
+        error: "Server error",
+        details: err.message
+      }),
+      { status: 500 }
+    );
   }
-
-  console.log("RAW BODY:", rawBody);
-
-  let body = {};
-  try {
-    body = rawBody ? JSON.parse(rawBody) : {};
-  } catch (e) {
-    console.log("JSON PARSE ERROR", e);
-  }
-
-  console.log("PARSED BODY:", body);
+}
