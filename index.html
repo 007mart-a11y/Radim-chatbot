@@ -138,6 +138,29 @@ button.send {
 }
 
 button:disabled { opacity: .6; }
+
+/* ✅ “Radim píše…” */
+.typing {
+  font-size: 13px;
+  color: #334155;
+  background: #ffffff;
+  border: 1px dashed #cbd5e1;
+  align-self: flex-start;
+}
+.dots::after{
+  content: "";
+  display: inline-block;
+  width: 1.5em;
+  text-align: left;
+  animation: dots 1.2s steps(4, end) infinite;
+}
+@keyframes dots {
+  0%   { content: ""; }
+  25%  { content: "."; }
+  50%  { content: ".."; }
+  75%  { content: "..."; }
+  100% { content: ""; }
+}
 </style>
 </head>
 
@@ -168,6 +191,9 @@ let aiNoteShown = false;
 let questionCount = 0;
 let feedbackShown = false;
 
+// ✅ typing indikátor (bublina)
+let typingEl = null;
+
 function toggleWidget() {
   widget.classList.toggle("collapsed");
   arrow.textContent = widget.classList.contains("collapsed") ? "⌃" : "⌄";
@@ -195,10 +221,7 @@ function addMessage(who, text, cls) {
   const div = document.createElement("div");
   div.className = "msg " + cls;
 
-  // ✅ kdo je vždy jen text
   const safeWho = escapeHtml(who);
-
-  // ✅ obsah je text, ale URL se změní na <a>
   div.innerHTML = `<strong>${safeWho}:</strong> ${linkify(text)}`;
 
   chatEl.appendChild(div);
@@ -214,6 +237,22 @@ function addAiNoteOnce() {
   div.textContent =
     "Upozornění: Odpovědi jsou generovány umělou inteligencí a mají informativní charakter. Pro oficiální a závazné informace doporučujeme ověřit údaje na webu obce Radim.";
   chatEl.appendChild(div);
+}
+
+/* ✅ zobrazí / skryje “Radim píše…” */
+function showTyping() {
+  if (typingEl) return;
+  typingEl = document.createElement("div");
+  typingEl.className = "msg bot typing";
+  typingEl.innerHTML = `<strong>Radim:</strong> <span class="dots">Hledám odpověď</span>`;
+  chatEl.appendChild(typingEl);
+  chatEl.scrollTop = chatEl.scrollHeight;
+}
+
+function hideTyping() {
+  if (!typingEl) return;
+  typingEl.remove();
+  typingEl = null;
 }
 
 function addFeedbackOnce() {
@@ -236,11 +275,17 @@ function addFeedbackOnce() {
   yes.onclick = () => {
     yes.classList.add("clicked");
     no.disabled = true;
+    yes.disabled = true;
+
+    addMessage("Radim", "Jsem rád, že jsem pomohl. Pokud budete potřebovat ještě něco dalšího, jsem vám k dispozici.", "bot");
   };
 
   no.onclick = () => {
     no.classList.add("clicked");
     yes.disabled = true;
+    no.disabled = true;
+
+    addMessage("Radim", "Mrzí mě, že se dotaz nepovedlo vyřešit. Můžete ho prosím lépe specifikovat (co přesně hledáte / jaká část chybí)?", "bot");
   };
 
   wrap.appendChild(yes);
@@ -248,6 +293,7 @@ function addFeedbackOnce() {
 
   chatEl.appendChild(label);
   chatEl.appendChild(wrap);
+  chatEl.scrollTop = chatEl.scrollHeight;
 }
 
 async function ask() {
@@ -261,20 +307,27 @@ async function ask() {
   questionCount++;
 
   try {
+    addAiNoteOnce();
+    showTyping();
+
     const res = await fetch("/.netlify/functions/search", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ message: query })
     });
 
-    const data = JSON.parse(await res.text());
+    const raw = await res.text();
+    let data;
+    try { data = JSON.parse(raw); }
+    catch { throw new Error("Server nevrátil JSON."); }
 
     if (!res.ok || !data.ok) {
+      hideTyping();
       addMessage("Radim", data?.error || "Chyba serveru", "bot");
       return;
     }
 
-    addAiNoteOnce();
+    hideTyping();
     addMessage("Radim", data.answer || "(bez odpovědi)", "bot");
 
     if (questionCount === 2) {
@@ -282,6 +335,7 @@ async function ask() {
     }
 
   } catch (e) {
+    hideTyping();
     addMessage("Radim", "Chyba: " + e.message, "bot");
   } finally {
     sendBtn.disabled = false;
