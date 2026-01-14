@@ -9,9 +9,8 @@
 :root{
   --text:#0f172a;
   --muted:#475569;
-  --border:rgba(255,255,255,.22);
 
-  /* Brand */
+  /* Brand (Radim) */
   --brand:#1e3a8a;
   --brand2:#1d4ed8;
 
@@ -20,16 +19,6 @@
 
   --meBg: rgba(219,234,254,.92);
   --botBg: rgba(255,255,255,.88);
-
-  /* INPUT + BUTTON (NEW) */
-  --inputBg: rgba(8,12,20,.55);
-  --inputBorder: rgba(255,255,255,.18);
-  --inputText: rgba(255,255,255,.92);
-  --inputPlaceholder: rgba(255,255,255,.62);
-
-  --sendBg: rgba(29,78,216,.92);
-  --sendBgHover: rgba(29,78,216,1);
-  --sendBorder: rgba(255,255,255,.18);
 }
 
 *{box-sizing:border-box}
@@ -46,7 +35,7 @@ body{
 /* DŮLEŽITÉ: aby hidden opravdu schoval prvky */
 [hidden]{ display:none !important; }
 
-/* ====== BACKGROUND ====== */
+/* ====== BACKGROUND (Radim web screenshot) ====== */
 .bg{
   position:fixed; inset:0; z-index:0;
   background:
@@ -97,7 +86,7 @@ body{
 
 /* HEADER */
 .chat-header{
-  padding:12px 12px 10px;
+  padding:12px 12px;
   background: linear-gradient(135deg, rgba(30,58,138,.92), rgba(21,48,111,.88));
   color:#fff;
   cursor:pointer;
@@ -110,16 +99,12 @@ body{
 
 .header-left{display:flex;gap:10px;align-items:center;min-width:0}
 
-/* ✅ ERB bigger + aligned */
+/* ERB (větší + čistě v rohu modré hlavičky) */
 .brandmark{
-  width:44px;                 /* was 34 */
-  height:44px;                /* was 34 */
-  border-radius:14px;         /* nicer */
+  width:52px;height:52px;border-radius:16px;
   background:rgba(255,255,255,.14);
-  border:1px solid rgba(255,255,255,.18);
-  display:flex;
-  align-items:center;
-  justify-content:center;
+  border:1px solid rgba(255,255,255,.16);
+  display:flex;align-items:center;justify-content:center;
   overflow:hidden;
   flex:0 0 auto;
 }
@@ -128,18 +113,16 @@ body{
   height:100%;
   object-fit:contain;
   display:block;
-  padding:6px;                /* a bit larger inside */
+  padding:6px; /* aby se erb nedotýkal okrajů */
 }
 
-/* ✅ title only (no official info line) */
 .header-title{
   font-weight:950;
-  font-size:13px;
+  font-size:14px;
   white-space:nowrap;
   overflow:hidden;
-  text-overflow:ellipsis;
+  text-overflow:ellipsis
 }
-.header-sub{ display:none; }  /* ✅ removed */
 
 .header-right{display:flex;align-items:center;gap:8px;flex:0 0 auto}
 .chip{
@@ -151,7 +134,7 @@ body{
 }
 .toggle{font-size:18px;opacity:.9}
 
-/* CHAT AREA (transparent, bubbles are blocks) */
+/* CHAT AREA (transparent) */
 .chat{
   flex:1;
   padding:14px 12px 10px;
@@ -162,7 +145,7 @@ body{
   background: transparent;
 }
 
-/* Messages (blocks) */
+/* Messages */
 .msg{
   max-width: 86%;
   padding: 10px 12px;
@@ -193,6 +176,39 @@ body{
 .msg a{color:var(--brand2);word-break:break-word;text-decoration:none}
 .msg a:hover{text-decoration:underline}
 
+/* ===== Quick FAQ chips (jako demo) ===== */
+.quickbox{
+  margin: 0 12px 10px 12px;
+  padding: 12px;
+  border-radius: 16px;
+  background: rgba(255,255,255,.10);
+  border:1px solid rgba(255,255,255,.14);
+  backdrop-filter: blur(10px);
+}
+.quicktitle{
+  font-weight:950;
+  font-size:12px;
+  color: rgba(255,255,255,.92);
+  margin:0 0 10px 0;
+}
+.quickgrid{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+}
+.qbtn{
+  appearance:none;
+  border:1px solid rgba(255,255,255,.16);
+  background: rgba(0,0,0,.18);
+  color:#fff;
+  border-radius:999px;
+  padding:8px 10px;
+  font-size:12px;
+  font-weight:900;
+  cursor:pointer;
+}
+.qbtn:hover{ background: rgba(0,0,0,.26); }
+
 /* INPUT */
 .row{
   display:flex;
@@ -203,36 +219,38 @@ body{
   backdrop-filter: blur(10px);
 }
 
-/* ✅ darker input, readable */
+/* POLE PRO PSANÍ – tmavší, jasně viditelné */
 input{
   flex:1;
-  height:44px;
+  height:46px;
   padding:0 14px;
   border-radius:999px;
-  border:1px solid var(--inputBorder);
-  background: var(--inputBg);
-  color: var(--inputText);
+  border:1px solid rgba(255,255,255,.20);
+  background: rgba(0,0,0,.32);       /* tmavší než předtím */
+  color:#fff;
   font-size:16px; /* iOS zoom fix */
   outline:none;
-  box-shadow: inset 0 0 0 1px rgba(0,0,0,.10);
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,.08);
 }
-input::placeholder{color: var(--inputPlaceholder)}
+input::placeholder{color: rgba(255,255,255,.78)}
 
-/* ✅ send button clear & strong */
+/* TLACITKO POSLAT – výraznější */
 button.send{
   width:46px;
-  height:44px;
-  border:1px solid var(--sendBorder);
+  height:46px;
+  border:1px solid rgba(0,229,255,.24);
   border-radius:14px;
-  background: var(--sendBg);
+  background: linear-gradient(135deg, rgba(0,229,255,.22), rgba(29,78,216,.22));
   color:#fff;
   font-weight:950;
   cursor:pointer;
   display:flex;align-items:center;justify-content:center;
-  box-shadow: 0 12px 26px rgba(29,78,216,.28);
+  box-shadow: 0 10px 26px rgba(0,0,0,.22);
 }
-button.send:hover{ background: var(--sendBgHover); }
-button.send:disabled{opacity:.55;cursor:not-allowed; box-shadow:none}
+button.send:hover{
+  background: linear-gradient(135deg, rgba(0,229,255,.28), rgba(29,78,216,.26));
+}
+button.send:disabled{opacity:.55;cursor:not-allowed}
 
 /* ===== FLOATING TAB ===== */
 .radim-fab{
@@ -261,11 +279,8 @@ button.send:disabled{opacity:.55;cursor:not-allowed; box-shadow:none}
   0%,100%{ box-shadow: 0 18px 55px rgba(0,0,0,.45); }
   50%{ box-shadow: 0 18px 55px rgba(29,78,216,.32); }
 }
-
-/* ✅ bigger erb in tab too */
 .fabIcon{
-  width:42px; height:42px;     /* was 36 */
-  border-radius:16px;
+  width:38px;height:38px;border-radius:14px;
   background: rgba(255,255,255,.08);
   border:1px solid rgba(255,255,255,.14);
   display:flex;align-items:center;justify-content:center;
@@ -283,46 +298,7 @@ button.send:disabled{opacity:.55;cursor:not-allowed; box-shadow:none}
 .fabText .a{font-weight:950;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px}
 .fabText .b{font-size:11px;color:rgba(255,255,255,.72);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px}
 
-/* Hint (ponechávám, jak máš) */
-.radim-hint{
-  position:fixed;
-  right: 20px;
-  bottom: 86px;
-  z-index:10001;
-  display:flex;
-  align-items:center;
-  gap:10px;
-  animation:hintFloat 3s ease-in-out infinite;
-}
-.radim-hint-text{
-  background: rgba(255,255,255,.86);
-  border:1px solid rgba(255,255,255,.25);
-  border-radius:16px;
-  padding:10px 12px;
-  font-size:13px;
-  line-height:1.3;
-  box-shadow: var(--shadow);
-  color: #0f172a;
-  white-space:nowrap;
-}
-.radim-hint-arrow{
-  font-size:22px;
-  color: rgba(255,255,255,.90);
-  text-shadow: 0 10px 25px rgba(0,0,0,.25);
-  animation:arrowPulse 1.4s ease-in-out infinite;
-}
-@keyframes hintFloat{
-  0%{transform:translateY(0)}
-  50%{transform:translateY(-6px)}
-  100%{transform:translateY(0)}
-}
-@keyframes arrowPulse{
-  0%{transform:translateX(0)}
-  50%{transform:translateX(6px)}
-  100%{transform:translateX(0)}
-}
-
-/* Loading: animated dots */
+/* ===== Loading: animated dots ===== */
 .loading-bar{
   display:flex;
   align-items:center;
@@ -365,7 +341,7 @@ button.send:disabled{opacity:.55;cursor:not-allowed; box-shadow:none}
   color: rgba(255,255,255,.92);
   backdrop-filter: blur(10px);
 }
-.feedback-q{ margin-bottom:10px; font-weight:900; }
+.feedback-q{ margin-bottom:10px; font-weight:950; }
 .feedback-actions{ display:flex; gap:8px; }
 .feedback-actions button{
   padding:9px 10px;
@@ -373,7 +349,7 @@ button.send:disabled{opacity:.55;cursor:not-allowed; box-shadow:none}
   border:1px solid rgba(255,255,255,.18);
   background: rgba(255,255,255,.10);
   cursor:pointer;
-  font-weight:900;
+  font-weight:950;
   color:#fff;
 }
 .feedback-actions button:hover{ background: rgba(255,255,255,.14); }
@@ -383,15 +359,12 @@ button.send:disabled{opacity:.55;cursor:not-allowed; box-shadow:none}
 @media(max-width:480px){
   .chat-widget{right:12px;left:12px;bottom:12px;width:auto;height:80vh}
   .radim-fab{right:12px;bottom:12px}
-  .radim-hint{display:none}
 }
 
 /* Reduce motion */
 @media (prefers-reduced-motion: reduce){
   .radim-fab{animation:none}
   .msg{animation:none}
-  .radim-hint{animation:none}
-  .radim-hint-arrow{animation:none}
   .typing span{animation:none}
 }
 </style>
@@ -410,11 +383,10 @@ button.send:disabled{opacity:.55;cursor:not-allowed; box-shadow:none}
   <div class="chat-header" onclick="closeChat()">
     <div class="header-left">
       <div class="brandmark" id="brandmark">
-        <span id="brandFallback" style="font-size:12px;font-weight:900;">AI</span>
+        <span id="brandFallback" style="font-size:14px;font-weight:950;">AI</span>
       </div>
       <div style="min-width:0;">
         <div class="header-title">Asistent obce Radim</div>
-        <!-- ✅ sub removed -->
       </div>
     </div>
     <div class="header-right">
@@ -424,6 +396,19 @@ button.send:disabled{opacity:.55;cursor:not-allowed; box-shadow:none}
   </div>
 
   <div id="chat" class="chat"></div>
+
+  <!-- Nejčastější dotazy -->
+  <div id="quickBox" class="quickbox">
+    <div class="quicktitle">Nejčastější dotazy</div>
+    <div class="quickgrid">
+      <button class="qbtn" data-q="Jaké je číslo na starostku?">Číslo na starostku</button>
+      <button class="qbtn" data-q="Jaké jsou kontakty na obecní úřad?">Kontakty úřadu</button>
+      <button class="qbtn" data-q="Kde je biodopad a jaká je otevírací doba?">Biodopad</button>
+      <button class="qbtn" data-q="Kdy je svoz komunálního odpadu?">Svoz odpadu</button>
+      <button class="qbtn" data-q="Jaké jsou poplatky za odpady a psa?">Poplatky</button>
+      <button class="qbtn" data-q="Kde najdu formuláře a žádosti?">Formuláře</button>
+    </div>
+  </div>
 
   <!-- Loading lišta -->
   <div id="loadingBar" class="loading-bar" hidden>
@@ -451,7 +436,7 @@ button.send:disabled{opacity:.55;cursor:not-allowed; box-shadow:none}
 <!-- Floating tab -->
 <button id="fab" class="radim-fab" onclick="openChat()">
   <div class="fabIcon" id="fabIcon">
-    <span id="fabFallback" style="font-size:12px;font-weight:900;">AI</span>
+    <span id="fabFallback" style="font-size:12px;font-weight:950;">AI</span>
   </div>
   <div class="fabText">
     <div class="a">Poradíme vám</div>
@@ -459,22 +444,12 @@ button.send:disabled{opacity:.55;cursor:not-allowed; box-shadow:none}
   </div>
 </button>
 
-<!-- Hint -->
-<div id="radim-hint" class="radim-hint">
-  <div class="radim-hint-text">
-    Chcete se na něco zeptat?<br>
-    <strong>Klikněte na lištu</strong>
-  </div>
-  <div class="radim-hint-arrow">➜</div>
-</div>
-
 <script>
 const chatEl=document.getElementById("chat");
 const input=document.getElementById("q");
 const send=document.getElementById("send");
 const widget=document.getElementById("widget");
 const fab=document.getElementById("fab");
-const hint=document.getElementById("radim-hint");
 
 const loadingBar=document.getElementById("loadingBar");
 const feedbackBox=document.getElementById("feedbackBox");
@@ -487,13 +462,15 @@ const brandFallback = document.getElementById("brandFallback");
 const fabIcon = document.getElementById("fabIcon");
 const fabFallback = document.getElementById("fabFallback");
 
-// Assets
-const BG_URL = "/skins/radim/bg.jpg";
-const ERB_URL = "/skins/radim/erb.png";
+const quickBox = document.getElementById("quickBox");
 
-// DOPLŇ kontakt na úřad
-const OFFICE_PHONE = "DOPLŇ_TEL_NA_ÚŘAD"; // např. "+420 123 456 789"
-const OFFICE_EMAIL = "";                  // volitelné
+// --- Assets (Radim)
+const BG_URL = "/skins/radim/bg.jpg";
+const ERB_URL = "/skins/radim/erb.png"; // erb ve složce skins/radim
+
+// DOPLŇ kontakt na úřad (volitelné – když chceš použít ve fallback odpovědi)
+const OFFICE_PHONE = "DOPLŇ_TEL_NA_ÚŘAD";
+const OFFICE_EMAIL = "";
 
 let userQuestionCount = 0;
 let awaitingFeedback = false;
@@ -501,13 +478,11 @@ let awaitingFeedback = false;
 function openChat(){
   widget.style.display="flex";
   fab.style.display="none";
-  hint.style.display="none";
   setTimeout(()=>input.focus(),100);
 }
 function closeChat(){
   widget.style.display="none";
   fab.style.display="flex";
-  hint.style.display="flex";
 }
 
 function escapeHtml(s){
@@ -539,7 +514,6 @@ function showFeedback(){
   feedbackBox.hidden = false;
   chatEl.scrollTop = chatEl.scrollHeight;
 }
-
 function hideFeedback(){
   feedbackBox.hidden = true;
   awaitingFeedback = false;
@@ -574,6 +548,9 @@ async function ask(){
   send.disabled=true;
   userQuestionCount++;
 
+  // po první interakci můžeš quickBox nechat nebo schovat:
+  // quickBox.hidden = true;
+
   showLoading(true);
 
   try{
@@ -596,7 +573,15 @@ async function ask(){
 send.onclick=ask;
 input.addEventListener("keydown",e=>e.key==="Enter"&&ask());
 
-// Background load (no HEAD)
+// Quick buttons -> pošlou dotaz
+document.querySelectorAll(".qbtn").forEach(btn=>{
+  btn.addEventListener("click", ()=>{
+    input.value = btn.dataset.q || btn.textContent.trim();
+    ask();
+  });
+});
+
+// === Load background reliably (no HEAD) ===
 (function loadBg(){
   const img = new Image();
   img.onload = () => { bgImg.style.backgroundImage = `url('${BG_URL}')`; };
@@ -604,16 +589,18 @@ input.addEventListener("keydown",e=>e.key==="Enter"&&ask());
   img.src = BG_URL + "?v=" + Date.now();
 })();
 
-// Erb load
+// === Load erb into header + floating tab ===
 (function loadErb(){
   const img = new Image();
   img.onload = () => {
+    // header
     brandmark.innerHTML = "";
     const h = document.createElement("img");
     h.src = ERB_URL;
     h.alt = "Erb obce Radim";
     brandmark.appendChild(h);
 
+    // fab
     fabIcon.innerHTML = "";
     const f = document.createElement("img");
     f.src = ERB_URL;
