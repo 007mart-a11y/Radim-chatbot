@@ -20,9 +20,21 @@
 
 *{box-sizing:border-box}
 body{
+  body{
   margin:0;
   font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
-  background:transparent; /* widget přes web obce */
+
+  /* fallback pozadí – když se otevře samostatně */
+  background:
+    linear-gradient(
+      rgba(255,255,255,0.55),
+      rgba(255,255,255,0.55)
+    ),
+    url("/skins/radim/bg.jpg");
+
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
 }
 
 /* aby hidden opravdu schoval prvky */
