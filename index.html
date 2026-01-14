@@ -2,389 +2,280 @@
 <html lang="cs">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Asistent obce Radim</title>
 
 <style>
 :root{
+  --bg:#f4f6fb;
+  --card:#ffffff;
   --text:#0f172a;
   --muted:#475569;
-  --border:rgba(255,255,255,.22);
-
-  /* Brand (Radim) */
+  --border:#e5e7eb;
   --brand:#1e3a8a;
-  --brand2:#1d4ed8;
-
-  /* Glass */
-  --glass: rgba(255,255,255,.82);
-  --glass2: rgba(255,255,255,.68);
-  --shadow: 0 24px 70px rgba(2,6,23,.28);
-
-  --meBg: rgba(219,234,254,.92);
-  --botBg: rgba(255,255,255,.88);
+  --brand-2:#1d4ed8;
+  --me:#dbeafe;
+  --shadow:0 18px 50px rgba(2,6,23,.16);
 }
 
 *{box-sizing:border-box}
-html,body{height:100%}
 body{
   margin:0;
   font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
-  color:var(--text);
-  background:#0b1220;
-  overflow-x:hidden;
-  -webkit-text-size-adjust:100%;
+  background:transparent; /* widget přes web obce */
 }
 
-/* DŮLEŽITÉ: aby hidden opravdu schoval prvky */
+/* aby hidden opravdu schoval prvky */
 [hidden]{ display:none !important; }
 
-/* ====== BACKGROUND (Radim web screenshot) ====== */
-.bg{
-  position:fixed; inset:0; z-index:0;
-  background:
-    radial-gradient(1200px 700px at 25% 0%, rgba(29,78,216,.22), transparent 60%),
-    radial-gradient(900px 600px at 85% 15%, rgba(255,255,255,.10), transparent 55%),
-    linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,0)),
-    #0b1220;
-}
-.bgImg{
-  position:absolute; inset:0;
-  background-size:cover;
-  background-position:top center;
-  filter:saturate(1.02) contrast(1.02);
-  opacity:.92;
-  transform:scale(1.02);
-}
-.bg::after{
-  content:"";
-  position:absolute; inset:0;
-  background: linear-gradient(90deg, rgba(11,18,32,.78), rgba(11,18,32,.42));
-  pointer-events:none;
-}
-.bgVignette{
-  position:absolute; inset:0;
-  background: radial-gradient(1200px 900px at 30% 15%, transparent 42%, rgba(0,0,0,.58) 100%);
-  pointer-events:none;
-}
-
-/* ====== CHAT WIDGET ====== */
+/* === CHAT WIDGET === */
 .chat-widget{
   position:fixed;
-  right:20px;
-  bottom:20px;
-  width:392px;
-  height:640px;
-
-  background: rgba(255,255,255,.10);
-  border:1px solid rgba(255,255,255,.16);
-  border-radius:22px;
-  box-shadow: var(--shadow);
-  backdrop-filter: blur(14px);
-
+  right:24px;
+  bottom:24px;
+  width:380px;
+  height:600px;
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:18px;
+  box-shadow:var(--shadow);
   display:none;
   flex-direction:column;
   overflow:hidden;
   z-index:9999;
 }
 
-/* HEADER */
+/* HLAVIČKA */
 .chat-header{
-  padding:12px 12px 10px;
-  background: linear-gradient(135deg, rgba(30,58,138,.92), rgba(21,48,111,.88));
+  padding:12px 14px;
+  background:linear-gradient(135deg,var(--brand),#15306f);
   color:#fff;
   cursor:pointer;
   display:flex;
   justify-content:space-between;
   align-items:center;
-  gap:10px;
-  border-bottom: 1px solid rgba(255,255,255,.12);
 }
-
-.header-left{display:flex;gap:10px;align-items:center;min-width:0}
+.header-left{display:flex;gap:10px;align-items:center}
 .brandmark{
-  width:34px;height:34px;border-radius:12px;
-  background:rgba(255,255,255,.14);
-  border:1px solid rgba(255,255,255,.16);
+  width:34px;height:34px;border-radius:10px;
+  background:rgba(255,255,255,.15);
   display:flex;align-items:center;justify-content:center;
   overflow:hidden;
-  flex:0 0 auto;
 }
-.brandmark img{
-  width:100%;
-  height:100%;
-  object-fit:contain;
-  display:block;
-  padding:5px;
-}
-.header-title{font-weight:900;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.header-sub{font-size:11px;opacity:.88;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:240px}
+.brandmark img{ width:100%; height:100%; object-fit:contain; padding:4px; }
 
-.header-right{display:flex;align-items:center;gap:8px;flex:0 0 auto}
+.header-title{font-weight:700;font-size:15px}
+.header-sub{font-size:11px;opacity:.85}
+
+.header-right{display:flex;align-items:center;gap:10px}
 .chip{
   font-size:11px;
-  padding:4px 10px;
+  padding:4px 8px;
   border-radius:999px;
-  background:rgba(255,255,255,.14);
-  border:1px solid rgba(255,255,255,.14);
+  background:rgba(255,255,255,.15);
 }
-.toggle{font-size:18px;opacity:.9}
+.toggle{font-size:18px}
 
-/* CHAT AREA (transparent, bubbles are blocks) */
+/* CHAT */
 .chat{
   flex:1;
-  padding:14px 12px 10px;
+  padding:14px;
+  background:var(--bg);
   overflow-y:auto;
   display:flex;
   flex-direction:column;
   gap:10px;
-  background: transparent;
 }
 
-/* Messages (Jičín-like blocks) */
+/* ZPRÁVY */
 .msg{
-  max-width: 86%;
-  padding: 10px 12px;
-  border-radius: 16px;
-  font-size: 13px;
-  line-height: 1.45;
-  white-space: pre-wrap;
-  word-break: break-word;
-  border: 1px solid rgba(255,255,255,.18);
-  box-shadow: 0 10px 28px rgba(0,0,0,.16);
-  animation: pop .16s ease-out;
-}
-@keyframes pop{
-  from{ transform: translateY(4px) scale(.985); opacity:0; }
-  to{ transform: translateY(0) scale(1); opacity:1; }
+  max-width:86%;
+  padding:10px 12px;
+  border-radius:14px;
+  font-size:14px;
+  line-height:1.45;
+  white-space:pre-wrap;
 }
 .me{
   align-self:flex-end;
-  background: var(--meBg);
-  border-bottom-right-radius: 8px;
+  background:var(--me);
+  border-bottom-right-radius:6px;
 }
 .bot{
   align-self:flex-start;
-  background: var(--botBg);
-  border-bottom-left-radius: 8px;
+  background:#fff;
+  border:1px solid var(--border);
+  border-bottom-left-radius:6px;
 }
-.msg strong{font-weight:900}
-.msg a{color:var(--brand2);word-break:break-word;text-decoration:none}
-.msg a:hover{text-decoration:underline}
+.msg a{color:var(--brand-2);word-break:break-word}
 
-/* INPUT */
-.row{
-  display:flex;
-  gap:10px;
-  padding:10px 12px 12px;
-  border-top:1px solid rgba(255,255,255,.14);
-  background: rgba(255,255,255,.06);
-  backdrop-filter: blur(10px);
-}
-input{
-  flex:1;
-  height:44px;
-  padding:0 14px;
-  border-radius:999px;
-  border:1px solid rgba(255,255,255,.18);
-  background: rgba(0,0,0,.18);
-  color:#fff;
-  font-size:16px; /* iOS zoom fix */
-  outline:none;
-}
-input::placeholder{color: rgba(255,255,255,.72)}
-button.send{
-  width:44px;
-  height:44px;
-  border:1px solid rgba(0,229,255,.18);
-  border-radius:14px;
-  background: rgba(0,229,255,.12);
-  color:#fff;
-  font-weight:900;
-  cursor:pointer;
-  display:flex;align-items:center;justify-content:center;
-}
-button.send:disabled{opacity:.55;cursor:not-allowed}
-
-/* ===== FLOATING TAB (modern) ===== */
-.radim-fab{
-  position:fixed;
-  right:20px;
-  bottom:20px;
-  height:56px;
-  padding:10px 12px;
-  border-radius:999px;
-  border:1px solid rgba(255,255,255,.18);
-  cursor:pointer;
-
-  background: rgba(10,16,28,.60);
-  backdrop-filter: blur(12px);
-  box-shadow: 0 18px 55px rgba(0,0,0,.45);
-  color:#fff;
-
-  display:flex;
-  align-items:center;
-  gap:10px;
-  z-index:10000;
-
-  animation: pulse 1.8s infinite ease-in-out;
-}
-@keyframes pulse{
-  0%,100%{ box-shadow: 0 18px 55px rgba(0,0,0,.45); }
-  50%{ box-shadow: 0 18px 55px rgba(29,78,216,.32); }
-}
-.fabIcon{
-  width:36px;height:36px;border-radius:14px;
-  background: rgba(255,255,255,.08);
-  border:1px solid rgba(255,255,255,.14);
-  display:flex;align-items:center;justify-content:center;
-  overflow:hidden;
-  flex:0 0 auto;
-}
-.fabIcon img{
-  width:100%;
-  height:100%;
-  object-fit:contain;
-  display:block;
-  padding:6px;
-}
-.fabText{display:flex;flex-direction:column;line-height:1.05;min-width:0}
-.fabText .a{font-weight:950;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px}
-.fabText .b{font-size:11px;color:rgba(255,255,255,.72);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px}
-
-/* Hint (optional) - keep your original, but modernize a bit */
-.radim-hint{
-  position:fixed;
-  right: 20px;
-  bottom: 86px;
-  z-index:10001;
-  display:flex;
-  align-items:center;
-  gap:10px;
-  animation:hintFloat 3s ease-in-out infinite;
-}
-.radim-hint-text{
-  background: rgba(255,255,255,.86);
-  border:1px solid rgba(255,255,255,.25);
-  border-radius:16px;
-  padding:10px 12px;
-  font-size:13px;
-  line-height:1.3;
-  box-shadow: var(--shadow);
-  color: #0f172a;
-  white-space:nowrap;
-}
-.radim-hint-arrow{
-  font-size:22px;
-  color: rgba(255,255,255,.90);
-  text-shadow: 0 10px 25px rgba(0,0,0,.25);
-  animation:arrowPulse 1.4s ease-in-out infinite;
-}
-
-@keyframes hintFloat{
-  0%{transform:translateY(0)}
-  50%{transform:translateY(-6px)}
-  100%{transform:translateY(0)}
-}
-@keyframes arrowPulse{
-  0%{transform:translateX(0)}
-  50%{transform:translateX(6px)}
-  100%{transform:translateX(0)}
-}
-
-/* ===== Loading: animated dots ===== */
+/* === LOADING + FEEDBACK === */
 .loading-bar{
   display:flex;
   align-items:center;
   gap:10px;
   padding:10px 12px;
-  margin:0 12px 10px 12px;
-  border-radius:14px;
-  background: rgba(255,255,255,.10);
-  border:1px solid rgba(255,255,255,.14);
+  margin:0 14px 10px 14px;
+  border-radius:12px;
+  background:rgba(0,0,0,0.05);
   font-size:13px;
-  color: rgba(255,255,255,.80);
-  backdrop-filter: blur(10px);
+  color:var(--muted);
 }
-.typing{
-  display:inline-flex;
-  gap:6px;
-  align-items:center;
+.loading-bar .dot{
+  width:10px;height:10px;border-radius:50%;
+  background:currentColor;
+  animation:pulse 1s infinite;
 }
-.typing span{
-  width:7px;height:7px;border-radius:999px;
-  background: rgba(255,255,255,.92);
-  opacity:.35;
-  animation:bounce 1s infinite ease-in-out;
-}
-.typing span:nth-child(2){animation-delay:.12s}
-.typing span:nth-child(3){animation-delay:.24s}
-@keyframes bounce{
-  0%,100%{transform:translateY(0);opacity:.35}
-  50%{transform:translateY(-4px);opacity:1}
+@keyframes pulse{
+  0%,100%{opacity:.25; transform:scale(.9)}
+  50%{opacity:1; transform:scale(1.1)}
 }
 
-/* Feedback */
 .feedback{
-  margin:0 12px 10px 12px;
+  margin:0 14px 10px 14px;
   padding:12px;
-  border-radius:16px;
-  background: rgba(255,255,255,.10);
-  border:1px solid rgba(255,255,255,.14);
+  border-radius:14px;
+  background:rgba(0,0,0,0.04);
+  border:1px solid var(--border);
   font-size:13px;
-  color: rgba(255,255,255,.92);
-  backdrop-filter: blur(10px);
+  color:var(--text);
 }
-.feedback-q{ margin-bottom:10px; font-weight:900; }
+.feedback-q{ margin-bottom:10px; font-weight:600; }
 .feedback-actions{ display:flex; gap:8px; }
 .feedback-actions button{
-  padding:9px 10px;
-  border-radius:12px;
-  border:1px solid rgba(255,255,255,.18);
-  background: rgba(255,255,255,.10);
+  padding:8px 10px;
+  border-radius:10px;
+  border:1px solid var(--border);
+  background:#fff;
   cursor:pointer;
-  font-weight:900;
-  color:#fff;
+  font-weight:600;
 }
-.feedback-actions button:hover{ background: rgba(255,255,255,.14); }
-.feedback-actions button:disabled{ opacity:.55; cursor:not-allowed; }
+.feedback-actions button:hover{ border-color:#cbd5e1; }
 
-/* Mobile */
+/* === INPUT (zvýrazněno) === */
+.row{
+  display:flex;
+  gap:10px;
+  padding:12px;
+  border-top:1px solid var(--border);
+  background:linear-gradient(180deg,#fff, #f8fafc);
+}
+
+input{
+  flex:1;
+  padding:12px 14px;
+  border-radius:14px;
+  border:1px solid #cbd5e1;
+  background:#ffffff;
+  font-size:14px;
+  color:var(--text);
+  box-shadow:0 6px 18px rgba(2,6,23,.08);
+  outline:none;
+}
+input::placeholder{ color:#64748b; }
+input:focus{
+  border-color: rgba(29,78,216,.55);
+  box-shadow:0 8px 22px rgba(29,78,216,.18);
+}
+
+button.send{
+  width:48px;
+  height:48px;
+  border:0;
+  border-radius:14px;
+  background:linear-gradient(135deg, var(--brand-2), #0b3ea8);
+  color:#fff;
+  font-weight:800;
+  cursor:pointer;
+  box-shadow:0 10px 22px rgba(29,78,216,.22);
+}
+button.send:hover{ filter:brightness(1.05); }
+button.send:active{ transform: translateY(1px); }
+button.send:disabled{
+  opacity:.55;
+  cursor:not-allowed;
+  box-shadow:none;
+}
+
+/* === SPODNÍ LIŠTA (místo bubliny) === */
+.radim-bar{
+  position:fixed;
+  right:18px;
+  bottom:18px;
+  display:flex;
+  align-items:center;
+  gap:12px;
+
+  padding:10px 14px;
+  border-radius:999px;
+  border:1px solid rgba(255,255,255,.22);
+  cursor:pointer;
+
+  background:linear-gradient(135deg, rgba(30,58,138,.95), rgba(21,48,111,.95));
+  color:#fff;
+  box-shadow:0 18px 50px rgba(2,6,23,.30);
+  z-index:10000;
+
+  transform: translateZ(0);
+  animation: barPulse 1.8s ease-in-out infinite;
+}
+@keyframes barPulse{
+  0%,100%{ box-shadow:0 18px 50px rgba(2,6,23,.30); transform:translateY(0); }
+  50%{ box-shadow:0 18px 50px rgba(29,78,216,.35); transform:translateY(-2px); }
+}
+
+.radim-crest{
+  width:34px;
+  height:34px;
+  border-radius:10px;
+  background:rgba(255,255,255,.12);
+  border:1px solid rgba(255,255,255,.20);
+  padding:4px;
+  object-fit:contain;
+
+  animation: crestFloat 1.6s ease-in-out infinite;
+}
+@keyframes crestFloat{
+  0%,100%{ transform:translateY(0) rotate(0deg); }
+  50%{ transform:translateY(-2px) rotate(-2deg); }
+}
+
+.radim-bar-text{ display:flex; flex-direction:column; line-height:1.1; text-align:left; }
+.radim-bar-title{ font-weight:900; font-size:13px; }
+.radim-bar-sub{ font-size:11px; opacity:.88; }
+
+.radim-bar-arrow{
+  width:26px;
+  height:26px;
+  border-radius:10px;
+  background:rgba(255,255,255,.14);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:18px;
+}
+
+/* MOBILE */
 @media(max-width:480px){
   .chat-widget{right:12px;left:12px;bottom:12px;width:auto;height:80vh}
-  .radim-fab{right:12px;bottom:12px}
-  .radim-hint{display:none}
-}
-
-/* Accessibility: reduce motion */
-@media (prefers-reduced-motion: reduce){
-  .radim-fab{animation:none}
-  .msg{animation:none}
-  .radim-hint{animation:none}
-  .radim-hint-arrow{animation:none}
-  .typing span{animation:none}
+  .radim-bar{ right:12px; left:12px; bottom:12px; justify-content:space-between; }
 }
 </style>
 </head>
 
 <body>
 
-<!-- Background layer -->
-<div class="bg" aria-hidden="true">
-  <div class="bgImg" id="bgImg"></div>
-  <div class="bgVignette"></div>
-</div>
-
 <!-- CHAT -->
-<div id="widget" class="chat-widget" role="dialog" aria-label="Chat – Asistent obce Radim">
+<div id="widget" class="chat-widget">
   <div class="chat-header" onclick="closeChat()">
     <div class="header-left">
-      <div class="brandmark" id="brandmark">
-        <!-- fallback if img missing -->
-        <span id="brandFallback" style="font-size:16px;">AI</span>
+      <div class="brandmark">
+        <!-- erb (stejný jako dole) -->
+        <img src="/skins/radim/erb.png" alt="Erb obce Radim">
       </div>
-      <div style="min-width:0;">
+      <div>
         <div class="header-title">Asistent obce Radim</div>
-        <div class="header-sub">Oficiální informace • demo</div>
+        <div class="header-sub">Oficiální informace</div>
       </div>
     </div>
     <div class="header-right">
@@ -397,9 +288,7 @@ button.send:disabled{opacity:.55;cursor:not-allowed}
 
   <!-- Loading lišta -->
   <div id="loadingBar" class="loading-bar" hidden>
-    <span class="typing" aria-label="Generuje se odpověď">
-      <span></span><span></span><span></span>
-    </span>
+    <span class="dot"></span>
     <span>Generuje se odpověď…</span>
   </div>
 
@@ -414,29 +303,19 @@ button.send:disabled{opacity:.55;cursor:not-allowed}
 
   <div class="row">
     <input id="q" type="text" placeholder="Napište dotaz…" />
-    <button id="send" class="send" aria-label="Odeslat">➤</button>
+    <button id="send" class="send" aria-label="Odeslat">›</button>
   </div>
 </div>
 
-<!-- Floating tab -->
-<button id="fab" class="radim-fab" onclick="openChat()">
-  <div class="fabIcon" id="fabIcon">
-    <span id="fabFallback" style="font-size:12px;font-weight:900;">AI</span>
+<!-- SPODNÍ LIŠTA -->
+<button id="fab" class="radim-bar" onclick="openChat()">
+  <img class="radim-crest" src="/skins/radim/erb.png" alt="Erb obce Radim">
+  <div class="radim-bar-text">
+    <div class="radim-bar-title">Poradíme vám</div>
+    <div class="radim-bar-sub">Klikněte a napište dotaz</div>
   </div>
-  <div class="fabText">
-    <div class="a">Poradíme vám</div>
-    <div class="b">Klikněte a napište dotaz…</div>
-  </div>
+  <div class="radim-bar-arrow">›</div>
 </button>
-
-<!-- Hint -->
-<div id="radim-hint" class="radim-hint">
-  <div class="radim-hint-text">
-    Chcete se na něco zeptat?<br>
-    <strong>Klikněte na lištu</strong>
-  </div>
-  <div class="radim-hint-arrow">➜</div>
-</div>
 
 <script>
 const chatEl=document.getElementById("chat");
@@ -444,22 +323,11 @@ const input=document.getElementById("q");
 const send=document.getElementById("send");
 const widget=document.getElementById("widget");
 const fab=document.getElementById("fab");
-const hint=document.getElementById("radim-hint");
 
 const loadingBar=document.getElementById("loadingBar");
 const feedbackBox=document.getElementById("feedbackBox");
 const feedbackYes=document.getElementById("feedbackYes");
 const feedbackNo=document.getElementById("feedbackNo");
-
-const bgImg = document.getElementById("bgImg");
-const brandmark = document.getElementById("brandmark");
-const brandFallback = document.getElementById("brandFallback");
-const fabIcon = document.getElementById("fabIcon");
-const fabFallback = document.getElementById("fabFallback");
-
-// --- Assets (Radim)
-const BG_URL = "/skins/radim/bg.jpg";
-const ERB_URL = "/skins/radim/erb.png"; // <- sem jsi dal erb
 
 // DOPLŇ kontakt na úřad
 const OFFICE_PHONE = "DOPLŇ_TEL_NA_ÚŘAD"; // např. "+420 123 456 789"
@@ -471,13 +339,11 @@ let awaitingFeedback = false;
 function openChat(){
   widget.style.display="flex";
   fab.style.display="none";
-  hint.style.display="none";
   setTimeout(()=>input.focus(),100);
 }
 function closeChat(){
   widget.style.display="none";
   fab.style.display="flex";
-  hint.style.display="flex";
 }
 
 function escapeHtml(s){
@@ -490,9 +356,7 @@ function linkify(t){
 function addMessage(who,text,cls){
   const d=document.createElement("div");
   d.className="msg "+cls;
-  // odstraňuj staré "source" artefakty
-  const cleaned = String(text || "").replace(/\d+\:\d+†source/g,"");
-  d.innerHTML=`<strong>${who}:</strong> ${linkify(cleaned)}`;
+  d.innerHTML=`<strong>${who}:</strong> ${linkify(text.replace(/\d+\:\d+†source/g,""))}`;
   chatEl.appendChild(d);
   chatEl.scrollTop=chatEl.scrollHeight;
 }
@@ -553,53 +417,20 @@ async function ask(){
       headers:{ "content-type":"application/json" },
       body:JSON.stringify({ message:q })
     });
-    const j=await r.json().catch(()=>({}));
-    addMessage("Radim", (j && j.answer) ? j.answer : "Bez odpovědi", "bot");
+    const j=await r.json();
+    addMessage("Radim",j.answer||"Bez odpovědi","bot");
     showFeedback();
   }catch(e){
     addMessage("Radim","Chyba spojení.","bot");
   }finally{
     showLoading(false);
     send.disabled=false;
+    input.focus();
   }
 }
 
 send.onclick=ask;
 input.addEventListener("keydown",e=>e.key==="Enter"&&ask());
-
-// === Load background reliably (no HEAD) ===
-(function loadBg(){
-  const img = new Image();
-  img.onload = () => { bgImg.style.backgroundImage = `url('${BG_URL}')`; };
-  img.onerror = () => { bgImg.style.backgroundImage = ""; };
-  img.src = BG_URL + "?v=" + Date.now();
-})();
-
-// === Load erb into header + floating tab ===
-(function loadErb(){
-  const img = new Image();
-  img.onload = () => {
-    // header
-    brandmark.innerHTML = "";
-    const h = document.createElement("img");
-    h.src = ERB_URL;
-    h.alt = "Erb obce Radim";
-    brandmark.appendChild(h);
-
-    // fab
-    fabIcon.innerHTML = "";
-    const f = document.createElement("img");
-    f.src = ERB_URL;
-    f.alt = "Erb obce Radim";
-    fabIcon.appendChild(f);
-  };
-  img.onerror = () => {
-    // keep fallbacks
-    brandFallback.style.display = "inline";
-    fabFallback.style.display = "inline";
-  };
-  img.src = ERB_URL + "?v=" + Date.now();
-})();
 
 // INIT – disclaimer + uvítání
 addMessage(
