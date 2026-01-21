@@ -1,8 +1,8 @@
 // netlify/functions/search.mjs
 // Netlify Functions (Node 18+), OpenAI Assistants v2 přes fetch
 // ENV: OPENAI_API_KEY, ASSISTANT_ID
-// Request JSON: { message: string, thread_id?: string, debug?: boolean }
-// Response JSON: { ok: true, answer: string, thread_id: string, raw_answer?: string } | { ok:false, error, details? }
+// Request JSON: { message: string, thread_id?: string }
+// Response JSON: { ok: true, answer: string, thread_id: string } | { ok:false, error, details? }
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -19,7 +19,7 @@ function sleep(ms) {
 function jsonResponse(status, data) {
   return new Response(JSON.stringify(data), {
     status,
-    headers: { ...corsHeaders, "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" },
+    headers: { ...corsHeaders, "Content-Type": "application/json; charset=utf-8" },
   });
 }
 
@@ -50,7 +50,9 @@ async function api(path, { method = "GET", body, headers = {} } = {}, apiKey) {
   let json = null;
   try {
     json = text ? JSON.parse(text) : null;
-  } catch {}
+  } catch {
+    // ignore
+  }
 
   if (!res.ok) {
     const msg = json?.error?.message || text || `HTTP ${res.status}`;
@@ -60,49 +62,43 @@ async function api(path, { method = "GET", body, headers = {} } = {}, apiKey) {
   return json ?? {};
 }
 
-function extractAssistantText(messagesListJson) {
-  const data = messagesListJson?.data || [];
-  const assistantMsg = data.find((m) => m.role === "assistant");
-  if (!assistantMsg?.content?.length) return "Bez odpovědi";
+/**
+ * ✅ DŮLEŽITÉ:
+ * Neber "první assistant zprávu" (find), ale POSLEDNÍ podle created_at.
+ * To je přesně bug, který dělá random odpovědi / staré odpovědi.
+ */
+function extractLatestAssistantText(messagesListJson) {
+  const data = Array.isArray(messagesListJson?.data) ? messagesListJson.data : [];
 
-  const parts = assistantMsg.content
+  const assistantMsgs = data.filter(
+    (m) => m?.role === "assistant" && Array.isArray(m?.content) && m.content.length
+  );
+
+  if (!assistantMsgs.length) return "Bez odpovědi.";
+
+  assistantMsgs.sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
+  const msg = assistantMsgs[0];
+
+  const parts = msg.content
     .map((c) => (c?.type === "text" ? c.text?.value : ""))
     .filter(Boolean);
 
-  return parts.length ? parts.join("\n\n") : "Bez odpovědi";
+  return parts.length ? parts.join("\n\n") : "Bez odpovědi.";
 }
 
-// Čištění: citace z file_search + markdown bold, ale NESAHAJ na časy
-function sanitizeAnswer(text) {
-  let t = String(text || "");
-
-  // OpenAI citace: 
-  t = t.replace(/【\s*\d+\s*:\s*\d+\s*†[^】]*】/g, "");
-  // i bez †
-  t = t.replace(/【\s*\d+\s*:\s*\d+\s*】/g, "");
-  // hranaté/kulaté varianty
-  t = t.replace(/\[\s*\d+\s*:\s*\d+\s*(?:†[^\]]*)?\]/g, "");
-  t = t.replace(/\(\s*\d+\s*:\s*\d+\s*(?:†[^)]*)?\)/g, "");
-
-  // pryč zbytky "†source"
-  t = t.replace(/†\s*source/gi, "");
-
-  // pryč markdown bold **něco**
-  t = t.replace(/\*\*(.*?)\*\*/g, "$1");
-
-  // uhladit whitespace
-  t = t.replace(/[ \t]+\n/g, "\n");
-  t = t.replace(/\n{3,}/g, "\n\n");
-  t = t.replace(/[ \t]{2,}/g, " ");
-  t = t.trim();
-
-  // oprava URL: odstraní trailing interpunkci za URL
-  t = t.replace(/(https?:\/\/[^\s<>"']+?)([)\],.;:!?]+)(?=\s|$)/g, "$1");
-
-  return t;
+/**
+ * Jemné čištění: jen odstranění citací z File Search.
+ * ŽÁDNÉ agresivní regexy (ty ti rozbíjely obsah a kontext).
+ */
+function stripCitations(text) {
+  return String(text || "")
+    .replace(/【\s*\d+\s*:\s*\d+\s*†[^】]*】/g, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 export default async function handler(req) {
+  // CORS preflight
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders });
 
   try {
@@ -121,24 +117,19 @@ export default async function handler(req) {
       return jsonResponse(400, { ok: false, error: "Missing message" });
     }
 
-    const debug = !!body?.debug;
-
-    // ✅ RUN instructions (jako Chomutice), ale pro RADIM + jasná priorita CORE
+    // Runtime datum (Europe/Prague)
     const todayStr = getCzechTodayString();
-
     const runInstructions =
       `Dnes je ${todayStr} (časová zóna: Europe/Prague).\n` +
-      `Když uživatel použije "dnes/zítra/včera/příští týden", vykládej to vůči tomuto datu.\n\n` +
-      `Jsi oficiální asistent obce Radim.\n` +
-      `PRIORITA ZDROJŮ: 1) 00_CORE (vždy rozhoduje) 2) LIVE 3) STATICKÁ/ARCHIV.\n` +
-      `Když je dotaz na kontakty/úřední hodiny/vedení obce, vždy použij údaje z 00_CORE.\n` +
-      `U úředních hodin odpověz přímo a konkrétně.\n\n` +
-      `DŮLEŽITÉ (RADIM, z CORE): Úřední hodiny jsou pouze ve středu 16:00–19:00.\n` +
-      `Nezmiňuj technické detaily (AI, crawling, scraping). Odpovídej věcně česky.\n` +
-      `Odkazy piš bez tečky na konci URL.`;
+      `Při výrazech jako "dnes", "zítra", "včera", "příští víkend", "tento týden" ` +
+      `vždy vykládej časové odkazy vzhledem k tomuto datu.\n\n` +
+      `Odpovídej podle znalostní báze ve File Search.\n` +
+      `Pokud existuje rozpor mezi CORE a jinými soubory, vždy platí CORE.\n` +
+      `U dotazů na úřední hodiny uveď konkrétní den i čas (např. "Středa 16:00–19:00").`;
 
-    // Thread
+    // Thread: pokud přijde thread_id, pokračujeme; jinak založíme nový
     let threadId = body?.thread_id;
+
     if (!threadId || typeof threadId !== "string" || !threadId.startsWith("thread_")) {
       const created = await api("/threads", { method: "POST" }, apiKey);
       threadId = created.id;
@@ -150,7 +141,10 @@ export default async function handler(req) {
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role: "user", content: message }),
+        body: JSON.stringify({
+          role: "user",
+          content: String(message).trim(),
+        }),
       },
       apiKey
     );
@@ -161,21 +155,24 @@ export default async function handler(req) {
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ assistant_id: assistantId, instructions: runInstructions }),
+        body: JSON.stringify({
+          assistant_id: assistantId,
+          instructions: runInstructions,
+        }),
       },
       apiKey
     );
 
-    // 3) Poll
+    // 3) Poll run status
     const started = Date.now();
-    const timeoutMs = 25_000;
+    const timeoutMs = 45_000;
 
     while (true) {
       if (Date.now() - started > timeoutMs) {
         return jsonResponse(504, { ok: false, error: "Timeout waiting for response" });
       }
 
-      await sleep(800);
+      await sleep(900);
 
       const check = await api(`/threads/${threadId}/runs/${run.id}`, {}, apiKey);
       const status = check.status;
@@ -198,11 +195,11 @@ export default async function handler(req) {
     }
 
     // 4) Read messages
-    const messages = await api(`/threads/${threadId}/messages?limit=20`, {}, apiKey);
-    const raw_answer = extractAssistantText(messages);
-    const answer = sanitizeAnswer(raw_answer) || "Bez odpovědi";
+    const messages = await api(`/threads/${threadId}/messages?limit=50`, {}, apiKey);
+    let answer = extractLatestAssistantText(messages);
+    answer = stripCitations(answer);
 
-    return jsonResponse(200, debug ? { ok: true, answer, raw_answer, thread_id: threadId } : { ok: true, answer, thread_id: threadId });
+    return jsonResponse(200, { ok: true, answer, thread_id: threadId });
   } catch (err) {
     return jsonResponse(500, {
       ok: false,
