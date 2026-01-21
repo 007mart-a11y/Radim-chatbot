@@ -135,14 +135,22 @@ async function addUserMessage(thread_id, message) {
   });
 }
 
+
 async function runAssistant(thread_id, assistant_id) {
-  // ✅ Stabilita odpovědí:
-  // temperature: 0 = minimální náhodnost
   const run = await oaiFetch(`/threads/${thread_id}/runs`, {
     method: "POST",
     body: JSON.stringify({
       assistant_id,
       temperature: 0,
+
+      // ✅ DŮLEŽITÉ: “guardrail” instrukce pro každý běh
+      additional_instructions: `
+Jsi AI asistent obce Radim. Při dotazech na kontakty, úřední hodiny, IČO, datovou schránku a vedení obce
+MUSÍŠ vždy použít údaje z 00_CORE (autorita).
+Úřední hodiny obecního úřadu Radim jsou POUZE:
+- Středa: 16:00–19:00
+Nevymýšlej jiné dny ani časy. Pokud si nejsi jistý, řekni že se má ověřit na webu obce.
+`.trim(),
     }),
   });
   return run.id;
