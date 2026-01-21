@@ -14,6 +14,7 @@
   --meBg: rgba(219,234,254,.92);
   --botBg: rgba(255,255,255,.88);
 }
+
 *{box-sizing:border-box}
 html,body{height:100%}
 body{
@@ -26,23 +27,36 @@ body{
 }
 [hidden]{ display:none !important; }
 
-/* ===== BACKGROUND ===== */
+/* ====== BACKGROUND ====== */
 .bg{
   position:fixed; inset:0; z-index:0;
-  background:#0b1220;
+  background:
+    radial-gradient(1200px 700px at 25% 0%, rgba(29,78,216,.22), transparent 60%),
+    radial-gradient(900px 600px at 85% 15%, rgba(255,255,255,.10), transparent 55%),
+    linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,0)),
+    #0b1220;
 }
 .bgImg{
   position:absolute; inset:0;
   background-size:cover;
   background-position:top center;
+  filter:saturate(1.02) contrast(1.02);
   opacity:.92;
+  transform:scale(1.02);
+}
+.bg::after{
+  content:"";
+  position:absolute; inset:0;
+  background: linear-gradient(90deg, rgba(11,18,32,.78), rgba(11,18,32,.42));
+  pointer-events:none;
 }
 .bgVignette{
   position:absolute; inset:0;
   background: radial-gradient(1200px 900px at 30% 15%, transparent 42%, rgba(0,0,0,.58) 100%);
+  pointer-events:none;
 }
 
-/* ===== CHAT ===== */
+/* ====== CHAT WIDGET ====== */
 .chat-widget{
   position:fixed;
   right:20px;
@@ -50,6 +64,7 @@ body{
   width:392px;
   height:640px;
   background: rgba(255,255,255,.10);
+  border:1px solid rgba(255,255,255,.16);
   border-radius:22px;
   box-shadow: var(--shadow);
   backdrop-filter: blur(14px);
@@ -59,31 +74,45 @@ body{
   z-index:9999;
 }
 
+/* HEADER */
 .chat-header{
-  padding:12px;
-  background: linear-gradient(135deg, #1e3a8a, #1d4ed8);
+  padding:12px 12px 10px;
+  background: linear-gradient(135deg, rgba(30,58,138,.92), rgba(21,48,111,.88));
   color:#fff;
+  cursor:pointer;
   display:flex;
   justify-content:space-between;
   align-items:center;
-  cursor:pointer;
+  gap:10px;
+  border-bottom: 1px solid rgba(255,255,255,.12);
 }
+.header-left{display:flex;gap:10px;align-items:center;min-width:0}
 .brandmark{
-  width:40px;height:40px;border-radius:12px;
-  background:rgba(255,255,255,.15);
+  width:44px;height:44px;border-radius:16px;
+  background:rgba(255,255,255,.14);
+  border:1px solid rgba(255,255,255,.16);
   display:flex;align-items:center;justify-content:center;
+  overflow:hidden;
+  flex:0 0 auto;
 }
-.brandmark img{width:100%;height:100%;object-fit:contain;padding:6px}
+.brandmark img{width:100%;height:100%;object-fit:contain;display:block;padding:6px}
+.header-title{font-weight:950;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.header-right{display:flex;align-items:center;gap:8px;flex:0 0 auto}
+.chip{font-size:11px;padding:4px 10px;border-radius:999px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.14)}
+.toggle{font-size:18px;opacity:.9}
 
+/* CHAT AREA */
 .chat{
   flex:1;
-  padding:12px;
+  padding:14px 12px 10px;
   overflow-y:auto;
   display:flex;
   flex-direction:column;
   gap:10px;
+  background: transparent;
 }
 
+/* Messages */
 .msg{
   max-width:86%;
   padding:10px 12px;
@@ -92,176 +121,351 @@ body{
   line-height:1.45;
   white-space:pre-wrap;
   word-break:break-word;
+  border:1px solid rgba(255,255,255,.18);
+  box-shadow:0 10px 28px rgba(0,0,0,.16);
 }
-.me{align-self:flex-end;background:var(--meBg)}
-.bot{align-self:flex-start;background:var(--botBg)}
-.msg a{color:#1d4ed8;text-decoration:none}
+.me{align-self:flex-end;background:var(--meBg);border-bottom-right-radius:8px}
+.bot{align-self:flex-start;background:var(--botBg);border-bottom-left-radius:8px}
+.msg strong{font-weight:950}
+.msg a{color:var(--brand2);word-break:break-word;text-decoration:none}
 .msg a:hover{text-decoration:underline}
 
+/* ===== Quick buttons (MENŠÍ, bez šedé plochy) ===== */
 .quickbar{
-  padding:8px 12px;
+  margin:6px 12px 8px 12px;
   display:flex;
-  gap:6px;
   flex-wrap:wrap;
+  gap:8px;
 }
-.qb{
+.quickbar .qb{
   border:0;
-  border-radius:999px;
-  padding:6px 10px;
-  font-size:12px;
-  background:rgba(29,78,216,.25);
-  color:#fff;
   cursor:pointer;
+  padding:6px 10px;
+  border-radius:999px;
+  font-size:12px;
+  font-weight:900;
+  color: rgba(255,255,255,.92);
+  background: rgba(29,78,216,.28);
+  box-shadow: 0 10px 24px rgba(0,0,0,.18);
 }
+.quickbar .qb:hover{ background: rgba(29,78,216,.38); }
 
+/* ===== LOADING BAR (Generuje se odpověď… + 3 tečky) ===== */
 .loading-bar{
   display:flex;
-  gap:8px;
+  align-items:center;
+  gap:10px;
   padding:10px 12px;
+  margin:0 12px 8px 12px;
+  border-radius:14px;
+  background: rgba(0,0,0,.22);
+  border:1px solid rgba(255,255,255,.14);
   font-size:13px;
-  color:#fff;
+  color: rgba(255,255,255,.92);
+  backdrop-filter: blur(10px);
+}
+.typing{
+  display:inline-flex;
+  gap:6px;
+  align-items:center;
 }
 .typing span{
-  width:6px;height:6px;border-radius:50%;
-  background:#fff;
-  display:inline-block;
+  width:7px;height:7px;border-radius:999px;
+  background: rgba(255,255,255,.92);
+  opacity:.35;
   animation:bounce 1s infinite ease-in-out;
 }
-.typing span:nth-child(2){animation-delay:.15s}
-.typing span:nth-child(3){animation-delay:.3s}
-@keyframes bounce{50%{opacity:.3}}
+.typing span:nth-child(2){animation-delay:.12s}
+.typing span:nth-child(3){animation-delay:.24s}
+@keyframes bounce{
+  0%,100%{transform:translateY(0);opacity:.35}
+  50%{transform:translateY(-4px);opacity:1}
+}
 
+/* INPUT */
 .row{
   display:flex;
-  gap:8px;
-  padding:10px 12px;
+  gap:10px;
+  padding:10px 12px 12px;
+  border-top:1px solid rgba(255,255,255,.14);
+  background: rgba(255,255,255,.06);
+  backdrop-filter: blur(10px);
 }
 input{
   flex:1;
-  height:42px;
-  border-radius:999px;
-  border:0;
+  height:44px;
   padding:0 14px;
-}
-button.send{
-  width:44px;
-  border-radius:12px;
-  border:0;
-  background:#1d4ed8;
+  border-radius:999px;
+  border:1px solid rgba(255,255,255,.22);
+  background: rgba(0,0,0,.28);
   color:#fff;
-  font-weight:900;
+  font-size:16px;
+  outline:none;
 }
+input::placeholder{color: rgba(255,255,255,.72)}
+button.send{
+  width:48px;
+  height:44px;
+  border:0;
+  border-radius:14px;
+  background: linear-gradient(135deg, rgba(29,78,216,.95), rgba(0,229,255,.25));
+  color:#fff;
+  font-weight:950;
+  cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  box-shadow: 0 14px 28px rgba(0,0,0,.25);
+}
+button.send:disabled{opacity:.55;cursor:not-allowed}
 
+/* FLOATING TAB */
 .radim-fab{
   position:fixed;
   right:20px;
   bottom:20px;
-  padding:10px 14px;
+  height:56px;
+  padding:10px 12px;
   border-radius:999px;
-  background:#0b1220;
-  color:#fff;
-  border:1px solid rgba(255,255,255,.2);
+  border:1px solid rgba(255,255,255,.18);
   cursor:pointer;
+  background: rgba(10,16,28,.60);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 18px 55px rgba(0,0,0,.45);
+  color:#fff;
+  display:flex;
+  align-items:center;
+  gap:10px;
   z-index:10000;
+}
+.fabIcon{
+  width:40px;height:40px;border-radius:16px;
+  background: rgba(255,255,255,.08);
+  border:1px solid rgba(255,255,255,.14);
+  display:flex;align-items:center;justify-content:center;
+  overflow:hidden;
+  flex:0 0 auto;
+}
+.fabIcon img{width:100%;height:100%;object-fit:contain;display:block;padding:6px}
+.fabText{display:flex;flex-direction:column;line-height:1.05;min-width:0}
+.fabText .a{font-weight:950;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px}
+.fabText .b{font-size:11px;color:rgba(255,255,255,.72);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px}
+
+/* Mobile */
+@media(max-width:480px){
+  .chat-widget{right:12px;left:12px;bottom:12px;width:auto;height:80vh}
+  .radim-fab{right:12px;bottom:12px}
+}
+
+/* Reduce motion */
+@media (prefers-reduced-motion: reduce){
+  .typing span{animation:none}
 }
 </style>
 </head>
 
 <body>
-
-<div class="bg">
+<div class="bg" aria-hidden="true">
   <div class="bgImg" id="bgImg"></div>
   <div class="bgVignette"></div>
 </div>
 
-<div id="widget" class="chat-widget">
-  <div class="chat-header" onclick="closeChat()">
-    <div class="brandmark"><img src="/skins/radim/erb.png" alt=""></div>
-    <strong>Asistent obce Radim</strong>
+<!-- CHAT -->
+<div id="widget" class="chat-widget" role="dialog" aria-label="Chat – Asistent obce Radim">
+  <!-- ✅ ÚPRAVA: zrušeno onclick="closeChat()" -->
+  <div class="chat-header">
+    <div class="header-left">
+      <div class="brandmark" id="brandmark"><span id="brandFallback" style="font-size:16px;font-weight:900;">AI</span></div>
+      <div style="min-width:0;">
+        <div class="header-title">Asistent obce Radim</div>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="chip">Online</div>
+      <span class="toggle">⌄</span>
+    </div>
   </div>
 
   <div id="chat" class="chat"></div>
 
-  <div class="quickbar">
-    <button class="qb" onclick="ask('Jaké jsou úřední hodiny?')">Úřední hodiny</button>
-    <button class="qb" onclick="ask('Poplatky za odpady')">Odpady</button>
-    <button class="qb" onclick="ask('Kontakt na obecní úřad')">Kontakty</button>
+  <!-- Quick buttons (jen to, co chceš) -->
+  <div class="quickbar" id="quickbar">
+    <button class="qb" type="button" data-q="Bioodpad – kam s ním v Radimi?">Bioodpad</button>
+    <button class="qb" type="button" data-q="Jaké je číslo na starostku?">Číslo na starostku</button>
+    <button class="qb" type="button" data-q="Kde najdu kontakty na obecní úřad?">Kontakty úřadu</button>
+    <button class="qb" type="button" data-q="Jaké jsou úřední hodiny obecního úřadu?">Úřední hodiny</button>
   </div>
 
+  <!-- Loading -->
   <div id="loadingBar" class="loading-bar" hidden>
-    <div class="typing"><span></span><span></span><span></span></div>
+    <span class="typing" aria-label="Generuje se odpověď">
+      <span></span><span></span><span></span>
+    </span>
     <span>Generuje se odpověď…</span>
   </div>
 
   <div class="row">
-    <input id="q" placeholder="Napište dotaz…" />
-    <button class="send" onclick="ask()">➤</button>
+    <input id="q" type="text" placeholder="Napište dotaz…" />
+    <button id="send" class="send" aria-label="Odeslat">➤</button>
   </div>
 </div>
 
-<button id="fab" class="radim-fab" onclick="openChat()">Poradíme vám</button>
+<!-- Floating tab -->
+<button id="fab" class="radim-fab" onclick="openChat()">
+  <div class="fabIcon" id="fabIcon"><span id="fabFallback" style="font-size:12px;font-weight:900;">AI</span></div>
+  <div class="fabText">
+    <div class="a">Poradíme vám</div>
+    <div class="b">Klikněte a napište dotaz…</div>
+  </div>
+</button>
 
 <script>
-const chatEl = document.getElementById("chat");
-const input = document.getElementById("q");
-const widget = document.getElementById("widget");
-const fab = document.getElementById("fab");
-const loadingBar = document.getElementById("loadingBar");
+const chatEl=document.getElementById("chat");
+const input=document.getElementById("q");
+const send=document.getElementById("send");
+const widget=document.getElementById("widget");
+const fab=document.getElementById("fab");
 
-function openChat(){ widget.style.display="flex"; fab.style.display="none"; input.focus(); }
-function closeChat(){ widget.style.display="none"; fab.style.display="block"; }
+const loadingBar=document.getElementById("loadingBar");
+const bgImg = document.getElementById("bgImg");
+const brandmark = document.getElementById("brandmark");
+const brandFallback = document.getElementById("brandFallback");
+const fabIcon = document.getElementById("fabIcon");
+const fabFallback = document.getElementById("fabFallback");
+const quickbar = document.getElementById("quickbar");
+
+// --- Assets
+const BG_URL = "/skins/radim/bg.jpg";
+const ERB_URL = "/skins/radim/erb.png";
+
+function openChat(){
+  widget.style.display="flex";
+  fab.style.display="none";
+  setTimeout(()=>input.focus(),100);
+}
+function closeChat(){
+  widget.style.display="none";
+  fab.style.display="flex";
+}
 
 function escapeHtml(s){
-  return String(s??"").replace(/[&<>"']/g,m=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;" }[m]));
+  return String(s).replace(/[&<>"']/g,m=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;" }[m]));
 }
 
-function stripCitations(t){
-  return String(t??"")
-    .replace(/【[^】]*】/g,"")
-    .replace(/\[[^\]]*\d+:\d+†[^\]]*\]/g,"")
-    .replace(/(^|\s)\d+:\d+(\s|$)/g," ")
-    .replace(/\s{2,}/g," ")
-    .trim();
-}
-
-function linkify(text){
-  return escapeHtml(text).replace(/https?:\/\/[^\s]+/g,u=>{
-    const clean=u.replace(/[),.;]+$/g,"");
-    return `<a href="${clean}" target="_blank">${clean}</a>`;
+/* ✅ lepší linkify: ignoruje koncové tečky/čárky/závorky */
+function linkify(t){
+  const s = escapeHtml(t);
+  return s.replace(/(https?:\/\/[^\s<]+)/g, (rawUrl) => {
+    let url = rawUrl;
+    // ořízni běžné koncové znaky, co rozbíjí link
+    while (/[)\],.;:!?]$/.test(url)) url = url.slice(0, -1);
+    return `<a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>`;
   });
 }
 
-function add(who,text,cls){
+/* ✅ čistění bordelu z FileSearch: "", "6:0", apod. */
+function cleanAssistantText(input){
+  if(!input) return "";
+  let t = String(input);
+
+  // pryč celé citation bloky:  (i více kusů)
+  t = t.replace(/【\s*\d+\s*:\s*\d+\s*†[^】]*】/g, "");
+
+  // pryč samotné "6:0" / "12:3" apod.
+  t = t.replace(/\b\d+\s*:\s*\d+\b/g, "");
+
+  // pryč "†source" varianty
+  t = t.replace(/\s*†source\b/g, "");
+
+  // zredukuj mezery + prázdné řádky
+  t = t.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+
+  return t;
+}
+
+function addMessage(who,text,cls){
   const d=document.createElement("div");
   d.className="msg "+cls;
-  d.innerHTML=`<strong>${who}:</strong> ${linkify(stripCitations(text))}`;
+  const cleaned = cleanAssistantText(text);
+  d.innerHTML=`<strong>${who}:</strong> ${linkify(cleaned)}`;
   chatEl.appendChild(d);
   chatEl.scrollTop=chatEl.scrollHeight;
 }
 
-async function ask(q){
-  const msg=q||input.value.trim();
-  if(!msg) return;
-  add("Vy",msg,"me");
+function showLoading(on){
+  loadingBar.hidden = !on;
+  chatEl.scrollTop = chatEl.scrollHeight;
+}
+
+async function ask(qOverride){
+  const q=(qOverride ?? input.value).trim();
+  if(!q) return;
+
+  addMessage("Vy",q,"me");
   input.value="";
-  loadingBar.hidden=false;
+  send.disabled=true;
+
+  showLoading(true);
 
   try{
     const r=await fetch("/.netlify/functions/search",{
       method:"POST",
       headers:{ "content-type":"application/json" },
-      body:JSON.stringify({ message:msg })
+      body:JSON.stringify({ message:q })
     });
-    const j=await r.json();
-    add("Radim",j.answer||"Bez odpovědi","bot");
-  }catch{
-    add("Radim","Chyba spojení.","bot");
+    const j=await r.json().catch(()=>({}));
+    addMessage("Radim", (j && j.answer) ? j.answer : "Bez odpovědi", "bot");
+  }catch(e){
+    addMessage("Radim","Chyba spojení.","bot");
   }finally{
-    loadingBar.hidden=true;
+    showLoading(false);
+    send.disabled=false;
   }
 }
 
-add("Radim","Ahoj 👋 Jsem oficiální asistent obce Radim. Zeptej se mě na cokoliv ohledně obce.","bot");
+send.onclick=()=>ask();
+input.addEventListener("keydown",e=>e.key==="Enter"&&ask());
+
+quickbar.addEventListener("click",(e)=>{
+  const btn = e.target.closest("button[data-q]");
+  if(!btn) return;
+  ask(btn.getAttribute("data-q"));
+});
+
+// Load background
+(function loadBg(){
+  const img = new Image();
+  img.onload = () => { bgImg.style.backgroundImage = `url('${BG_URL}')`; };
+  img.onerror = () => { bgImg.style.backgroundImage = ""; };
+  img.src = BG_URL + "?v=" + Date.now();
+})();
+
+// Load erb into header + floating tab
+(function loadErb(){
+  const img = new Image();
+  img.onload = () => {
+    brandmark.innerHTML = "";
+    const h = document.createElement("img");
+    h.src = ERB_URL; h.alt = "Erb obce Radim";
+    brandmark.appendChild(h);
+
+    fabIcon.innerHTML = "";
+    const f = document.createElement("img");
+    f.src = ERB_URL; f.alt = "Erb obce Radim";
+    fabIcon.appendChild(f);
+  };
+  img.onerror = () => {
+    brandFallback.style.display = "inline";
+    fabFallback.style.display = "inline";
+  };
+  img.src = ERB_URL + "?v=" + Date.now();
+})();
+
+// INIT
+addMessage(
+  "Radim",
+  "Upozornění:\nOdpovědi tohoto asistenta jsou generovány umělou inteligencí na základě dostupných informací.\nPrávně závazné a oficiální informace si vždy ověřte na oficiálním webu obce Radim nebo přímo na obecním úřadě.",
+  "bot"
+);
+addMessage("Radim","Ahoj! Zeptej se mě na cokoliv ohledně obce Radim.","bot");
 </script>
 
 </body>
