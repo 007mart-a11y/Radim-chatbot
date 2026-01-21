@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "type": "module",
   "dependencies": {
+    "jsdom": "^27.4.0",
     "openai": "^4.0.0"
   }
 }

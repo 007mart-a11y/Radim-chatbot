@@ -1,0 +1,19 @@
+cat << 'EOF' > knowledge/00_CORE_obec_radim.txt
+OBEC RADIM – OFICIÁLNÍ ÚDAJE (AUTORITATIVNÍ ZDROJ)
+
+Obec: Radim
+Adresa: Radim 8, 507 12 Radim
+IČO: 00272001
+Datová schránka: szfj9sk
+
+Telefon: +420 731 409 498
+E-mail: urad@obec-radim.cz
+
+Starostka: Zdeňka Stříbrná
+
+Úřední hodiny:
+- Středa: 16:00–19:00
+
+Tento soubor je hlavní zdroj pravdy.
+Pokud se jiné zdroje liší, platí VŽDY tento dokument.
+EOF
