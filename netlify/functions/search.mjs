@@ -1,82 +1,113 @@
 // netlify/functions/search.mjs
-// OpenAI Assistants v2 přes fetch (bez OpenAI SDK)
-// Vrací JSON: { ok:true, answer, thread_id } nebo { ok:false, error, details }
-//
-// ENV:
-// - OPENAI_API_KEY
-// - ASSISTANT_ID
+// Netlify Functions (Node 18+), OpenAI Assistants v2 přes fetch
+// ENV: OPENAI_API_KEY, ASSISTANT_ID
+// Request JSON: { message: string, thread_id?: string }
+// Response JSON: { ok: true, answer: string, thread_id: string } | { ok:false, error, details? }
 
-const OPENAI_BASE = "https://api.openai.com/v1";
-const MODEL_HEADERS = () => ({
-  "authorization": `Bearer ${process.env.OPENAI_API_KEY || ""}`,
-  "content-type": "application/json",
-  "openai-beta": "assistants=v2",
-});
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "content-type",
+  "Access-Control-Allow-Methods": "POST,OPTIONS",
+};
 
-function jsonResponse(status, data) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: {
-      "content-type": "application/json; charset=utf-8",
-      "cache-control": "no-store",
-      "access-control-allow-origin": "*",
-      "access-control-allow-headers": "content-type, authorization",
-      "access-control-allow-methods": "POST, OPTIONS",
-    },
-  });
-}
+const OPENAI_BASE_URL = "https://api.openai.com/v1";
 
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
+function jsonResponse(status, data) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json; charset=utf-8" },
+  });
+}
+
+function getCzechTodayString() {
+  const now = new Date();
+  const fmt = new Intl.DateTimeFormat("cs-CZ", {
+    timeZone: "Europe/Prague",
+    weekday: "long",
+    day: "numeric",
+    month: "numeric",
+    year: "numeric",
+  });
+  return fmt.format(now);
+}
+
+async function api(path, { method = "GET", body, headers = {} } = {}, apiKey) {
+  const res = await fetch(`${OPENAI_BASE_URL}${path}`, {
+    method,
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "OpenAI-Beta": "assistants=v2",
+      ...headers,
+    },
+    body,
+  });
+
+  const text = await res.text().catch(() => "");
+  let json = null;
+  try {
+    json = text ? JSON.parse(text) : null;
+  } catch {
+    // ignore
+  }
+
+  if (!res.ok) {
+    const msg = json?.error?.message || text || `HTTP ${res.status}`;
+    throw new Error(`${method} ${path} failed: ${msg}`);
+  }
+
+  return json ?? {};
+}
+
+function extractAssistantText(messagesListJson) {
+  const data = messagesListJson?.data || [];
+  const assistantMsg = data.find((m) => m.role === "assistant");
+  if (!assistantMsg?.content?.length) return "Bez odpovědi";
+
+  const parts = assistantMsg.content
+    .map((c) => (c?.type === "text" ? c.text?.value : ""))
+    .filter(Boolean);
+
+  return parts.length ? parts.join("\n\n") : "Bez odpovědi";
+}
+
 /**
- * Odstraní FileSearch citace a bordel typu:
- * , [6:0], (6:0), "†source", apod.
- * + zruší markdown hvězdičky (**bold**, * odrážky)
- * + uhladí whitespace
- * + opraví rozbitá URL (odsekne ),.];:!? za odkazem)
+ * Čistič výstupu asistenta:
+ * - odstraní FileSearch citace: 
+ * - odstraní tokeny [6:0], (6:0) apod.
+ * - odstraní markdown hvězdičky (hlavně **tučně**)
+ * - opraví URL s rozbitou interpunkcí na konci
+ * - uhladí whitespace
  */
 function cleanAssistantText(input) {
   if (!input) return "";
   let t = String(input);
 
-  // 0) Zruš markdown bold/italic hvězdičky
-  // **text** -> text
-  t = t.replace(/\*\*(.*?)\*\*/g, "$1");
-  // * text (odrážka) -> - text
-  t = t.replace(/^(\s*)\*\s+/gm, "$1- ");
-  // zbytečné osamělé hvězdičky
-  t = t.replace(/\*/g, "");
-
-  // 1) Nejčastější OpenAI citace z File Search
+  // 1) Citace z File Search: 【 6:0 † ... 】
   t = t.replace(/【\s*\d+\s*:\s*\d+\s*†[^】]*】/g, "");
-
-  // 2) Variace bez †… nebo s jiným obsahem
   t = t.replace(/【\s*\d+\s*:\s*\d+\s*】/g, "");
 
-  // 3) Variace v hranatých / kulatých závorkách
+  // 2) Tokeny v [] nebo ()
   t = t.replace(/\[\s*\d+\s*:\s*\d+\s*(?:†[^\]]*)?\]/g, "");
   t = t.replace(/\(\s*\d+\s*:\s*\d+\s*(?:†[^)]*)?\)/g, "");
 
-  // 4) „†source“ a podobné zbytky
+  // 3) „†source“ apod.
   t = t.replace(/†\s*source/gi, "");
   t = t.replace(/\bsource:\s*\d+\s*:\s*\d+\b/gi, "");
 
-  // 5) Holé tokeny typu "6:0" (pozor na časy 12:30)
-  t = t.replace(/(^|[^\d])(\d{1,3}\s*:\s*\d{1,3})(?=($|[^\d]))/g, (m, p1, tok) => {
-    const parts = tok.replace(/\s+/g, "").split(":");
-    const a = Number(parts[0]);
-    const b = Number(parts[1]);
-    const looksLikeTime = a >= 0 && a <= 23 && b >= 0 && b <= 59;
-    if (looksLikeTime) return m; // nech čas
-    return p1; // smaž token
-  });
+  // 4) Markdown hvězdičky: **tučně** => tučně
+  t = t.replace(/\*\*(.*?)\*\*/g, "$1");
+  // občas model dá *slovo* – odstraníme jen ty „obalovací“ hvězdičky
+  t = t.replace(/(^|[\s(])\*(\S[^*]*\S)\*([\s).,!?]|$)/g, "$1$2$3");
 
-  // 6) Oprava rozbitých URL: odstraní trailing interpunkci za URL
+  // 5) Oprava URL: odstraní trailing interpunkci za URL
+  // např. https://.../).  -> https://.../
   t = t.replace(/(https?:\/\/[^\s<>"']+?)([)\],.;:!?]+)(?=\s|$)/g, "$1");
 
-  // 7) Uhlazení mezer a prázdných řádků
+  // 6) Uhlazení whitespace
   t = t.replace(/[ \t]+\n/g, "\n");
   t = t.replace(/\n{3,}/g, "\n\n");
   t = t.replace(/[ \t]{2,}/g, " ");
@@ -85,164 +116,117 @@ function cleanAssistantText(input) {
   return t;
 }
 
-function extractAssistantTextFromMessage(msg) {
-  if (!msg || !Array.isArray(msg.content)) return "";
-  let out = "";
-  for (const c of msg.content) {
-    if (c?.type === "text" && c?.text?.value) {
-      out += (out ? "\n\n" : "") + c.text.value;
-    }
-  }
-  return out;
-}
+export default async function handler(req) {
+  // CORS preflight
+  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders });
 
-async function oaiFetch(path, options = {}) {
-  const res = await fetch(`${OPENAI_BASE}${path}`, {
-    ...options,
-    headers: { ...MODEL_HEADERS(), ...(options.headers || {}) },
-  });
-
-  const text = await res.text().catch(() => "");
-  let json = null;
   try {
-    json = text ? JSON.parse(text) : null;
-  } catch {
-    json = null;
-  }
+    if (req.method !== "POST") return jsonResponse(405, { ok: false, error: "Method not allowed" });
 
-  if (!res.ok) {
-    const detail = json || { raw: text || "(empty)" };
-    const msg = detail?.error?.message || `OpenAI error (${res.status})`;
-    const err = new Error(msg);
-    err.status = res.status;
-    err.detail = detail;
-    throw err;
-  }
+    const apiKey = process.env.OPENAI_API_KEY;
+    const assistantId = process.env.ASSISTANT_ID;
 
-  return json;
-}
+    if (!apiKey) return jsonResponse(500, { ok: false, error: "Missing OPENAI_API_KEY" });
+    if (!assistantId) return jsonResponse(500, { ok: false, error: "Missing ASSISTANT_ID" });
 
-async function ensureThread(thread_id) {
-  if (thread_id) return thread_id;
-  const t = await oaiFetch(`/threads`, { method: "POST", body: JSON.stringify({}) });
-  return t.id;
-}
+    const body = await req.json().catch(() => ({}));
+    const message = body?.message;
 
-async function addUserMessage(thread_id, message) {
-  await oaiFetch(`/threads/${thread_id}/messages`, {
-    method: "POST",
-    body: JSON.stringify({ role: "user", content: message }),
-  });
-}
-
-
-async function runAssistant(thread_id, assistant_id) {
-  const run = await oaiFetch(`/threads/${thread_id}/runs`, {
-    method: "POST",
-    body: JSON.stringify({
-      assistant_id,
-      temperature: 0,
-
-      // ✅ DŮLEŽITÉ: “guardrail” instrukce pro každý běh
-      additional_instructions: `
-Jsi AI asistent obce Radim. Při dotazech na kontakty, úřední hodiny, IČO, datovou schránku a vedení obce
-MUSÍŠ vždy použít údaje z 00_CORE (autorita).
-Úřední hodiny obecního úřadu Radim jsou POUZE:
-- Středa: 16:00–19:00
-Nevymýšlej jiné dny ani časy. Pokud si nejsi jistý, řekni že se má ověřit na webu obce.
-`.trim(),
-    }),
-  });
-  return run.id;
-}
-
-async function waitRun(thread_id, run_id, { timeoutMs = 45000 } = {}) {
-  const start = Date.now();
-  while (true) {
-    const run = await oaiFetch(`/threads/${thread_id}/runs/${run_id}`, { method: "GET" });
-
-    const status = run.status;
-    if (status === "completed") return run;
-    if (status === "failed" || status === "cancelled" || status === "expired") {
-      const errMsg = run?.last_error?.message || `Run ${status}`;
-      const err = new Error(errMsg);
-      err.detail = run;
-      throw err;
-    }
-
-    if (Date.now() - start > timeoutMs) {
-      const err = new Error("Timeout: asistent nestihl odpovědět v limitu.");
-      err.detail = run;
-      throw err;
-    }
-
-    await sleep(900);
-  }
-}
-
-async function getLatestAssistantMessage(thread_id) {
-  const list = await oaiFetch(`/threads/${thread_id}/messages?limit=50`, { method: "GET" });
-  const msgs = Array.isArray(list.data) ? list.data : [];
-
-  // ✅ vezmeme opravdu nejnovější assistant zprávu
-  const assistants = msgs.filter((m) => m.role === "assistant");
-  assistants.sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
-  return assistants[0] || null;
-}
-
-/**
- * Netlify Function handler
- */
-export default async (request) => {
-  try {
-    if (request.method === "OPTIONS") {
-      return jsonResponse(200, { ok: true });
-    }
-
-    if (request.method !== "POST") {
-      return jsonResponse(405, { ok: false, error: "Method not allowed" });
-    }
-
-    const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-    const ASSISTANT_ID = process.env.ASSISTANT_ID;
-
-    if (!OPENAI_API_KEY) {
-      return jsonResponse(500, { ok: false, error: "Missing env OPENAI_API_KEY" });
-    }
-    if (!ASSISTANT_ID) {
-      return jsonResponse(500, { ok: false, error: "Missing env ASSISTANT_ID" });
-    }
-
-    let body = {};
-    try {
-      body = await request.json();
-    } catch {
-      body = {};
-    }
-
-    const message = String(body.message || "").trim();
-    const thread_in = body.thread_id ? String(body.thread_id) : "";
-
-    if (!message) {
+    if (!message || typeof message !== "string") {
       return jsonResponse(400, { ok: false, error: "Missing message" });
     }
 
-    const thread_id = await ensureThread(thread_in);
-    await addUserMessage(thread_id, message);
+    // ✅ Runtime datum (Europe/Prague) – do RUN instructions
+    const todayStr = getCzechTodayString();
 
-    const run_id = await runAssistant(thread_id, ASSISTANT_ID);
-    await waitRun(thread_id, run_id, { timeoutMs: 45000 });
+    // Důležité: NEBUĎ přehnaně přísný – ale jasně řekni PRIORITU CORE.
+    const runInstructions =
+      `Dnes je ${todayStr} (časová zóna: Europe/Prague).\n` +
+      `Při výrazech jako "dnes", "zítra", "včera", "příští víkend", "tento týden" ` +
+      `vždy vykládej časové odkazy vzhledem k tomuto datu.\n\n` +
+      `Používej znalostní bázi (File Search).\n` +
+      `PRIORITA ZDROJŮ: pokud existuje soubor 00_CORE_* (CORE), má přednost při rozporu.\n` +
+      `Jinak aktivně hledej i v ostatních souborech (STATIC/LIVE/PDF) a odpověz podle nich.\n` +
+      `Neuváděj citace ani značky typu 【…】 nebo 6:0. Odpovídej lidsky a stručně.`;
 
-    const msg = await getLatestAssistantMessage(thread_id);
-    const raw = extractAssistantTextFromMessage(msg);
-    const answer = cleanAssistantText(raw) || "Bez odpovědi.";
+    // Thread: pokud přijde thread_id, pokračujeme; jinak založíme nový
+    let threadId = body?.thread_id;
 
-    return jsonResponse(200, { ok: true, answer, thread_id });
-  } catch (e) {
+    if (!threadId || typeof threadId !== "string" || !threadId.startsWith("thread_")) {
+      const created = await api("/threads", { method: "POST" }, apiKey);
+      threadId = created.id;
+    }
+
+    // 1) User message
+    await api(
+      `/threads/${threadId}/messages`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          role: "user",
+          content: message,
+        }),
+      },
+      apiKey
+    );
+
+    // 2) Run + instructions
+    const run = await api(
+      `/threads/${threadId}/runs`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          assistant_id: assistantId,
+          instructions: runInstructions,
+        }),
+      },
+      apiKey
+    );
+
+    // 3) Poll run status
+    const started = Date.now();
+    const timeoutMs = 25_000;
+
+    while (true) {
+      if (Date.now() - started > timeoutMs) {
+        return jsonResponse(504, { ok: false, error: "Timeout waiting for response" });
+      }
+
+      await sleep(800);
+
+      const check = await api(`/threads/${threadId}/runs/${run.id}`, {}, apiKey);
+      const status = check.status;
+
+      if (status === "queued" || status === "in_progress") continue;
+
+      if (status === "requires_action") {
+        return jsonResponse(501, {
+          ok: false,
+          error: "Run requires action (tool call not handled in function).",
+          status,
+        });
+      }
+
+      if (status !== "completed") {
+        return jsonResponse(500, { ok: false, error: "Run failed", status });
+      }
+
+      break;
+    }
+
+    // 4) Read messages
+    const messages = await api(`/threads/${threadId}/messages?limit=20`, {}, apiKey);
+    let answer = extractAssistantText(messages);
+    answer = cleanAssistantText(answer) || "Bez odpovědi.";
+
+    return jsonResponse(200, { ok: true, answer, thread_id: threadId });
+  } catch (err) {
     return jsonResponse(500, {
       ok: false,
-      error: e?.message || "Internal error",
-      details: e?.detail || null,
+      error: "Server error",
+      details: err?.message || String(err),
     });
   }
-};
+}
