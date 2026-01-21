@@ -32,14 +32,24 @@ function sleep(ms) {
 
 /**
  * Odstraní FileSearch citace a bordel typu:
- * , [6:0], (6:0), 6:0, "†source", atd.
- * + uhladí whitespace.
+ * , [6:0], (6:0), "†source", apod.
+ * + zruší markdown hvězdičky (**bold**, * odrážky)
+ * + uhladí whitespace
+ * + opraví rozbitá URL (odsekne ),.];:!? za odkazem)
  */
 function cleanAssistantText(input) {
   if (!input) return "";
   let t = String(input);
 
-  // 1) Nejčastější OpenAI citace z File Search: 
+  // 0) Zruš markdown bold/italic hvězdičky
+  // **text** -> text
+  t = t.replace(/\*\*(.*?)\*\*/g, "$1");
+  // * text (odrážka) -> - text
+  t = t.replace(/^(\s*)\*\s+/gm, "$1- ");
+  // zbytečné osamělé hvězdičky
+  t = t.replace(/\*/g, "");
+
+  // 1) Nejčastější OpenAI citace z File Search
   t = t.replace(/【\s*\d+\s*:\s*\d+\s*†[^】]*】/g, "");
 
   // 2) Variace bez †… nebo s jiným obsahem
@@ -53,34 +63,28 @@ function cleanAssistantText(input) {
   t = t.replace(/†\s*source/gi, "");
   t = t.replace(/\bsource:\s*\d+\s*:\s*\d+\b/gi, "");
 
-  // 5) Holé tokeny typu "6:0" (nechceme, ale pozor aby to nesmazalo čas)
-  // Mažeme jen když je to obklopené ne-čísly nebo na konci, typicky za textem.
+  // 5) Holé tokeny typu "6:0" (pozor na časy 12:30)
   t = t.replace(/(^|[^\d])(\d{1,3}\s*:\s*\d{1,3})(?=($|[^\d]))/g, (m, p1, tok) => {
-    // tok jako 12:30 může být čas – necháme, pokud kolem jsou mezery a vypadá jako čas (0-23:0-59)
     const parts = tok.replace(/\s+/g, "").split(":");
     const a = Number(parts[0]);
     const b = Number(parts[1]);
     const looksLikeTime = a >= 0 && a <= 23 && b >= 0 && b <= 59;
-    if (looksLikeTime) return m; // nech
+    if (looksLikeTime) return m; // nech čas
     return p1; // smaž token
   });
 
-  // 6) Uhlazení mezer a prázdných řádků
+  // 6) Oprava rozbitých URL: odstraní trailing interpunkci za URL
+  t = t.replace(/(https?:\/\/[^\s<>"']+?)([)\],.;:!?]+)(?=\s|$)/g, "$1");
+
+  // 7) Uhlazení mezer a prázdných řádků
   t = t.replace(/[ \t]+\n/g, "\n");
   t = t.replace(/\n{3,}/g, "\n\n");
   t = t.replace(/[ \t]{2,}/g, " ");
   t = t.trim();
 
-  // 7) Oprava rozbitých URL: odstraní trailing interpunkci za URL uvnitř textu
-  // (typicky "…).", ").", "],", ";", "…")
-  t = t.replace(/(https?:\/\/[^\s<>"']+?)([)\],.;:!?]+)(?=\s|$)/g, "$1");
-
   return t;
 }
 
-/**
- * Bezpečné vytažení textu z odpovědi Assistants (text.value).
- */
 function extractAssistantTextFromMessage(msg) {
   if (!msg || !Array.isArray(msg.content)) return "";
   let out = "";
@@ -132,9 +136,14 @@ async function addUserMessage(thread_id, message) {
 }
 
 async function runAssistant(thread_id, assistant_id) {
+  // ✅ Stabilita odpovědí:
+  // temperature: 0 = minimální náhodnost
   const run = await oaiFetch(`/threads/${thread_id}/runs`, {
     method: "POST",
-    body: JSON.stringify({ assistant_id }),
+    body: JSON.stringify({
+      assistant_id,
+      temperature: 0,
+    }),
   });
   return run.id;
 }
@@ -164,10 +173,13 @@ async function waitRun(thread_id, run_id, { timeoutMs = 45000 } = {}) {
 }
 
 async function getLatestAssistantMessage(thread_id) {
-  const list = await oaiFetch(`/threads/${thread_id}/messages?limit=20`, { method: "GET" });
+  const list = await oaiFetch(`/threads/${thread_id}/messages?limit=50`, { method: "GET" });
   const msgs = Array.isArray(list.data) ? list.data : [];
-  const latest = msgs.find((m) => m.role === "assistant");
-  return latest || null;
+
+  // ✅ vezmeme opravdu nejnovější assistant zprávu
+  const assistants = msgs.filter((m) => m.role === "assistant");
+  assistants.sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
+  return assistants[0] || null;
 }
 
 /**
