@@ -1,8 +1,8 @@
 // netlify/functions/search.mjs
 // Netlify Functions (Node 18+), OpenAI Assistants v2 přes fetch
 // ENV: OPENAI_API_KEY, ASSISTANT_ID
-// Request JSON: { message: string, thread_id?: string }
-// Response JSON: { ok: true, answer: string, thread_id: string } | { ok:false, error, details? }
+// Request JSON: { message: string, thread_id?: string, debug?: boolean }
+// Response JSON: { ok: true, answer: string, thread_id: string, raw_answer?: string } | { ok:false, error, details? }
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -19,7 +19,7 @@ function sleep(ms) {
 function jsonResponse(status, data) {
   return new Response(JSON.stringify(data), {
     status,
-    headers: { ...corsHeaders, "Content-Type": "application/json; charset=utf-8" },
+    headers: { ...corsHeaders, "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" },
   });
 }
 
@@ -50,9 +50,7 @@ async function api(path, { method = "GET", body, headers = {} } = {}, apiKey) {
   let json = null;
   try {
     json = text ? JSON.parse(text) : null;
-  } catch {
-    // ignore
-  }
+  } catch {}
 
   if (!res.ok) {
     const msg = json?.error?.message || text || `HTTP ${res.status}`;
@@ -74,50 +72,37 @@ function extractAssistantText(messagesListJson) {
   return parts.length ? parts.join("\n\n") : "Bez odpovědi";
 }
 
-/**
- * Čistič výstupu asistenta:
- * - odstraní FileSearch citace: 
- * - odstraní tokeny [6:0], (6:0) apod.
- * - odstraní markdown hvězdičky (hlavně **tučně**)
- * - opraví URL s rozbitou interpunkcí na konci
- * - uhladí whitespace
- */
-function cleanAssistantText(input) {
-  if (!input) return "";
-  let t = String(input);
+// Čištění: citace z file_search + markdown bold, ale NESAHAJ na časy
+function sanitizeAnswer(text) {
+  let t = String(text || "");
 
-  // 1) Citace z File Search: 【 6:0 † ... 】
+  // OpenAI citace: 
   t = t.replace(/【\s*\d+\s*:\s*\d+\s*†[^】]*】/g, "");
+  // i bez †
   t = t.replace(/【\s*\d+\s*:\s*\d+\s*】/g, "");
-
-  // 2) Tokeny v [] nebo ()
+  // hranaté/kulaté varianty
   t = t.replace(/\[\s*\d+\s*:\s*\d+\s*(?:†[^\]]*)?\]/g, "");
   t = t.replace(/\(\s*\d+\s*:\s*\d+\s*(?:†[^)]*)?\)/g, "");
 
-  // 3) „†source“ apod.
+  // pryč zbytky "†source"
   t = t.replace(/†\s*source/gi, "");
-  t = t.replace(/\bsource:\s*\d+\s*:\s*\d+\b/gi, "");
 
-  // 4) Markdown hvězdičky: **tučně** => tučně
+  // pryč markdown bold **něco**
   t = t.replace(/\*\*(.*?)\*\*/g, "$1");
-  // občas model dá *slovo* – odstraníme jen ty „obalovací“ hvězdičky
-  t = t.replace(/(^|[\s(])\*(\S[^*]*\S)\*([\s).,!?]|$)/g, "$1$2$3");
 
-  // 5) Oprava URL: odstraní trailing interpunkci za URL
-  // např. https://.../).  -> https://.../
-  t = t.replace(/(https?:\/\/[^\s<>"']+?)([)\],.;:!?]+)(?=\s|$)/g, "$1");
-
-  // 6) Uhlazení whitespace
+  // uhladit whitespace
   t = t.replace(/[ \t]+\n/g, "\n");
   t = t.replace(/\n{3,}/g, "\n\n");
   t = t.replace(/[ \t]{2,}/g, " ");
   t = t.trim();
 
+  // oprava URL: odstraní trailing interpunkci za URL
+  t = t.replace(/(https?:\/\/[^\s<>"']+?)([)\],.;:!?]+)(?=\s|$)/g, "$1");
+
   return t;
 }
 
 export default async function handler(req) {
-  // CORS preflight
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders });
 
   try {
@@ -136,22 +121,24 @@ export default async function handler(req) {
       return jsonResponse(400, { ok: false, error: "Missing message" });
     }
 
-    // ✅ Runtime datum (Europe/Prague) – do RUN instructions
+    const debug = !!body?.debug;
+
+    // ✅ RUN instructions (jako Chomutice), ale pro RADIM + jasná priorita CORE
     const todayStr = getCzechTodayString();
 
-    // Důležité: NEBUĎ přehnaně přísný – ale jasně řekni PRIORITU CORE.
     const runInstructions =
       `Dnes je ${todayStr} (časová zóna: Europe/Prague).\n` +
-      `Při výrazech jako "dnes", "zítra", "včera", "příští víkend", "tento týden" ` +
-      `vždy vykládej časové odkazy vzhledem k tomuto datu.\n\n` +
-      `Používej znalostní bázi (File Search).\n` +
-      `PRIORITA ZDROJŮ: pokud existuje soubor 00_CORE_* (CORE), má přednost při rozporu.\n` +
-      `Jinak aktivně hledej i v ostatních souborech (STATIC/LIVE/PDF) a odpověz podle nich.\n` +
-      `Neuváděj citace ani značky typu 【…】 nebo 6:0. Odpovídej lidsky a stručně.`;
+      `Když uživatel použije "dnes/zítra/včera/příští týden", vykládej to vůči tomuto datu.\n\n` +
+      `Jsi oficiální asistent obce Radim.\n` +
+      `PRIORITA ZDROJŮ: 1) 00_CORE (vždy rozhoduje) 2) LIVE 3) STATICKÁ/ARCHIV.\n` +
+      `Když je dotaz na kontakty/úřední hodiny/vedení obce, vždy použij údaje z 00_CORE.\n` +
+      `U úředních hodin odpověz přímo a konkrétně.\n\n` +
+      `DŮLEŽITÉ (RADIM, z CORE): Úřední hodiny jsou pouze ve středu 16:00–19:00.\n` +
+      `Nezmiňuj technické detaily (AI, crawling, scraping). Odpovídej věcně česky.\n` +
+      `Odkazy piš bez tečky na konci URL.`;
 
-    // Thread: pokud přijde thread_id, pokračujeme; jinak založíme nový
+    // Thread
     let threadId = body?.thread_id;
-
     if (!threadId || typeof threadId !== "string" || !threadId.startsWith("thread_")) {
       const created = await api("/threads", { method: "POST" }, apiKey);
       threadId = created.id;
@@ -163,10 +150,7 @@ export default async function handler(req) {
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          role: "user",
-          content: message,
-        }),
+        body: JSON.stringify({ role: "user", content: message }),
       },
       apiKey
     );
@@ -177,15 +161,12 @@ export default async function handler(req) {
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          assistant_id: assistantId,
-          instructions: runInstructions,
-        }),
+        body: JSON.stringify({ assistant_id: assistantId, instructions: runInstructions }),
       },
       apiKey
     );
 
-    // 3) Poll run status
+    // 3) Poll
     const started = Date.now();
     const timeoutMs = 25_000;
 
@@ -218,10 +199,10 @@ export default async function handler(req) {
 
     // 4) Read messages
     const messages = await api(`/threads/${threadId}/messages?limit=20`, {}, apiKey);
-    let answer = extractAssistantText(messages);
-    answer = cleanAssistantText(answer) || "Bez odpovědi.";
+    const raw_answer = extractAssistantText(messages);
+    const answer = sanitizeAnswer(raw_answer) || "Bez odpovědi";
 
-    return jsonResponse(200, { ok: true, answer, thread_id: threadId });
+    return jsonResponse(200, debug ? { ok: true, answer, raw_answer, thread_id: threadId } : { ok: true, answer, thread_id: threadId });
   } catch (err) {
     return jsonResponse(500, {
       ok: false,
