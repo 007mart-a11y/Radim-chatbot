@@ -79,7 +79,6 @@ body{
   padding:12px 12px 10px;
   background: linear-gradient(135deg, rgba(30,58,138,.92), rgba(21,48,111,.88));
   color:#fff;
-  cursor:pointer;
   display:flex;
   justify-content:space-between;
   align-items:center;
@@ -99,7 +98,27 @@ body{
 .header-title{font-weight:950;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .header-right{display:flex;align-items:center;gap:8px;flex:0 0 auto}
 .chip{font-size:11px;padding:4px 10px;border-radius:999px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.14)}
-.toggle{font-size:18px;opacity:.9}
+
+.hdr-close{
+  width:34px;height:34px;
+  border-radius:12px;
+  border:1px solid rgba(255,255,255,.18);
+  background: rgba(255,255,255,.14);
+  color:#fff;
+  cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  font-size:18px;
+  line-height:1;
+  user-select:none;
+}
+.hdr-close:hover{ background: rgba(255,255,255,.22); }
+
+/* klikatelné zavření i na levé části headeru (mimo tlačítka) */
+.header-clickzone{
+  cursor:pointer;
+  display:flex; align-items:center; gap:10px;
+  min-width:0;
+}
 
 /* CHAT AREA */
 .chat{
@@ -130,7 +149,7 @@ body{
 .msg a{color:var(--brand2);word-break:break-word;text-decoration:none}
 .msg a:hover{text-decoration:underline}
 
-/* ===== Quick buttons (MENŠÍ, bez šedé plochy) ===== */
+/* ===== Quick buttons ===== */
 .quickbar{
   margin:6px 12px 8px 12px;
   display:flex;
@@ -150,7 +169,7 @@ body{
 }
 .quickbar .qb:hover{ background: rgba(29,78,216,.38); }
 
-/* ===== LOADING BAR (Generuje se odpověď… + 3 tečky) ===== */
+/* ===== LOADING BAR ===== */
 .loading-bar{
   display:flex;
   align-items:center;
@@ -164,11 +183,7 @@ body{
   color: rgba(255,255,255,.92);
   backdrop-filter: blur(10px);
 }
-.typing{
-  display:inline-flex;
-  gap:6px;
-  align-items:center;
-}
+.typing{display:inline-flex;gap:6px;align-items:center}
 .typing span{
   width:7px;height:7px;border-radius:999px;
   background: rgba(255,255,255,.92);
@@ -217,37 +232,54 @@ button.send{
 }
 button.send:disabled{opacity:.55;cursor:not-allowed}
 
-/* FLOATING TAB */
+/* FLOATING TAB (výraznější + jemné blikání) */
 .radim-fab{
   position:fixed;
   right:20px;
   bottom:20px;
-  height:56px;
-  padding:10px 12px;
+  height:58px;
+  padding:10px 14px;
   border-radius:999px;
-  border:1px solid rgba(255,255,255,.18);
+  border:1px solid rgba(255,255,255,.22);
   cursor:pointer;
-  background: rgba(10,16,28,.60);
+  background: rgba(10,16,28,.72);
   backdrop-filter: blur(12px);
-  box-shadow: 0 18px 55px rgba(0,0,0,.45);
+  box-shadow: 0 22px 70px rgba(0,0,0,.55);
   color:#fff;
   display:flex;
   align-items:center;
   gap:10px;
   z-index:10000;
+  transform: translateZ(0);
 }
+
+/* jemný „blink“ jen když je zavřeno (třída .blink) */
+.radim-fab.blink{
+  animation: fabPulse 1.55s ease-in-out infinite;
+}
+@keyframes fabPulse{
+  0%,100%{
+    box-shadow: 0 22px 70px rgba(0,0,0,.55);
+    border-color: rgba(255,255,255,.22);
+  }
+  50%{
+    box-shadow: 0 28px 95px rgba(29,78,216,.28), 0 22px 70px rgba(0,0,0,.55);
+    border-color: rgba(0,229,255,.35);
+  }
+}
+
 .fabIcon{
   width:40px;height:40px;border-radius:16px;
-  background: rgba(255,255,255,.08);
-  border:1px solid rgba(255,255,255,.14);
+  background: rgba(255,255,255,.10);
+  border:1px solid rgba(255,255,255,.16);
   display:flex;align-items:center;justify-content:center;
   overflow:hidden;
   flex:0 0 auto;
 }
 .fabIcon img{width:100%;height:100%;object-fit:contain;display:block;padding:6px}
 .fabText{display:flex;flex-direction:column;line-height:1.05;min-width:0}
-.fabText .a{font-weight:950;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px}
-.fabText .b{font-size:11px;color:rgba(255,255,255,.72);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px}
+.fabText .a{font-weight:950;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:240px}
+.fabText .b{font-size:11px;color:rgba(255,255,255,.78);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:240px}
 
 /* Mobile */
 @media(max-width:480px){
@@ -258,6 +290,7 @@ button.send:disabled{opacity:.55;cursor:not-allowed}
 /* Reduce motion */
 @media (prefers-reduced-motion: reduce){
   .typing span{animation:none}
+  .radim-fab.blink{animation:none}
 }
 </style>
 </head>
@@ -270,28 +303,29 @@ button.send:disabled{opacity:.55;cursor:not-allowed}
 
 <!-- CHAT -->
 <div id="widget" class="chat-widget" role="dialog" aria-label="Chat – Asistent obce Radim">
-  <!-- ✅ ÚPRAVA: zrušeno onclick="closeChat()" -->
   <div class="chat-header">
-    <div class="header-left">
+    <!-- kliknutelná zóna (zavírá chat) -->
+    <div class="header-clickzone" id="headerClick" title="Zavřít chat">
       <div class="brandmark" id="brandmark"><span id="brandFallback" style="font-size:16px;font-weight:900;">AI</span></div>
       <div style="min-width:0;">
         <div class="header-title">Asistent obce Radim</div>
       </div>
     </div>
+
     <div class="header-right">
       <div class="chip">Online</div>
-      <span class="toggle">⌄</span>
+      <button class="hdr-close" id="closeBtn" type="button" aria-label="Zavřít">✕</button>
     </div>
   </div>
 
   <div id="chat" class="chat"></div>
 
-  <!-- Quick buttons (jen to, co chceš) -->
+  <!-- Quick buttons -->
   <div class="quickbar" id="quickbar">
-    <button class="qb" type="button" data-q="Bioodpad – kam s ním v Radimi?">Bioodpad</button>
-    <button class="qb" type="button" data-q="Jaké je číslo na starostku?">Číslo na starostku</button>
-    <button class="qb" type="button" data-q="Kde najdu kontakty na obecní úřad?">Kontakty úřadu</button>
-    <button class="qb" type="button" data-q="Jaké jsou úřední hodiny obecního úřadu?">Úřední hodiny</button>
+    <button class="qb" type="button" data-q="Bioodpad – kam s ním v Radimi? Odpověz stručně a přidej správný odkaz na relevantní stránku obce Radim.">Bioodpad</button>
+    <button class="qb" type="button" data-q="Jaké je číslo na starostku obce Radim? Odpověz jednou větou a případně doplň odkaz na kontakty.">Číslo na starostku</button>
+    <button class="qb" type="button" data-q="Kde najdu kontakty na obecní úřad v Radimi? Dej prosím telefon, e-mail a odkaz na stránku kontaktů.">Kontakty úřadu</button>
+    <button class="qb" type="button" data-q="Jaké jsou úřední hodiny obecního úřadu v Radimi? Napiš je přehledně (dny + čas) a přidej odkaz na oficiální stránku.">Úřední hodiny</button>
   </div>
 
   <!-- Loading -->
@@ -309,7 +343,7 @@ button.send:disabled{opacity:.55;cursor:not-allowed}
 </div>
 
 <!-- Floating tab -->
-<button id="fab" class="radim-fab" onclick="openChat()">
+<button id="fab" class="radim-fab blink" type="button" aria-label="Otevřít chat">
   <div class="fabIcon" id="fabIcon"><span id="fabFallback" style="font-size:12px;font-weight:900;">AI</span></div>
   <div class="fabText">
     <div class="a">Poradíme vám</div>
@@ -332,59 +366,70 @@ const fabIcon = document.getElementById("fabIcon");
 const fabFallback = document.getElementById("fabFallback");
 const quickbar = document.getElementById("quickbar");
 
+const headerClick = document.getElementById("headerClick");
+const closeBtn = document.getElementById("closeBtn");
+
 // --- Assets
 const BG_URL = "/skins/radim/bg.jpg";
 const ERB_URL = "/skins/radim/erb.png";
 
+function setFabBlink(on){
+  fab.classList.toggle("blink", !!on);
+}
+
 function openChat(){
   widget.style.display="flex";
   fab.style.display="none";
+  setFabBlink(false);
   setTimeout(()=>input.focus(),100);
 }
 function closeChat(){
   widget.style.display="none";
   fab.style.display="flex";
+  setFabBlink(true);
 }
+
+// header close handlers (spolehlivé)
+headerClick.addEventListener("click", (e)=>{ e.preventDefault(); closeChat(); });
+closeBtn.addEventListener("click", (e)=>{ e.preventDefault(); closeChat(); });
+
+// open button
+fab.addEventListener("click", (e)=>{ e.preventDefault(); openChat(); });
 
 function escapeHtml(s){
   return String(s).replace(/[&<>"']/g,m=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;" }[m]));
 }
 
-/* ✅ lepší linkify: ignoruje koncové tečky/čárky/závorky */
-function linkify(t){
-  const s = escapeHtml(t);
-  return s.replace(/(https?:\/\/[^\s<]+)/g, (rawUrl) => {
-    let url = rawUrl;
-    // ořízni běžné koncové znaky, co rozbíjí link
-    while (/[)\],.;:!?]$/.test(url)) url = url.slice(0, -1);
-    return `<a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>`;
-  });
-}
-
-/* ✅ čistění bordelu z FileSearch: "", "6:0", apod. */
-function cleanAssistantText(input){
+/* ---- ČIŠTĚNÍ ODPOVĚDI: hvězdičky, citace, 6:0 bordel ---- */
+function cleanAnswerText(input){
   if(!input) return "";
   let t = String(input);
 
-  // pryč celé citation bloky:  (i více kusů)
-  t = t.replace(/【\s*\d+\s*:\s*\d+\s*†[^】]*】/g, "");
+  // File Search citace: 【...†...】 (typicky z OpenAI)
+  t = t.replace(/【[^】]*†[^】]*】/g, "");
+  // občasný bordel typu "6:0" nebo "12:3"
+  t = t.replace(/\b\d+:\d+\b/g, "");
 
-  // pryč samotné "6:0" / "12:3" apod.
-  t = t.replace(/\b\d+\s*:\s*\d+\b/g, "");
+  // markdown tučné **text**
+  t = t.replace(/\*\*(.*?)\*\*/g, "$1");
 
-  // pryč "†source" varianty
-  t = t.replace(/\s*†source\b/g, "");
+  // zbytečné dvojité mezery / prázdné řádky
+  t = t.replace(/[ \t]+\n/g, "\n");
+  t = t.replace(/\n{3,}/g, "\n\n");
 
-  // zredukuj mezery + prázdné řádky
-  t = t.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+  return t.trim();
+}
 
-  return t;
+/* linkify – necháváme jednoduché, ať ti to zase nerozbije odkazy */
+function linkify(t){
+  const s=escapeHtml(t);
+  return s.replace(/(https?:\/\/[^\s]+)/g,u=>`<a href="${u}" target="_blank" rel="noopener noreferrer">${u}</a>`);
 }
 
 function addMessage(who,text,cls){
   const d=document.createElement("div");
   d.className="msg "+cls;
-  const cleaned = cleanAssistantText(text);
+  const cleaned = cleanAnswerText(text || "");
   d.innerHTML=`<strong>${who}:</strong> ${linkify(cleaned)}`;
   chatEl.appendChild(d);
   chatEl.scrollTop=chatEl.scrollHeight;
@@ -402,7 +447,6 @@ async function ask(qOverride){
   addMessage("Vy",q,"me");
   input.value="";
   send.disabled=true;
-
   showLoading(true);
 
   try{
@@ -466,6 +510,9 @@ addMessage(
   "bot"
 );
 addMessage("Radim","Ahoj! Zeptej se mě na cokoliv ohledně obce Radim.","bot");
+
+// default: chat zavřený → fab bliká
+setFabBlink(true);
 </script>
 
 </body>
