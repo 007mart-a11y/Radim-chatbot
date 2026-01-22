@@ -189,14 +189,14 @@ body{
 }
 .quickbar .qb:hover{ background: rgba(29,78,216,.38); }
 
-/* ===== FEEDBACK ===== */
+/* ===== FEEDBACK (výraznější a užší) ===== */
 .feedback{
   margin:6px 12px 10px 12px;
   padding:10px 12px;
   border-radius:16px;
-  background: rgba(0,0,0,.22);
-  border:1px solid rgba(255,255,255,.14);
-  color: rgba(255,255,255,.92);
+  background: linear-gradient(135deg, rgba(29,78,216,.32), rgba(0,0,0,.22));
+  border:1px solid rgba(255,255,255,.18);
+  color: rgba(255,255,255,.95);
   backdrop-filter: blur(10px);
 }
 .feedback .q{font-weight:950;font-size:12px;margin-bottom:8px}
@@ -210,22 +210,16 @@ body{
 }
 .fbBtn{
   flex:1;
-  border:1px solid rgba(255,255,255,.16);
-  background: rgba(29,78,216,.22);
-  color: rgba(255,255,255,.92);
+  border:1px solid rgba(255,255,255,.20);
+  background: rgba(29,78,216,.34);
+  color: rgba(255,255,255,.95);
   border-radius:999px;
-  height:36px;
+  height:34px;
   cursor:pointer;
   font-weight:950;
   font-size:12px;
 }
-.fbBtn:hover{ background: rgba(29,78,216,.30); }
-.fbMsg{
-  margin-top:8px;
-  font-size:12px;
-  color: rgba(255,255,255,.82);
-  line-height:1.35;
-}
+.fbBtn:hover{ background: rgba(29,78,216,.44); }
 
 /* ===== LOADING BAR ===== */
 .loading-bar{
@@ -298,11 +292,11 @@ button.send:disabled{opacity:.55;cursor:not-allowed}
   height:60px;
   padding:10px 14px;
   border-radius:999px;
-  border:1px solid rgba(255,255,255,.26);
+  border:1px solid rgba(255,255,255,.30);
   cursor:pointer;
-  background: rgba(10,16,28,.78);
+  background: rgba(10,16,28,.80);
   backdrop-filter: blur(12px);
-  box-shadow: 0 26px 86px rgba(0,0,0,.62);
+  box-shadow: 0 28px 96px rgba(0,0,0,.66);
   color:#fff;
   display:flex;
   align-items:center;
@@ -313,20 +307,20 @@ button.send:disabled{opacity:.55;cursor:not-allowed}
 
 /* silnější „blink“ jen když je zavřeno (třída .blink) */
 .radim-fab.blink{
-  animation: fabPulse 1.05s ease-in-out infinite;
+  animation: fabPulse 0.85s ease-in-out infinite;
 }
 @keyframes fabPulse{
   0%,100%{
     transform: translateZ(0) scale(1);
-    box-shadow: 0 26px 86px rgba(0,0,0,.62);
-    border-color: rgba(255,255,255,.26);
+    box-shadow: 0 28px 96px rgba(0,0,0,.66);
+    border-color: rgba(255,255,255,.30);
   }
   50%{
-    transform: translateZ(0) scale(1.02);
+    transform: translateZ(0) scale(1.05);
     box-shadow:
-      0 34px 120px rgba(29,78,216,.38),
-      0 26px 86px rgba(0,0,0,.62);
-    border-color: rgba(0,229,255,.50);
+      0 40px 140px rgba(29,78,216,.45),
+      0 28px 96px rgba(0,0,0,.66);
+    border-color: rgba(0,229,255,.58);
   }
 }
 
@@ -366,7 +360,6 @@ button.send:disabled{opacity:.55;cursor:not-allowed}
 <!-- CHAT -->
 <div id="widget" class="chat-widget" role="dialog" aria-label="Chat – Asistent obce Radim">
   <div class="chat-header">
-    <!-- kliknutelná zóna (zavírá chat) -->
     <div class="header-clickzone" id="headerClick" title="Zavřít chat">
       <div class="brandmark" id="brandmark"><span id="brandFallback" style="font-size:16px;font-weight:900;">AI</span></div>
       <div style="min-width:0;">
@@ -382,7 +375,7 @@ button.send:disabled{opacity:.55;cursor:not-allowed}
 
   <div id="chat" class="chat"></div>
 
-  <!-- DLAŽDICE (zobrazí se nad quickbarem) -->
+  <!-- DLAŽDICE -->
   <div class="tiles" id="tiles">
     <button class="tile" type="button" data-q="Jaké jsou úřední hodiny obecního úřadu v Radimi? Napiš je přehledně (dny + čas) a přidej odkaz na oficiální stránku.">
       <div class="t1">Úřední hodiny</div>
@@ -402,12 +395,11 @@ button.send:disabled{opacity:.55;cursor:not-allowed}
     </button>
   </div>
 
-  <!-- Quick buttons -->
+  <!-- Quick buttons (jen 3, bez „Číslo na starostku“) -->
   <div class="quickbar" id="quickbar">
-    <button class="qb" type="button" data-q="Bioodpad – kam s ním v Radimi? Odpověz stručně a přidej správný odkaz na relevantní stránku obce Radim.">Bioodpad</button>
-    <button class="qb" type="button" data-q="Jaké je číslo na starostku obce Radim? Odpověz jednou větou a případně doplň odkaz na kontakty.">Číslo na starostku</button>
     <button class="qb" type="button" data-q="Kde najdu kontakty na obecní úřad v Radimi? Dej prosím telefon, e-mail a odkaz na stránku kontaktů.">Kontakty úřadu</button>
     <button class="qb" type="button" data-q="Jaké jsou úřední hodiny obecního úřadu v Radimi? Napiš je přehledně (dny + čas) a přidej odkaz na oficiální stránku.">Úřední hodiny</button>
+    <button class="qb" type="button" data-q="Bioodpad – kam s ním v Radimi? Odpověz stručně a přidej správný odkaz na relevantní stránku obce Radim.">Bioodpad</button>
   </div>
 
   <!-- Loading -->
@@ -418,7 +410,7 @@ button.send:disabled{opacity:.55;cursor:not-allowed}
     <span>Generuje se odpověď…</span>
   </div>
 
-  <!-- Feedback (vkládá se dynamicky) -->
+  <!-- Feedback mount -->
   <div id="feedbackMount"></div>
 
   <div class="row">
@@ -487,7 +479,7 @@ function escapeHtml(s){
   return String(s).replace(/[&<>"']/g,m=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;" }[m]));
 }
 
-/* ---- ČIŠTĚNÍ ODPOVĚDI: citace + markdown **, ALE NEŠAHAT NA ČASY ---- */
+/* ---- ČIŠTĚNÍ ODPOVĚDI: citace + markdown ** + odfiltrování interních vět ---- */
 function cleanAnswerText(input){
   if(!input) return "";
   let t = String(input);
@@ -498,9 +490,34 @@ function cleanAnswerText(input){
   // markdown tučné **text**
   t = t.replace(/\*\*(.*?)\*\*/g, "$1");
 
+  // odfiltrování interních informací (aby neříkal jak to funguje uvnitř)
+  // odstraníme celé řádky/souvětí s těmito výrazy a nahradíme jednou neutrální větou
+  const internalRe = /(file[_\s-]?search|vector\s*store|assistant[s]?|openai|scrap|crawl|nahran(é|y|a)\s+(soubor|dokument)|soubor(y|ů)|znalostn(í|i)\s+báze|knowledge\s*base|\bCORE\b|\bLIVE\b|priorit(a|y)\s+zdrojů|sekce\s+„?důležité„?)/i;
+  let hadInternal = internalRe.test(t);
+
+  // pryč konkrétní interní řádky (bez rozbití zbytku)
+  t = t.split("\n").filter(line => !internalRe.test(line)).join("\n");
+
+  // typické souvětí, když to zůstane v jedné větě
+  // (raději vyčistíme hrubě a nahradíme neutrálně)
+  if (internalRe.test(t)) {
+    hadInternal = true;
+    t = t.replace(/[^.\n]*?(file[_\s-]?search|vector\s*store|assistant[s]?|openai|scrap|crawl|nahran(é|y|a)\s+(soubor|dokument)|soubor(y|ů)|znalostn(í|i)\s+báze|knowledge\s*base|\bCORE\b|\bLIVE\b|priorit(a|y)\s+zdrojů|sekce\s+„?důležité„?)[^.\n]*[.\n]?/gi, "");
+  }
+
   // zbytečné dvojité mezery / prázdné řádky
   t = t.replace(/[ \t]+\n/g, "\n");
   t = t.replace(/\n{3,}/g, "\n\n");
+  t = t.trim();
+
+  if (hadInternal) {
+    const neutral = "Informace čerpám z oficiálních podkladů obce Radim.";
+    if (!t) return neutral;
+    // nepřidávat dvakrát
+    if (!t.toLowerCase().includes(neutral.toLowerCase())) {
+      t = neutral + "\n\n" + t;
+    }
+  }
 
   return t.trim();
 }
@@ -525,6 +542,14 @@ function showLoading(on){
   chatEl.scrollTop = chatEl.scrollHeight;
 }
 
+/* ===== Tiles: po první interakci zmizí ===== */
+let tilesHidden = false;
+function hideTiles(){
+  if(tilesHidden) return;
+  tilesHidden = true;
+  if(tiles) tiles.style.display = "none";
+}
+
 /* ===== FEEDBACK LOGIKA ===== */
 let userQuestionsCount = 0;
 let feedbackShown = false;
@@ -545,7 +570,6 @@ function showFeedbackOnce(){
       <button class="fbBtn" type="button" data-v="yes">Ano</button>
       <button class="fbBtn" type="button" data-v="no">Ne</button>
     </div>
-    <div class="fbMsg" id="fbMsg"></div>
   `;
 
   feedbackMount.appendChild(wrap);
@@ -554,20 +578,23 @@ function showFeedbackOnce(){
     const btn = e.target.closest("button[data-v]");
     if(!btn) return;
     const v = btn.getAttribute("data-v");
-    const msg = wrap.querySelector("#fbMsg");
+
+    // po kliknutí feedback zmizí a výsledek se napíše jako zpráva
+    removeFeedback();
     if(v === "yes"){
-      msg.textContent = "Super, to mě těší 🙂 Kdykoliv se zeptejte znovu.";
+      addMessage("Radim","Super, to mě těší. Kdykoliv se zeptejte znovu.","bot");
     }else{
-      msg.textContent = "To mě mrzí. Zkuste prosím dotaz napsat jinak (jiná formulace), nebo napište, co přesně hledáte.";
+      addMessage("Radim","To mě mrzí. Zkuste prosím dotaz napsat jinak (jiná formulace), nebo napište, co přesně hledáte.","bot");
     }
-    // po kliknutí už tlačítka zablokujeme
-    wrap.querySelectorAll("button").forEach(b=>{ b.disabled = true; b.style.opacity = ".65"; b.style.cursor="default"; });
   });
 }
 
 async function ask(qOverride){
   const q=(qOverride ?? input.value).trim();
   if(!q) return;
+
+  // po první akci skrýt tiles, aby nezakrývaly chat a nebyly duplicitní s quickbar
+  hideTiles();
 
   addMessage("Vy",q,"me");
   input.value="";
@@ -583,10 +610,9 @@ async function ask(qOverride){
     const j=await r.json().catch(()=>({}));
     addMessage("Radim", (j && j.answer) ? j.answer : "Bez odpovědi", "bot");
 
-    // zvýšíme počítadlo uživatelských dotazů (jen reálné dotazy)
     userQuestionsCount++;
 
-    // Feedback po 2. dotazu (stejně jako Chomutice styl)
+    // Feedback po 2. dotazu
     if(userQuestionsCount >= 2){
       showFeedbackOnce();
     }
