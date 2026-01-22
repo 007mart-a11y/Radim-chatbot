@@ -148,30 +148,9 @@ body{
 .msg a{color:var(--brand2);word-break:break-word;text-decoration:none}
 .msg a:hover{text-decoration:underline}
 
-/* ===== DLAŽDICE (tiles) ===== */
-.tiles{
-  margin:2px 12px 10px 12px;
-  display:grid;
-  grid-template-columns: 1fr 1fr;
-  gap:10px;
-}
-.tile{
-  border:1px solid rgba(255,255,255,.16);
-  background: rgba(0,0,0,.20);
-  color: rgba(255,255,255,.92);
-  border-radius:16px;
-  padding:10px 12px;
-  cursor:pointer;
-  box-shadow: 0 12px 26px rgba(0,0,0,.20);
-  text-align:left;
-}
-.tile:hover{ background: rgba(0,0,0,.28); }
-.tile .t1{font-weight:950;font-size:12px;line-height:1.15;margin-bottom:4px}
-.tile .t2{font-size:11px;color: rgba(255,255,255,.72);line-height:1.25}
-
-/* ===== Quick buttons ===== */
+/* ===== Quick buttons (jen 3) ===== */
 .quickbar{
-  margin:6px 12px 8px 12px;
+  margin:8px 12px 10px 12px;
   display:flex;
   flex-wrap:wrap;
   gap:8px;
@@ -184,12 +163,12 @@ body{
   font-size:12px;
   font-weight:900;
   color: rgba(255,255,255,.92);
-  background: rgba(29,78,216,.28);
+  background: rgba(29,78,216,.30);
   box-shadow: 0 10px 24px rgba(0,0,0,.18);
 }
-.quickbar .qb:hover{ background: rgba(29,78,216,.38); }
+.quickbar .qb:hover{ background: rgba(29,78,216,.40); }
 
-/* ===== FEEDBACK (výraznější a užší) ===== */
+/* ===== FEEDBACK (výraznější) ===== */
 .feedback{
   margin:6px 12px 10px 12px;
   padding:10px 12px;
@@ -284,7 +263,7 @@ button.send{
 }
 button.send:disabled{opacity:.55;cursor:not-allowed}
 
-/* FLOATING TAB (víc výrazné + víc bliká) */
+/* FLOATING TAB (slabší blink, bez “šíleného” scale) */
 .radim-fab{
   position:fixed;
   right:20px;
@@ -292,7 +271,7 @@ button.send:disabled{opacity:.55;cursor:not-allowed}
   height:60px;
   padding:10px 14px;
   border-radius:999px;
-  border:1px solid rgba(255,255,255,.30);
+  border:1px solid rgba(255,255,255,.28);
   cursor:pointer;
   background: rgba(10,16,28,.80);
   backdrop-filter: blur(12px);
@@ -304,23 +283,21 @@ button.send:disabled{opacity:.55;cursor:not-allowed}
   z-index:10000;
   transform: translateZ(0);
 }
-
-/* silnější „blink“ jen když je zavřeno (třída .blink) */
 .radim-fab.blink{
-  animation: fabPulse 0.85s ease-in-out infinite;
+  animation: fabPulse 2.2s ease-in-out infinite;
 }
 @keyframes fabPulse{
   0%,100%{
-    transform: translateZ(0) scale(1);
     box-shadow: 0 28px 96px rgba(0,0,0,.66);
-    border-color: rgba(255,255,255,.30);
+    border-color: rgba(255,255,255,.28);
+    filter: none;
   }
   50%{
-    transform: translateZ(0) scale(1.05);
     box-shadow:
-      0 40px 140px rgba(29,78,216,.45),
+      0 34px 120px rgba(29,78,216,.24),
       0 28px 96px rgba(0,0,0,.66);
-    border-color: rgba(0,229,255,.58);
+    border-color: rgba(0,229,255,.40);
+    filter: saturate(1.03);
   }
 }
 
@@ -337,10 +314,69 @@ button.send:disabled{opacity:.55;cursor:not-allowed}
 .fabText .a{font-weight:950;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:240px}
 .fabText .b{font-size:11px;color:rgba(255,255,255,.78);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:240px}
 
+/* Onboarding “šipka + rámeček” nad lištou */
+.coach{
+  position:fixed;
+  right:20px;
+  bottom:92px;
+  z-index:10001;
+  width:260px;
+  max-width:calc(100vw - 40px);
+  border-radius:16px;
+  background: rgba(10,16,28,.86);
+  border:1px solid rgba(255,255,255,.18);
+  box-shadow: 0 18px 60px rgba(0,0,0,.50);
+  backdrop-filter: blur(12px);
+  color:#fff;
+  padding:10px 12px;
+}
+.coach:after{
+  content:"";
+  position:absolute;
+  right:34px;
+  bottom:-10px;
+  width:0;height:0;
+  border-left:10px solid transparent;
+  border-right:10px solid transparent;
+  border-top:10px solid rgba(10,16,28,.86);
+  filter: drop-shadow(0 -1px 0 rgba(255,255,255,.12));
+}
+.coach .top{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:10px;
+}
+.coach .title{
+  font-weight:950;
+  font-size:12px;
+  color:rgba(255,255,255,.95);
+}
+.coach .desc{
+  margin-top:4px;
+  font-size:11px;
+  color:rgba(255,255,255,.78);
+  line-height:1.25;
+}
+.coach .x{
+  width:28px;height:28px;
+  border-radius:10px;
+  border:1px solid rgba(255,255,255,.16);
+  background: rgba(255,255,255,.10);
+  color:#fff;
+  cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  flex:0 0 auto;
+  user-select:none;
+}
+.coach .x:hover{ background: rgba(255,255,255,.16); }
+
 /* Mobile */
 @media(max-width:480px){
   .chat-widget{right:12px;left:12px;bottom:12px;width:auto;height:80vh}
   .radim-fab{right:12px;bottom:12px}
+  .coach{right:12px;bottom:84px;width:240px}
+  .coach:after{ right:28px; }
 }
 
 /* Reduce motion */
@@ -355,6 +391,17 @@ button.send:disabled{opacity:.55;cursor:not-allowed}
 <div class="bg" aria-hidden="true">
   <div class="bgImg" id="bgImg"></div>
   <div class="bgVignette"></div>
+</div>
+
+<!-- Onboarding box -->
+<div id="coach" class="coach" hidden>
+  <div class="top">
+    <div>
+      <div class="title">Asistent obce Radim</div>
+      <div class="desc">Klikněte sem a zeptejte se.</div>
+    </div>
+    <button id="coachClose" class="x" type="button" aria-label="Zavřít">✕</button>
+  </div>
 </div>
 
 <!-- CHAT -->
@@ -375,31 +422,11 @@ button.send:disabled{opacity:.55;cursor:not-allowed}
 
   <div id="chat" class="chat"></div>
 
-  <!-- DLAŽDICE -->
-  <div class="tiles" id="tiles">
-    <button class="tile" type="button" data-q="Jaké jsou úřední hodiny obecního úřadu v Radimi? Napiš je přehledně (dny + čas) a přidej odkaz na oficiální stránku.">
-      <div class="t1">Úřední hodiny</div>
-      <div class="t2">Kdy je úřad otevřený</div>
-    </button>
-    <button class="tile" type="button" data-q="Kde najdu kontakty na obecní úřad v Radimi? Dej prosím telefon, e-mail a odkaz na stránku kontaktů.">
-      <div class="t1">Kontakty</div>
-      <div class="t2">Telefon, e-mail, datovka</div>
-    </button>
-    <button class="tile" type="button" data-q="Bioodpad – kam s ním v Radimi? Odpověz stručně a přidej správný odkaz na relevantní stránku obce Radim.">
-      <div class="t1">Bioodpad</div>
-      <div class="t2">Kam s bioodpadem</div>
-    </button>
-    <button class="tile" type="button" data-q="Kde najdu úřední desku obce Radim? Pošli prosím odkaz a krátce vysvětli, co tam najdu.">
-      <div class="t1">Úřední deska</div>
-      <div class="t2">Vyhlášky, oznámení</div>
-    </button>
-  </div>
-
-  <!-- Quick buttons (jen 3, bez „Číslo na starostku“) -->
+  <!-- Quick buttons (jen 3, krátké dotazy) -->
   <div class="quickbar" id="quickbar">
-    <button class="qb" type="button" data-q="Kde najdu kontakty na obecní úřad v Radimi? Dej prosím telefon, e-mail a odkaz na stránku kontaktů.">Kontakty úřadu</button>
-    <button class="qb" type="button" data-q="Jaké jsou úřední hodiny obecního úřadu v Radimi? Napiš je přehledně (dny + čas) a přidej odkaz na oficiální stránku.">Úřední hodiny</button>
-    <button class="qb" type="button" data-q="Bioodpad – kam s ním v Radimi? Odpověz stručně a přidej správný odkaz na relevantní stránku obce Radim.">Bioodpad</button>
+    <button class="qb" type="button" data-q="Kontakty úřadu.">Kontakty úřadu</button>
+    <button class="qb" type="button" data-q="Úřední hodiny úřadu.">Úřední hodiny</button>
+    <button class="qb" type="button" data-q="Kde je skládka bioodpadu v Radimi?">Bioodpad</button>
   </div>
 
   <!-- Loading -->
@@ -442,15 +469,33 @@ const brandFallback = document.getElementById("brandFallback");
 const fabIcon = document.getElementById("fabIcon");
 const fabFallback = document.getElementById("fabFallback");
 const quickbar = document.getElementById("quickbar");
-const tiles = document.getElementById("tiles");
 
 const headerClick = document.getElementById("headerClick");
 const closeBtn = document.getElementById("closeBtn");
 const feedbackMount = document.getElementById("feedbackMount");
 
+const coach = document.getElementById("coach");
+const coachClose = document.getElementById("coachClose");
+
 // --- Assets
 const BG_URL = "/skins/radim/bg.jpg";
 const ERB_URL = "/skins/radim/erb.png";
+
+// onboarding
+const COACH_KEY = "radim_coach_dismissed_v1";
+function showCoach(){
+  if(!coach) return;
+  if(localStorage.getItem(COACH_KEY)==="1") return;
+  // jen když je chat zavřený
+  if(widget.style.display === "flex") return;
+  coach.hidden = false;
+}
+function hideCoach(save){
+  if(!coach) return;
+  coach.hidden = true;
+  if(save) localStorage.setItem(COACH_KEY,"1");
+}
+coachClose?.addEventListener("click",(e)=>{ e.preventDefault(); hideCoach(true); });
 
 function setFabBlink(on){
   fab.classList.toggle("blink", !!on);
@@ -460,12 +505,14 @@ function openChat(){
   widget.style.display="flex";
   fab.style.display="none";
   setFabBlink(false);
+  hideCoach(false);
   setTimeout(()=>input.focus(),100);
 }
 function closeChat(){
   widget.style.display="none";
   fab.style.display="flex";
   setFabBlink(true);
+  showCoach();
 }
 
 // header close handlers
@@ -479,7 +526,7 @@ function escapeHtml(s){
   return String(s).replace(/[&<>"']/g,m=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;" }[m]));
 }
 
-/* ---- ČIŠTĚNÍ ODPOVĚDI: citace + markdown ** + odfiltrování interních vět ---- */
+/* ---- ČIŠTĚNÍ ODPOVĚDI: citace + markdown ** + odstranění interních keců (bez náhradní věty) ---- */
 function cleanAnswerText(input){
   if(!input) return "";
   let t = String(input);
@@ -490,34 +537,18 @@ function cleanAnswerText(input){
   // markdown tučné **text**
   t = t.replace(/\*\*(.*?)\*\*/g, "$1");
 
-  // odfiltrování interních informací (aby neříkal jak to funguje uvnitř)
-  // odstraníme celé řádky/souvětí s těmito výrazy a nahradíme jednou neutrální větou
+  // odfiltrování interních informací (NEPŘIDÁVAT žádnou neutrální větu!)
   const internalRe = /(file[_\s-]?search|vector\s*store|assistant[s]?|openai|scrap|crawl|nahran(é|y|a)\s+(soubor|dokument)|soubor(y|ů)|znalostn(í|i)\s+báze|knowledge\s*base|\bCORE\b|\bLIVE\b|priorit(a|y)\s+zdrojů|sekce\s+„?důležité„?)/i;
-  let hadInternal = internalRe.test(t);
 
-  // pryč konkrétní interní řádky (bez rozbití zbytku)
+  // pryč celé řádky s interními slovy
   t = t.split("\n").filter(line => !internalRe.test(line)).join("\n");
 
-  // typické souvětí, když to zůstane v jedné větě
-  // (raději vyčistíme hrubě a nahradíme neutrálně)
-  if (internalRe.test(t)) {
-    hadInternal = true;
-    t = t.replace(/[^.\n]*?(file[_\s-]?search|vector\s*store|assistant[s]?|openai|scrap|crawl|nahran(é|y|a)\s+(soubor|dokument)|soubor(y|ů)|znalostn(í|i)\s+báze|knowledge\s*base|\bCORE\b|\bLIVE\b|priorit(a|y)\s+zdrojů|sekce\s+„?důležité„?)[^.\n]*[.\n]?/gi, "");
-  }
+  // když by to zůstalo v jedné větě, vyříznout souvětí
+  t = t.replace(/[^.\n]*?(file[_\s-]?search|vector\s*store|assistant[s]?|openai|scrap|crawl|nahran(é|y|a)\s+(soubor|dokument)|soubor(y|ů)|znalostn(í|i)\s+báze|knowledge\s*base|\bCORE\b|\bLIVE\b|priorit(a|y)\s+zdrojů|sekce\s+„?důležité„?)[^.\n]*[.\n]?/gi, "");
 
   // zbytečné dvojité mezery / prázdné řádky
   t = t.replace(/[ \t]+\n/g, "\n");
   t = t.replace(/\n{3,}/g, "\n\n");
-  t = t.trim();
-
-  if (hadInternal) {
-    const neutral = "Informace čerpám z oficiálních podkladů obce Radim.";
-    if (!t) return neutral;
-    // nepřidávat dvakrát
-    if (!t.toLowerCase().includes(neutral.toLowerCase())) {
-      t = neutral + "\n\n" + t;
-    }
-  }
 
   return t.trim();
 }
@@ -540,14 +571,6 @@ function addMessage(who,text,cls){
 function showLoading(on){
   loadingBar.hidden = !on;
   chatEl.scrollTop = chatEl.scrollHeight;
-}
-
-/* ===== Tiles: po první interakci zmizí ===== */
-let tilesHidden = false;
-function hideTiles(){
-  if(tilesHidden) return;
-  tilesHidden = true;
-  if(tiles) tiles.style.display = "none";
 }
 
 /* ===== FEEDBACK LOGIKA ===== */
@@ -579,12 +602,11 @@ function showFeedbackOnce(){
     if(!btn) return;
     const v = btn.getAttribute("data-v");
 
-    // po kliknutí feedback zmizí a výsledek se napíše jako zpráva
     removeFeedback();
     if(v === "yes"){
       addMessage("Radim","Super, to mě těší. Kdykoliv se zeptejte znovu.","bot");
     }else{
-      addMessage("Radim","To mě mrzí. Zkuste prosím dotaz napsat jinak (jiná formulace), nebo napište, co přesně hledáte.","bot");
+      addMessage("Radim","To mě mrzí. Zkuste prosím dotaz napsat jinak, nebo napište, co přesně hledáte.","bot");
     }
   });
 }
@@ -592,9 +614,6 @@ function showFeedbackOnce(){
 async function ask(qOverride){
   const q=(qOverride ?? input.value).trim();
   if(!q) return;
-
-  // po první akci skrýt tiles, aby nezakrývaly chat a nebyly duplicitní s quickbar
-  hideTiles();
 
   addMessage("Vy",q,"me");
   input.value="";
@@ -611,8 +630,6 @@ async function ask(qOverride){
     addMessage("Radim", (j && j.answer) ? j.answer : "Bez odpovědi", "bot");
 
     userQuestionsCount++;
-
-    // Feedback po 2. dotazu
     if(userQuestionsCount >= 2){
       showFeedbackOnce();
     }
@@ -629,13 +646,6 @@ input.addEventListener("keydown",e=>e.key==="Enter"&&ask());
 
 // quickbar
 quickbar.addEventListener("click",(e)=>{
-  const btn = e.target.closest("button[data-q]");
-  if(!btn) return;
-  ask(btn.getAttribute("data-q"));
-});
-
-// tiles
-tiles.addEventListener("click",(e)=>{
   const btn = e.target.closest("button[data-q]");
   if(!btn) return;
   ask(btn.getAttribute("data-q"));
@@ -678,8 +688,9 @@ addMessage(
 );
 addMessage("Radim","Ahoj! Zeptej se mě na cokoliv ohledně obce Radim.","bot");
 
-// default: chat zavřený → fab bliká
+// default: chat zavřený → fab bliká + onboarding šipka
 setFabBlink(true);
+showCoach();
 </script>
 
 </body>
