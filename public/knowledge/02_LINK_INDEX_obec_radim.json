@@ -1,0 +1,60 @@
+{
+  "generatedAt": "2026-01-22T15:44:46.519Z",
+  "site": "https://www.obec-radim.cz",
+  "items": [
+    {
+      "type": "page",
+      "url": "https://www.obec-radim.cz/",
+      "finalUrl": "https://www.obec-radim.cz/",
+      "status": 200,
+      "ok": true,
+      "section": "Úvod",
+      "title": "Obce Radim",
+      "textPreview": "Statistické údaje\n ZUJ: 573370 Počet částí: 5 Katastrální výměra: 10,38 km² Počet obyvatel: 440 Z toho v produkt. věku: 273 Průměrný věk: 42,6\n Obec Radim\n leží 7 km severovýchodně od města Jičín a nachází se na rozhraní dvou turisticky atraktivních oblastí – Český ráj a Krkonoše. První zmínka o obci se datuje do roku 1360 a v současné době tvoří obec Radim další 3 vesnice – Tužín, Studeňany, Lháň, kde dohromady žije 350 obyvatel. V obci můžete najít základní občanskou vybavenost – mateřská a zá",
+      "links": [
+        {
+          "text": "Aktuality",
+          "url": "https://www.obec-radim.cz/#tab_43_0",
+          "valid": {
+            "ok": true,
+            "status": 200,
+            "finalUrl": "https://www.obec-radim.cz/"
+          }
+        },
+        {
+          "text": "Úřední deska",
+          "url": "https://www.obec-radim.cz/#tab_43_1",
+          "valid": {
+            "ok": true,
+            "status": 200,
+            "finalUrl": "https://www.obec-radim.cz/"
+          }
+        },
+        {
+          "text": "Kalendář akcí",
+          "url": "https://www.obec-radim.cz/#tab_43_2",
+          "valid": {
+            "ok": true,
+            "status": 200,
+            "finalUrl": "https://www.obec-radim.cz/"
+          }
+        },
+        {
+          "text": "Fotogalerie",
+          "url": "https://www.obec-radim.cz/#tab_43_3",
+          "valid": {
+            "ok": true,
+            "status": 200,
+            "finalUrl": "https://www.obec-radim.cz/"
+          }
+        }
+      ],
+      "files": [],
+      "valid": {
+        "ok": true,
+        "status": 200,
+        "finalUrl": "https://www.obec-radim.cz/"
+      }
+    }
+  ]
+}

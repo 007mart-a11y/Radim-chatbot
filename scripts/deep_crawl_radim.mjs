@@ -1,523 +1,443 @@
-// scripts/deep_crawl_radim_structured.mjs
-// Node 18+ (nativní fetch), bez obrázků a bez aktualit / fotek / zpravodaje.
-// Výstup:
-//  - knowledge/01_STATIC_SITE_obec_radim.txt  (silně strukturovaný text pro asistenta)
-//  - knowledge/20_PDF_LIBRARY_manifest.json   (jen seznam všech PDF odkazů)
-//
-// ENV (typicky přes příkaz nebo Netlify build):
-//   SITE_BASE_URL=https://www.obec-radim.cz
-//   OUT_FILE=knowledge/01_STATIC_SITE_obec_radim.txt
-//   PDF_MANIFEST=knowledge/20_PDF_LIBRARY_manifest.json
-//   MAX_PAGES=900
-//   CONCURRENCY=8
-//   REQUEST_DELAY_MS=120
-//   USER_AGENT="RadimBot/1.0 (+deep crawl)"
-//   ONLY_SAME_ORIGIN=true
-
-import fs from "fs";
-import path from "path";
+// scripts/deep_crawl_radim_B.mjs
+// Node 18+ (nativní fetch). Doporučeno: npm i jsdom
+import fs from "node:fs";
+import path from "node:path";
 import { JSDOM } from "jsdom";
 
 const SITE_BASE_URL = process.env.SITE_BASE_URL || "https://www.obec-radim.cz";
-const OUT_FILE = process.env.OUT_FILE || "knowledge/01_STATIC_SITE_obec_radim.txt";
-const PDF_MANIFEST = process.env.PDF_MANIFEST || "knowledge/20_PDF_LIBRARY_manifest.json";
+const OUT_DIR = process.env.OUT_DIR || "public/knowledge";
+const OUT_TXT = process.env.OUT_TXT || path.join(OUT_DIR, "01_STATIC_SITE_obec_radim.txt");
+const OUT_INDEX = process.env.OUT_INDEX || path.join(OUT_DIR, "02_LINK_INDEX_obec_radim.json");
 
-const MAX_PAGES = parseInt(process.env.MAX_PAGES || "900", 10);
-const CONCURRENCY = parseInt(process.env.CONCURRENCY || "8", 10);
-const REQUEST_DELAY_MS = parseInt(process.env.REQUEST_DELAY_MS || "120", 10);
-const ONLY_SAME_ORIGIN = String(process.env.ONLY_SAME_ORIGIN ?? "true").toLowerCase() !== "false";
-const USER_AGENT = process.env.USER_AGENT || "RadimBot/1.0 (+deep crawl)";
+const MAX_PAGES = Number(process.env.MAX_PAGES || 600);
+const CONCURRENCY = Number(process.env.CONCURRENCY || 8);
+const TIMEOUT_MS = Number(process.env.TIMEOUT_MS || 20000);
 
-const ORIGIN = new URL(SITE_BASE_URL).origin;
+// Co přesně nechceme tahat (můžeš doplnit)
+const SKIP_URL_RE = new RegExp(
+  [
+    "/fotogalerie",
+    "/galerie",
+    "/vyhledavani",
+    "/print",
+    "/rss",
+    "/sitemap",
+    "/admin",
+    "/cookie",
+    "/gdpr",
+    // často měnící se sekce – dle potřeby:
+    "/uredni-deska",      // jestli chceš vynechat úřední desku, nech; jinak smaž
+    "/aktuality",         // jestli chceš vynechat aktuality, nech; jinak smaž
+    "/kalendar-akci",     // jestli chceš vynechat akce, nech; jinak smaž
+    "/obecni-spravodaj",  // zpravodaj
+  ].join("|"),
+  "i"
+);
 
-// Nechceme: aktuality, kalendář, fotky, zpravodaj…
-const denyPathContains = [
-  "/fotogalerie",
-  "/galerie",
-  "/gallery",
-  "/media",
-  "/img",
-  "/images",
-  "/css",
-  "/js",
-  "/admin",
-  "/wp-admin",
-  "/login",
-  "/user",
-  "/account",
-  "/cart",
-  "/cookies",
-  "/sitemap",
-  "/aktualne",
-  "/aktuality",
-  "/kalendar-akci",
-  "/kalendar_akci",
-  "/zpravodaj",
-  "/obecni-zpravodaj",
-  "/obecni_zpravodaj"
-];
+// Soubory – nelezeme “dovnitř”, jen evidujeme a validujeme
+const FILE_EXT_RE = /\.(pdf|doc|docx|xls|xlsx|ppt|pptx|odt|ods|csv|rtf|zip)$/i;
 
-const denyExtensions = [
-  ".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg", ".ico",
-  ".mp4", ".mov", ".avi", ".mkv",
-  ".mp3", ".wav", ".ogg",
-  ".zip", ".rar", ".7z"
-];
-
-// Tohle je jen pro prioritu, ne filtr
-const allowPriorityPathContains = [
-  "/organizace",
-  "/spolky",
-  "/sokol",
-  "/hasici",
-  "/sdh",
-  "/zahradkari",
-  "/kontakt",
-  "/kontakty",
-  "/o-obci",
-  "/urad",
-  "/uradni-deska",
-  "/skolka",
-  "/skola",
-  "/ms-",
-  "/zs-",
-  "/sport",
-  "/knihovna",
-  "/odpady",
-  "/vodovod",
-  "/kanalizace"
-];
-
-function sleep(ms) {
-  return new Promise((r) => setTimeout(r, ms));
+// Často rozbíjející odkazy na tomto webu
+function shouldSkipUrl(u) {
+  const s = String(u);
+  if (!s.startsWith(SITE_BASE_URL)) return true;
+  if (SKIP_URL_RE.test(s)) return true;
+  // typicky nepotřebné / duplicitní
+  if (s.includes("download.php")) return false; // necháme jako resource
+  if (s.includes("modules/")) return true;      // bývá galerie / interní modul
+  if (s.includes("#")) return false;            // anchor je ok (pro index)
+  return false;
 }
 
-function normalizeUrl(u, base = SITE_BASE_URL) {
+function ensureDir(p) {
+  fs.mkdirSync(p, { recursive: true });
+}
+
+function normalizeUrl(raw, base) {
   try {
-    const url = new URL(u, base);
+    const u = new URL(raw, base);
+    // jen stejné domény (ať neleze ven)
+    if (u.origin !== new URL(SITE_BASE_URL).origin) return null;
 
-    if (!["http:", "https:"].includes(url.protocol)) return null;
-    if (ONLY_SAME_ORIGIN && url.origin !== ORIGIN) return null;
+    // uklidit tracking
+    ["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term"].forEach(k => u.searchParams.delete(k));
 
-    // pryč hash
-    url.hash = "";
-
-    // pryč běžné tracking parametry + print
-    ["utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content", "fbclid", "gclid"].forEach((k) => {
-      url.searchParams.delete(k);
-    });
-    if (url.searchParams.has("print")) return null;
-
-    return url.toString();
+    // sjednotit: bez koncové tečky apod.
+    return u.toString().replace(/\.+$/g, "");
   } catch {
     return null;
   }
 }
 
-function isDenied(urlStr) {
+// jemný timeout wrapper
+async function fetchWithTimeout(url, options = {}) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
   try {
-    const url = new URL(urlStr);
-    const p = url.pathname.toLowerCase();
-
-    if (denyPathContains.some((d) => p.includes(d))) return true;
-    if (denyExtensions.some((ext) => p.endsWith(ext))) return true;
-
-    // nechceme divné download.php a modules
-    if (p.includes("download.php") || p.includes("/modules/")) return true;
-
-    // moc dlouhé query = typicky filtry, bordel
-    if ((url.search || "").length > 80) return true;
-
-    return false;
-  } catch {
-    return true;
+    const r = await fetch(url, { ...options, signal: ctrl.signal, redirect: "follow" });
+    return r;
+  } finally {
+    clearTimeout(t);
   }
 }
 
-function scoreUrl(urlStr) {
-  let s = 0;
-  const u = new URL(urlStr);
-  const p = u.pathname.toLowerCase();
+/** =========================
+ *  VALIDACE ODKAZŮ (B)
+ *  - cache pro rychlost
+ *  - HEAD -> fallback GET
+ *  - ukládá status + finalUrl
+ *  ========================= */
+const validateCache = new Map();
+async function validateUrl(url) {
+  if (validateCache.has(url)) return validateCache.get(url);
 
-  if (allowPriorityPathContains.some((x) => p.includes(x))) s += 50;
-  if (p.includes("kontakt")) s += 40;
-  if (p.includes("organizace") || p.includes("spolky")) s += 40;
-  if (p.includes("sokol") || p.includes("hasici") || p.includes("sdh")) s += 35;
-  if (p.includes("skola") || p.includes("skolka") || p.includes("ms-") || p.includes("zs-")) s += 35;
+  const prom = (async () => {
+    // u anchor odkazů validujeme jen “base” bez hashe
+    const base = url.split("#")[0];
 
-  // root lehce dolů
-  if (p === "/" || p === "") s -= 10;
+    try {
+      // 1) zkus HEAD
+      let r = await fetchWithTimeout(base, { method: "HEAD" });
+      if (r.status === 405 || r.status === 403) {
+        // 2) fallback GET (bez stahování velkých věcí – ale u PDF to stejně může být velké)
+        r = await fetchWithTimeout(base, { method: "GET" });
+      }
+      const finalUrl = r.url || base;
+      const status = r.status || 0;
 
-  // kratší URL jako bonus
-  s += Math.max(0, 20 - p.length / 10);
-
-  return s;
-}
-
-async function fetchHtml(url) {
-  await sleep(REQUEST_DELAY_MS);
-  const res = await fetch(url, {
-    headers: {
-      "User-Agent": USER_AGENT,
-      "Accept": "text/html,application/xhtml+xml"
+      // považuj 200-399 za OK
+      const ok = status >= 200 && status < 400;
+      return { ok, status, finalUrl };
+    } catch (e) {
+      return { ok: false, status: 0, finalUrl: base, error: String(e?.message || e) };
     }
-  });
+  })();
 
-  const ct = (res.headers.get("content-type") || "").toLowerCase();
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  if (!ct.includes("text/html") && !ct.includes("application/xhtml+xml")) return null;
-
-  return await res.text();
+  validateCache.set(url, prom);
+  return prom;
 }
 
-function textClean(s) {
+/** =========================
+ *  EXTRAKCE OBSAHU
+ *  - odřízne menu/footer/script/style
+ *  - zkusí najít hlavní content
+ *  ========================= */
+function pickMain(document) {
+  const selectors = [
+    "main",
+    "#content",
+    ".content",
+    ".page-content",
+    "article",
+    ".container article",
+    ".container",
+    "body",
+  ];
+  for (const sel of selectors) {
+    const el = document.querySelector(sel);
+    if (el && el.textContent && el.textContent.trim().length > 200) return el;
+  }
+  return document.body;
+}
+
+function cleanText(s) {
   return String(s || "")
-    .replace(/\u00a0/g, " ")
-    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\s+\n/g, "\n")
     .replace(/\n{3,}/g, "\n\n")
+    .replace(/[ \t]{2,}/g, " ")
     .trim();
 }
 
-function elText(el) {
-  if (!el) return "";
-  return textClean(el.textContent || "");
+function sectionFromUrl(u) {
+  try {
+    const p = new URL(u).pathname.split("/").filter(Boolean);
+    if (!p.length) return "Úvod";
+    // první segment = sekce
+    return p[0].replace(/-/g, " ");
+  } catch {
+    return "Úvod";
+  }
 }
 
-function removeJunk(dom) {
-  const doc = dom.window.document;
-  const selectors = [
-    "script", "style", "noscript", "svg",
-    "header nav", "nav", "footer",
-    ".breadcrumb", ".breadcrumbs",
-    ".cookie", ".cookies", "#cookies",
-    ".gallery", ".fotogalerie", ".carousel",
-    ".menu", ".main-menu", ".site-menu",
-    ".search", "form"
-  ];
-  selectors.forEach((sel) => doc.querySelectorAll(sel).forEach((n) => n.remove()));
-}
+/** =========================
+ *  CRAWL
+ *  ========================= */
+const visited = new Set();
+const queue = [SITE_BASE_URL + "/"];
+const pages = [];      // obsah pro TXT
+const linkIndex = [];  // strukturovaný JSON index
 
-function extractLinks(dom, baseUrl) {
-  const doc = dom.window.document;
-  const a = [...doc.querySelectorAll("a[href]")];
+async function processPage(url) {
+  if (visited.has(url)) return;
+  visited.add(url);
 
+  // skip pravidla
+  if (shouldSkipUrl(url)) return;
+
+  const isFile = FILE_EXT_RE.test(url.split("#")[0]) || url.includes("download.php");
+  if (isFile) {
+    // soubory neparsujeme, jen evidujeme (validace později při sběru linků z page)
+    return;
+  }
+
+  let html = "";
+  let status = 0;
+  let finalUrl = url;
+
+  try {
+    const r = await fetchWithTimeout(url, { method: "GET" });
+    status = r.status || 0;
+    finalUrl = r.url || url;
+
+    if (status >= 400) {
+      // stránka je špatná, ale necháme ji v indexu jako ARCHIVED/ERROR
+      linkIndex.push({
+        type: "page",
+        url,
+        finalUrl,
+        status,
+        ok: false,
+        section: sectionFromUrl(url),
+        title: null,
+        text: null,
+        links: [],
+        files: [],
+        note: "HTTP error",
+      });
+      return;
+    }
+
+    const ct = r.headers.get("content-type") || "";
+    if (!ct.includes("text/html")) {
+      // není HTML, bereme jako resource
+      linkIndex.push({
+        type: "resource",
+        url,
+        finalUrl,
+        status,
+        ok: status >= 200 && status < 400,
+        section: sectionFromUrl(url),
+        title: null,
+        text: null,
+        links: [],
+        files: [],
+      });
+      return;
+    }
+
+    html = await r.text();
+  } catch (e) {
+    linkIndex.push({
+      type: "page",
+      url,
+      finalUrl,
+      status: 0,
+      ok: false,
+      section: sectionFromUrl(url),
+      title: null,
+      text: null,
+      links: [],
+      files: [],
+      note: "Fetch failed: " + String(e?.message || e),
+    });
+    return;
+  }
+
+  const dom = new JSDOM(html);
+  const { document } = dom.window;
+
+  // odstraň rušivé věci
+  document.querySelectorAll("script,style,noscript,svg").forEach(n => n.remove());
+
+  const title = cleanText(document.querySelector("h1")?.textContent || document.title || "");
+  const main = pickMain(document);
+
+  // posbírej odkazy
   const links = [];
-  for (const node of a) {
-    const href = node.getAttribute("href");
-    if (!href) continue;
-    if (href.startsWith("mailto:") || href.startsWith("tel:")) continue;
-    if (href.startsWith("#") || href.startsWith("javascript:")) continue;
+  const files = [];
 
-    const norm = normalizeUrl(href, baseUrl);
-    if (!norm) continue;
-    if (isDenied(norm)) continue;
+  main.querySelectorAll("a[href]").forEach(a => {
+    const text = cleanText(a.textContent).slice(0, 140);
+    const hrefRaw = a.getAttribute("href");
+    const abs = normalizeUrl(hrefRaw, finalUrl);
+    if (!abs) return;
 
-    links.push(norm);
-  }
-  return [...new Set(links)];
-}
+    // filtr sekcí / duplicit
+    if (shouldSkipUrl(abs) && !abs.includes("#") && !FILE_EXT_RE.test(abs) && !abs.includes("download.php")) return;
 
-// Pozná kontaktní/organizační stránky (spolky, Sokol, hasiči…)
-function looksLikeOrgOrContactsPage(urlStr, titleText, bodyText) {
-  const p = new URL(urlStr).pathname.toLowerCase();
-  const t = (titleText || "").toLowerCase();
+    const base = abs.split("#")[0];
+    const isFileLink = FILE_EXT_RE.test(base) || base.includes("download.php");
 
-  if (p.includes("organizace") || p.includes("spolky")) return true;
-  if (p.includes("sokol") || p.includes("hasici") || p.includes("sdh")) return true;
-  if (p.includes("kontakt")) return true;
-  if (t.includes("kontakt") || t.includes("sokol") || t.includes("hasi")) return true;
-
-  const hasPhone = /(\+420\s*)?\d{3}\s?\d{3}\s?\d{3}/.test(bodyText);
-  const hasEmail = /[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/i.test(bodyText);
-  const hasRole = /(předsed|jednatel|hospodář|starost|místostarost|správce|výbor|členové)/i.test(bodyText);
-
-  return (hasPhone && hasEmail) || (hasPhone && hasRole);
-}
-
-function extractContactsEntities(bodyText) {
-  const text = bodyText;
-  const emails = [...new Set((text.match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/gi) || []))];
-
-  const phoneRaw = (text.match(/(\+420\s*)?\d{3}\s?\d{3}\s?\d{3}/g) || [])
-    .map((x) => x.replace(/\s+/g, " ").trim());
-  const phones = [...new Set(phoneRaw)];
-
-  const roleLines = [];
-  const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
-  const roleRe = /(předsed[ay]|jednatel|hospodář|místopředsed[ay]|správce|velitel|pokladn[íy]|tajemník|členové výboru|výbor|kontakt)/i;
-
-  for (const l of lines) {
-    if (roleRe.test(l) && l.length < 200) roleLines.push(l);
-  }
-
-  return { emails, phones, roleLines: [...new Set(roleLines)] };
-}
-
-function pickMainTitle(dom) {
-  const doc = dom.window.document;
-  const h1 = doc.querySelector("h1");
-  if (h1) return elText(h1);
-  const title = doc.querySelector("title");
-  if (title) return elText(title);
-  return "";
-}
-
-function extractMainText(dom) {
-  const doc = dom.window.document;
-
-  const main =
-    doc.querySelector("main") ||
-    doc.querySelector("#content") ||
-    doc.querySelector(".content") ||
-    doc.querySelector(".main") ||
-    doc.body;
-
-  const parts = [];
-  const walker = doc.createTreeWalker(main, dom.window.NodeFilter.SHOW_ELEMENT);
-
-  const pushLine = (s) => {
-    const t = textClean(s);
-    if (t) parts.push(t);
-  };
-
-  while (walker.nextNode()) {
-    const el = walker.currentNode;
-    const tag = (el.tagName || "").toLowerCase();
-
-    if (["h2", "h3", "h4"].includes(tag)) pushLine("\n" + elText(el));
-    if (tag === "p") pushLine(elText(el));
-    if (tag === "li") pushLine("• " + elText(el));
-    if (tag === "table") {
-      const rows = [...el.querySelectorAll("tr")].slice(0, 80);
-      for (const r of rows) {
-        const cells = [...r.querySelectorAll("th,td")].map((c) => elText(c)).filter(Boolean);
-        if (cells.length) pushLine(cells.join(" | "));
-      }
-      pushLine("");
+    if (isFileLink) {
+      files.push({ text: text || "(soubor)", url: abs });
+    } else {
+      links.push({ text: text || "(odkaz)", url: abs });
+      // přidej do fronty jen base bez anchoru
+      if (!visited.has(base) && !shouldSkipUrl(base)) queue.push(base);
     }
+  });
+
+  // z textu vyhoď menu-like opakující se věci tím, že bereš jen MAIN
+  const text = cleanText(main.textContent);
+
+  // pro TXT: krátká “hlavička” + body + linky
+  pages.push({
+    url: finalUrl,
+    title: title || "(bez názvu)",
+    section: sectionFromUrl(finalUrl),
+    text,
+    links,
+    files,
+  });
+
+  linkIndex.push({
+    type: "page",
+    url,
+    finalUrl,
+    status,
+    ok: true,
+    section: sectionFromUrl(finalUrl),
+    title: title || null,
+    textPreview: text.slice(0, 500),
+    links,
+    files,
+  });
+}
+
+async function worker() {
+  while (queue.length && visited.size < MAX_PAGES) {
+    const url = queue.shift();
+    if (!url) break;
+    await processPage(url);
   }
-
-  return textClean(parts.join("\n"));
-}
-
-function extractPdfLinks(dom, baseUrl) {
-  const doc = dom.window.document;
-  const a = [...doc.querySelectorAll("a[href]")];
-  const pdfs = [];
-
-  for (const node of a) {
-    const href = node.getAttribute("href");
-    if (!href) continue;
-    const norm = normalizeUrl(href, baseUrl);
-    if (!norm) continue;
-
-    const p = new URL(norm).pathname.toLowerCase();
-    if (p.endsWith(".pdf")) {
-      const label = elText(node) || "";
-      pdfs.push({ url: norm, label });
-    }
-  }
-
-  const m = new Map();
-  for (const x of pdfs) m.set(x.url, x);
-  return [...m.values()];
-}
-
-// Kategorie pro asistenta (aby „chápal význam“)
-function categorizeUrl(urlStr) {
-  const p = new URL(urlStr).pathname.toLowerCase();
-
-  if (p.includes("/urad/")) return "ÚŘAD A ÚŘEDNÍ INFORMACE";
-  if (p.includes("sokol") || p.includes("hasici") || p.includes("sdh") || p.includes("spolek") || p.includes("zahradkari") || p.includes("knihovna"))
-    return "SPOLKY A ORGANIZACE";
-  if (p.includes("skola") || p.includes("škol") || p.includes("/ms") || p.includes("materska") || p.includes("školka") || p.includes("/zs"))
-    return "ŠKOLA A ŠKOLKA";
-  if (p.includes("odpady") || p.includes("trideni-odpadu") || p.includes("bioodpad") || p.includes("sberny-dvur") || p.includes("vodovod") || p.includes("kanalizace"))
-    return "ODPADY A TECHNICKÉ SLUŽBY";
-  if (p.includes("o-obci") || p.includes("historie") || p.includes("pamatky"))
-    return "OBCI, HISTORIE A MÍSTA";
-  return "OSTATNÍ INFORMACE";
-}
-
-function ensureDir(filePath) {
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
 }
 
 async function run() {
-  console.log("DEEP CRAWL RADIM – STRUKTUROVANÁ VERZE");
-  console.log("Base:", SITE_BASE_URL);
-  console.log("OUT:", OUT_FILE);
+  ensureDir(OUT_DIR);
 
-  const visited = new Set();
-  const queue = [];
-  const results = [];
-  const pdfLibrary = new Map(); // url -> {url,label,found_on}
-
-  const startUrl = normalizeUrl(SITE_BASE_URL);
-  if (!startUrl) throw new Error("Bad SITE_BASE_URL");
-
-  queue.push({ url: startUrl, score: scoreUrl(startUrl) });
-
-  function popNext() {
-    queue.sort((a, b) => b.score - a.score);
-    return queue.shift();
-  }
-
-  function enqueue(url) {
-    if (!url) return;
-    if (visited.has(url)) return;
-    if (queue.some((x) => x.url === url)) return;
-    queue.push({ url, score: scoreUrl(url) });
-  }
-
-  async function worker(workerId) {
-    while (results.length < MAX_PAGES) {
-      const item = popNext();
-      if (!item) break;
-
-      const url = item.url;
-      if (visited.has(url)) continue;
-      visited.add(url);
-
-      try {
-        const html = await fetchHtml(url);
-        if (!html) continue;
-
-        const dom = new JSDOM(html);
-        removeJunk(dom);
-
-        const title = pickMainTitle(dom);
-        const bodyText = extractMainText(dom);
-        const pdfs = extractPdfLinks(dom, url);
-
-        pdfs.forEach((p) => {
-          if (!pdfLibrary.has(p.url)) {
-            pdfLibrary.set(p.url, { ...p, found_on: url });
-          }
-        });
-
-        const important = looksLikeOrgOrContactsPage(url, title, bodyText);
-        const entities = important ? extractContactsEntities(bodyText) : null;
-        const category = categorizeUrl(url);
-
-        if (bodyText && bodyText.length > 80) {
-          results.push({
-            url,
-            title,
-            text: bodyText,
-            important,
-            category,
-            pdfs,
-            entities
-          });
-        }
-
-        const links = extractLinks(dom, url);
-        for (const l of links) {
-          if (allowPriorityPathContains.some((x) => new URL(l).pathname.toLowerCase().includes(x))) {
-            enqueue(l);
-          }
-        }
-        for (const l of links) enqueue(l);
-
-        if (visited.size % 25 === 0) {
-          console.log(`[W${workerId}] visited=${visited.size} saved=${results.length} queue=${queue.length}`);
-        }
-      } catch (e) {
-        // tiché chyby, nechceme padat
-      }
-    }
-  }
-
-  const workers = [];
-  for (let i = 0; i < CONCURRENCY; i++) workers.push(worker(i + 1));
+  // crawl paralelně
+  const workers = Array.from({ length: CONCURRENCY }, () => worker());
   await Promise.all(workers);
 
-  // seřadit: prioritní napřed, pak podle kategorie a URL
-  results.sort((a, b) => {
-    if (a.important !== b.important) return a.important ? -1 : 1;
-    if (a.category !== b.category) return a.category.localeCompare(b.category, "cs");
-    return a.url.localeCompare(b.url, "cs");
-  });
-
-  const out = [];
-  out.push("01_STATIC_SITE_OBEC_RADIM – STRUKTUROVANÉ STABILNÍ INFORMACE");
-  out.push(`Vygenerováno: ${new Date().toISOString()}`);
-  out.push(`Zdroj: ${SITE_BASE_URL}`);
-  out.push("Tento soubor neobsahuje aktuality, kalendář akcí, fotogalerie ani obecní zpravodaj.");
-  out.push("Stránky jsou rozděleny do kategorií a každá položka obsahuje URL, název, stručný obsah a případné PDF odkazy.");
-  out.push("\n================================================================\n");
-
-  let lastCategory = null;
-
-  for (const r of results) {
-    if (r.category !== lastCategory) {
-      lastCategory = r.category;
-      out.push(`\n######## KATEGORIE: ${r.category}\n`);
-    }
-
-    out.push("------------------------------------------------------------");
-    out.push(`URL: ${r.url}`);
-    if (r.title) out.push(`NÁZEV: ${r.title}`);
-    out.push(`TYP STRÁNKY: ${r.important ? "PRIORITNÍ – kontakty / organizace / úřad" : "Standardní informativní stránka"}`);
-
-    if (r.entities) {
-      const { phones, emails, roleLines } = r.entities;
-      if ((phones?.length || 0) || (emails?.length || 0) || (roleLines?.length || 0)) {
-        out.push("VYTAŽENÉ KONTAKTY A ROLE:");
-        if (phones?.length) out.push(`- TELEFONY: ${phones.join(", ")}`);
-        if (emails?.length) out.push(`- E-MAILY: ${emails.join(", ")}`);
-        if (roleLines?.length) {
-          out.push("- ROLE / POPIS FUNKCÍ:");
-          roleLines.slice(0, 40).forEach((l) => out.push(`  • ${l}`));
-        }
-      }
-    }
-
-    if (r.pdfs && r.pdfs.length) {
-      out.push("PDF DOKUMENTY NA TÉTO STRÁNCE:");
-      for (const p of r.pdfs) {
-        const label = p.label ? p.label.replace(/\s+/g, " ").trim() : "Dokument (bez názvu)";
-        out.push(`- ${label} → ${p.url}`);
-      }
-    }
-
-    out.push("\nTEXT STRÁNKY:");
-    out.push(r.text);
-    out.push("");
+  // =========================
+  // VALIDACE ODKAZŮ (B)
+  // validujeme jen to, co budeme posílat lidem
+  // =========================
+  const allToValidate = new Set();
+  for (const p of pages) {
+    p.links.forEach(l => allToValidate.add(l.url));
+    p.files.forEach(f => allToValidate.add(f.url));
+    allToValidate.add(p.url);
   }
 
-  // uložit text
-  ensureDir(OUT_FILE);
-  fs.writeFileSync(OUT_FILE, out.join("\n"), "utf-8");
+  const list = Array.from(allToValidate);
+  // batch validace (omezeně paralelně)
+  const V = 12;
+  for (let i = 0; i < list.length; i += V) {
+    const chunk = list.slice(i, i + V);
+    const res = await Promise.all(chunk.map(u => validateUrl(u)));
+    // nic – cache se naplní
+    void res;
+  }
 
-  // PDF manifest (globální seznam všech PDF)
-  const pdfArr = [...pdfLibrary.values()].sort((a, b) => a.url.localeCompare(b.url, "cs"));
-  ensureDir(PDF_MANIFEST);
-  fs.writeFileSync(
-    PDF_MANIFEST,
-    JSON.stringify(
-      {
-        generated_at: new Date().toISOString(),
-        site: SITE_BASE_URL,
-        count: pdfArr.length,
-        items: pdfArr
-      },
-      null,
-      2
-    ),
-    "utf-8"
-  );
+  // promítnout validaci do struktur
+  for (const p of pages) {
+    const vPage = await validateUrl(p.url);
+    p.valid = vPage;
 
-  console.log("\nDONE");
+    for (const l of p.links) {
+      l.valid = await validateUrl(l.url);
+      // když 404, označ jako archivní – asistent pak nebude tvrdit “aktuální”
+      if (!l.valid.ok) l.archived = true;
+    }
+    for (const f of p.files) {
+      f.valid = await validateUrl(f.url);
+      if (!f.valid.ok) f.archived = true;
+    }
+  }
+
+  for (const it of linkIndex) {
+    const v = await validateUrl(it.finalUrl || it.url);
+    it.valid = v;
+    if (!v.ok) it.archived = true;
+
+    if (Array.isArray(it.links)) {
+      for (const l of it.links) {
+        l.valid = await validateUrl(l.url);
+        if (!l.valid.ok) l.archived = true;
+      }
+    }
+    if (Array.isArray(it.files)) {
+      for (const f of it.files) {
+        f.valid = await validateUrl(f.url);
+        if (!f.valid.ok) f.archived = true;
+      }
+    }
+  }
+
+  // =========================
+  // VÝSTUP: TXT pro vector store
+  // =========================
+  let out = "";
+  out += `# OBEC RADIM – STATICKÝ KONTEXT (deep crawl)\n`;
+  out += `# Generováno: ${new Date().toISOString()}\n\n`;
+
+  // seřadit dle sekce + title
+  pages.sort((a, b) => (a.section || "").localeCompare(b.section || "") || (a.title || "").localeCompare(b.title || ""));
+
+  for (const p of pages) {
+    // když stránka 404, nedávej text, jen poznámku
+    const ok = p.valid?.ok !== false;
+
+    out += `---\n`;
+    out += `## ${p.title}\n`;
+    out += `Sekce: ${p.section}\n`;
+    out += `URL: ${p.url}\n`;
+    if (!ok) out += `Poznámka: ARCHIVNÍ / nedostupné (HTTP ${p.valid?.status || "?"})\n`;
+    out += `\n`;
+
+    if (ok && p.text) {
+      // omez délku, aby to nebylo gigantické; zbytek stejně pokryje index + další stránky
+      const trimmed = p.text.length > 12000 ? p.text.slice(0, 12000) + "\n…(zkráceno)\n" : p.text;
+      out += trimmed + "\n\n";
+    }
+
+    if ((p.links?.length || 0) > 0) {
+      out += `Odkazy na podstránky:\n`;
+      for (const l of p.links.slice(0, 60)) {
+        const label = l.text && l.text !== "(odkaz)" ? l.text : "odkaz";
+        const suffix = l.archived ? " [ARCHIVNÍ]" : "";
+        out += `- ${label}: ${l.url}${suffix}\n`;
+      }
+      out += `\n`;
+    }
+
+    if ((p.files?.length || 0) > 0) {
+      out += `Soubory / formuláře:\n`;
+      for (const f of p.files.slice(0, 60)) {
+        const label = f.text && f.text !== "(soubor)" ? f.text : "soubor";
+        const suffix = f.archived ? " [ARCHIVNÍ]" : "";
+        out += `- ${label}: ${f.url}${suffix}\n`;
+      }
+      out += `\n`;
+    }
+  }
+
+  fs.writeFileSync(OUT_TXT, out, "utf8");
+
+  // =========================
+  // VÝSTUP: JSON index pro přesné odkazy
+  // =========================
+  fs.writeFileSync(OUT_INDEX, JSON.stringify({ generatedAt: new Date().toISOString(), site: SITE_BASE_URL, items: linkIndex }, null, 2), "utf8");
+
+  console.log("DONE");
   console.log("Visited:", visited.size);
-  console.log("Saved pages:", results.length);
   console.log("Queue left:", queue.length);
-  console.log("OUT:", OUT_FILE);
-  console.log("PDF:", PDF_MANIFEST);
+  console.log("OUT_TXT:", OUT_TXT);
+  console.log("OUT_INDEX:", OUT_INDEX);
 }
 
 run().catch((e) => {
-  console.error("FATAL:", e?.message || e);
+  console.error("FATAL:", e?.stack || e?.message || e);
   process.exit(1);
 });
