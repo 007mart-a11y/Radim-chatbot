@@ -1,0 +1,8 @@
+01_STATIC_DOPRAVA_ODPADY_obec_radim.txt
+Vygenerováno: 2026-01-23T16:32:50.477Z
+Zdroj: https://www.obec-radim.cz
+
+Tento soubor obsahuje stabilní informace z webu obce Radim.
+Proměnlivé sekce (aktuality, úřední deska, kalendář akcí, fotogalerie, zpravodaj) jsou záměrně vynechány.
+
+==============================

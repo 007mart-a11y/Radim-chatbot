@@ -1,0 +1,192 @@
+00_CORE — OBEC RADIM (AUTORITATIVNÍ ZDROJ)
+Poslední aktualizace: 21. 1. 2026
+Zdroj dat: https://www.obec-radim.cz/urad/kontakty/
+
+Tento soubor je nejvyšší autoritativní zdroj pravdy pro AI asistenta obce Radim.
+Při rozporu s jinými daty má tento CORE vždy přednost.
+
+----------------------------------------------------------------
+
+1) ZÁKLADNÍ KONTAKT NA OBEC
+
+Obecní úřad Radim  
+Adresa:  
+Obecní úřad Radim  
+Radim 8  
+507 12 Radim  
+
+Telefon:  
++420 731 409 498  
+
+E-mail:  
+urad@obec-radim.cz  
+
+IČO:  
+00272001  
+
+Datová schránka:  
+szfj9sk  
+
+Číslo bankovního účtu obce:  
+5503257329 / 0800  
+
+----------------------------------------------------------------
+
+2) ÚŘEDNÍ HODINY
+
+Úřední hodiny obecního úřadu Radim:  
+- Středa: 16:00–19:00  
+
+Poznámka:  
+Mimo úřední hodiny je možné řešit záležitosti po předchozí domluvě.
+
+----------------------------------------------------------------
+
+3) VEDENÍ OBCE
+
+Starostka obce:  
+Zdeňka Stříbrná  
+Telefon: +420 731 409 498  
+
+Další informace o osobách, funkcích a zastupitelích jsou dostupné v sekci  
+„Organizační struktura obce“ na webu obce Radim.
+
+----------------------------------------------------------------
+
+4) SBORY, SPOLKY A ORGANIZACE V OBCI
+
+----------------------------------------------------------------
+4.1) SDH RADIM (Sbor dobrovolných hasičů)
+
+Starosta sboru:  
+Karel Stříbrný ml.  
+tel. 731 108 539  
+
+Velitel:  
+Jaroslav Sedláček ml.  
+tel. 739 471 795  
+
+Správce webu SDH Radim:  
+Tomáš Myšík  
+tel. 774 500 641  
+e-mail: tomasmysik@seznam.cz  
+
+Hasičský kroužek:  
+Petra Stříbrná  
+tel. 603 979 507  
+
+E-mail SDH Radim:  
+sdhradim@email.cz  
+
+----------------------------------------------------------------
+4.2) TJ SOKOL RADIM z.s.
+
+Předsedkyně:  
+Štěpánka Kořínková  
+tel. 604 238 206  
+
+Místopředseda:  
+Lukáš Karban  
+tel. 723 226 623  
+
+Pokladník:  
+Martina Říhová  
+tel. 728 860 482  
+
+Jednatel, správce webu:  
+Petra Macáková  
+tel. 777 255 193  
+
+Členové výboru:  
+Petr Kořínek  
+Petra Macáková  
+Pavel Míka  
+Martina Říhová  
+Karel Stříbrný  
+
+Správce areálu:  
+Lukáš Karban (tel. 723 226 623)  
+Jiří Macák  
+
+----------------------------------------------------------------
+4.3) ZAHRÁDKÁŘSKÝ SPOLEK RADIM
+
+Předseda:  
+Jaromír Šimek  
+
+Tajemník:  
+Václav Nidrle  
+
+Hospodářka:  
+Renata Odvárková  
+
+Členové výboru:  
+Jaroslav Štál  
+Jaroslav Odvárko  
+Hana Militká  
+Jiří Militký  
+Jaroslav Šulc  
+
+----------------------------------------------------------------
+
+5) DŮLEŽITÉ OFICIÁLNÍ SEKCE WEBU
+
+Kontakty:  
+https://www.obec-radim.cz/urad/kontakty/
+
+E-podatelna:  
+https://www.obec-radim.cz/urad/e-podatelna/
+
+Úřední deska:  
+https://www.obec-radim.cz/urad/uredni-deska/
+
+Zápisy a usnesení:  
+https://www.obec-radim.cz/urad/zapisy-usneseni/
+
+Povinné informace:  
+https://www.obec-radim.cz/urad/povinne-informace/
+
+Kalendář akcí:  
+https://www.obec-radim.cz/aktualne/kalendar-akci/
+
+Aktuality:  
+https://www.obec-radim.cz/aktualne/aktuality/
+
+----------------------------------------------------------------
+----------------------------------------------------------------
+INTERNÍ INFORMACE OBCE – NA ŽÁDOST STAROSTKY
+(nejsou zveřejněny na oficiálním webu obce)
+
+Poplatky:
+- Komunální odpad: 750 Kč / osoba / rok
+- Poplatek za psa: 150 Kč / rok
+- Splatnost obou poplatků: do 1. března
+
+Voda:
+- Cena vody: 33 Kč / m³
+- Vyúčtování je provedeno do konce srpna
+- Splatnost: do konce září
+
+Stavební parcely:
+- Obec Radim aktuálně neeviduje žádné volné stavební parcely
+- Je možné, že se nabídky mohou objevit v soukromé inzerci
+
+Poznámka:
+Tyto informace poskytuje obecní úřad Radim
+a mohou se v budoucnu změnit.
+
+----------------------------------------------------------------
+
+5) PRAVIDLA ODPOVÍDÁNÍ PRO AI ASISTENTA
+
+- Při dotazech na kontakty, úřední hodiny, vedení obce, IČO, datovou schránku
+  vždy používej údaje z tohoto CORE souboru.
+- Pokud se uživatel ptá na dokumenty, vyhlášky nebo aktuální rozhodnutí,
+  odkaž ho na Úřední desku.
+- U časově proměnlivých informací vždy upozorni,
+  že se informace mohou měnit, a nabídni oficiální odkaz.
+- Nikdy si nevymýšlej údaje, které nejsou v CORE nebo ve znalostní bázi.
+
+----------------------------------------------------------------
+
+KONEC CORE

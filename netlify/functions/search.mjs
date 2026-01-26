@@ -85,148 +85,98 @@ function extractLatestAssistantText(messagesListJson) {
 }
 
 /**
- * Jemné čištění: odstranění citací z File Search.
+ * Čištění citací a "bordelu" z File Search.
+ * - smaže:  apod.
+ * - smaže tokeny jako 6:0 (ale NESMAŽE časy typu 16:00)
  */
 function stripCitations(text) {
   return String(text || "")
+    // typické file_search citace
     .replace(/【\s*\d+\s*:\s*\d+\s*†[^】]*】/g, "")
+    // někdy se objeví samotné tokeny typu 6:0 (jednociferné za dvojtečkou)
+    .replace(/\b\d+:\d\b/g, "")
+    // markdown ** (často zbytečné v úředním tónu)
+    .replace(/\*\*(.*?)\*\*/g, "$1")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 }
 
+function isListRequest(userMessage) {
+  const m = String(userMessage || "").toLowerCase();
+  return (
+    m.includes("vypiš") ||
+    m.includes("vypsat") ||
+    m.includes("všechny") ||
+    m.includes("seznam") ||
+    m.includes("výčet") ||
+    m.includes("co je vyvěšeno") ||
+    m.includes("co je na úřední desce") ||
+    m.includes("co je na uredni desce") ||
+    m.includes("jaké dokumenty") ||
+    m.includes("jake dokumenty") ||
+    m.includes("jaké vyhlášky") ||
+    m.includes("jake vyhlasky") ||
+    m.includes("jaké akce") ||
+    m.includes("jake akce")
+  );
+}
+
 /**
- * Guardrails po odpovědi:
- * - pryč meta kecy ("v dokumentech..."), doporučení ("doporučuji/můžete/je možné")
- * - zkrácení (max 5 vět)
- * - pokud dotaz míří na spolek (Sokol/SDH/Zahrádkáři), vyhodí kontakt na obecní úřad,
- *   protože to model často cpe jako "bezpečný fallback".
- *
- * Pozn.: je to schválně jemné, aby to nebylo "debilní" a neničilo validní odpovědi.
+ * Jemný postprocess:
+ * - neničí seznamy
+ * - nemaže URL a řádky s názvem/datem
+ * - odstraní jen opravdu typické "meta kecy"
+ * - u běžných odpovědí podrží max 5 vět, ale u výpisů NE
  */
 function postProcessAnswer(answerRaw, userMessage) {
   let t = String(answerRaw || "").trim();
 
-  // Pryč typické meta-věty / vycpávky
-  const bannedPhrases = [
-    /v dostupných dokumentech[^.\n]*[.\n]/gi,
-    /v dostupných podkladech[^.\n]*[.\n]/gi,
-    /bohužel[^.\n]*nenašel[^.\n]*[.\n]/gi,
-    /není (přímo )?uveden[^.\n]*[.\n]/gi,
-    /doporučuji[^.\n]*[.\n]/gi,
-    /můžete[^.\n]*[.\n]/gi,
-    /je možné[^.\n]*[.\n]/gi,
-    /obecně[^.\n]*bývá[^.\n]*[.\n]/gi,
+  // Základní úklid whitespace
+  t = t.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+
+  // Meta věty – jen nejhorší, a jen když NEobsahují URL (abychom neodstřelili odkaz)
+  const metaRegexes = [
+    /(^|\n)\s*(v dostupných (dokumentech|podkladech)[^.\n]*[.\n])/gi,
+    /(^|\n)\s*(v oficiálních (dokumentech|podkladech)[^.\n]*[.\n])/gi,
+    /(^|\n)\s*(bohužel[^.\n]*nenašel[^.\n]*[.\n])/gi,
   ];
-  for (const re of bannedPhrases) t = t.replace(re, "");
 
-  // Pokud jde o spolek/organizaci, vyhoď obecní kontakt (telefon/email/úřední hodiny),
-  // protože to má být jen u dotazu na úřad.
-  const msg = String(userMessage || "").toLowerCase();
-  const isOrg =
-    msg.includes("sokol") ||
-    msg.includes("t j sokol") ||
-    msg.includes("tj sokol") ||
-    msg.includes("sdh") ||
-    msg.includes("hasič") ||
-    msg.includes("zahrádk") ||
-    msg.includes("spolek");
-
-  if (isOrg) {
-    // Odstraň řádky s obecním kontaktem (jemně, jen když jsou evidentně obecní)
-    t = t
-      .split("\n")
-      .filter((line) => {
-        const s = line.toLowerCase();
-        if (s.includes("urad@obec-radim.cz")) return false;
-        if (s.includes("úřední hodiny")) return false;
-        if (s.includes("obecní úřad")) return false;
-        // obecní telefon z CORE (aby ho to necpe všude)
-        if (s.includes("731 409 498") || s.includes("+420 731 409 498")) return false;
-        return true;
-      })
-      .join("\n")
-      .trim();
+  for (const re of metaRegexes) {
+    t = t.replace(re, (m) => (m.includes("http") ? m : "\n"));
   }
 
-  // Uklidit prázdné řádky
-  t = t.replace(/\n{3,}/g, "\n\n").trim();
+  // Nikdy neukončuj URL tečkou/čárkou
+  t = t.replace(/(https?:\/\/[^\s)\]]+)[\.,]+/g, "$1");
 
-  // Zkrácení na max 5 vět (počítáme věty po tečce/!/?, ale necháváme odrážky)
-  // Když jsou v textu odrážky, necháme je; jen ořízneme celkovou délku.
-  const hasBullets = /(^|\n)\s*[-•]\s+/.test(t);
-  if (!hasBullets) {
+  // Oprav "nedopsané číslování" na konci (typ: "2." bez obsahu)
+  //  - odstraní trailing řádek typu "2." nebo "2. " apod.
+  t = t.replace(/\n?\s*\d+\.\s*$/g, "").trim();
+
+  // Pokud je to výpis / seznam, NEomezuj na 5 vět.
+  const listMode = isListRequest(userMessage);
+
+  // U běžných odpovědí: max 5 vět (ale necháme odrážky)
+  const hasBullets = /(^|\n)\s*([-•]|\d+\.)\s+/.test(t);
+
+  if (!listMode && !hasBullets) {
     const sentences = t
       .split(/(?<=[.!?])\s+/)
       .map((s) => s.trim())
       .filter(Boolean);
+
     if (sentences.length > 5) t = sentences.slice(0, 5).join(" ");
-  } else {
-    // u odrážek: omez na cca 1200 znaků, aby to nevyplnilo celý chat
-    if (t.length > 1200) t = t.slice(0, 1200).trim() + "…";
   }
 
-  // Konečné dočištění
-  t = t.replace(/[ \t]+\n/g, "\n").trim();
+  // Soft limit, aby se to nerozjelo na 50k znaků (ale nechá to dlouhé výpisy)
+  const HARD_LIMIT = 9000;
+  if (t.length > HARD_LIMIT) {
+    t = t.slice(0, HARD_LIMIT).trim();
+    // dočistit případný rozseknutý poslední řádek
+    t = t.replace(/\n[^\n]*$/g, "").trim() + "\n…";
+  }
 
-  // Kdyby to náhodou zůstalo prázdné, nech původní (raději něco než nic)
+  // Kdyby to zůstalo prázdné, vrať původní
   return t || String(answerRaw || "").trim() || "Bez odpovědi.";
-}
-
-/**
- * Heuristika pro “relevance” instrukce:
- * - Pokud dotaz míří na spolek/organizaci, vynutíme odpověď jen kontakty spolku z CORE
- * - Pokud dotaz je na obecní úřad, povolíme obecní kontakt
- */
-function buildRelevanceInstructions(userMessage) {
-  const msg = String(userMessage || "").toLowerCase();
-
-  const orgSokol =
-    msg.includes("sokol") || msg.includes("tj sokol") || msg.includes("t j sokol");
-  const orgSdh = msg.includes("sdh") || msg.includes("hasič");
-  const orgZahr = msg.includes("zahrádk");
-
-  const askingOffice =
-    msg.includes("obecní úřad") ||
-    msg.includes("úřad") ||
-    msg.includes("urad") ||
-    msg.includes("kontakty úřadu") ||
-    msg.includes("úřední hodiny") ||
-    msg.includes("datová schránka") ||
-    msg.includes("ičo") ||
-    msg.includes("e-podatelna") ||
-    msg.includes("povinné informace");
-
-  // Spolek má přednost před “úřadem” jen pokud dotaz evidentně míří na spolek
-  if (orgSokol && !askingOffice) {
-    return `
-RELEVANCE (povinné):
-- Dotaz míří na TJ Sokol Radim.
-- Odpověz pouze kontakty a údaji TJ Sokol Radim z 00_CORE (předsedkyně / místopředseda / jednatel / pokladník apod.).
-- Neuváděj kontakt na obecní úřad, úřední hodiny, ani e-mail úřadu, pokud se uživatel neptá přímo na úřad.
-- Neuváděj žádné rady ani postup; pouze konkrétní kontakty a případně oficiální odkaz, pokud je ve zdrojích.
-`;
-  }
-
-  if (orgSdh && !askingOffice) {
-    return `
-RELEVANCE (povinné):
-- Dotaz míří na SDH Radim.
-- Odpověz pouze kontakty a údaji SDH Radim z 00_CORE.
-- Neuváděj kontakt na obecní úřad, úřední hodiny, ani e-mail úřadu, pokud se uživatel neptá přímo na úřad.
-`;
-  }
-
-  if (orgZahr && !askingOffice) {
-    return `
-RELEVANCE (povinné):
-- Dotaz míří na Zahrádkářský spolek Radim.
-- Odpověz pouze údaji o Zahrádkářském spolku z 00_CORE.
-- Neuváděj kontakt na obecní úřad, pokud se uživatel neptá přímo na úřad.
-`;
-  }
-
-  // default: žádné extra
-  return "";
 }
 
 export default async function handler(req) {
@@ -251,38 +201,50 @@ export default async function handler(req) {
 
     // Runtime datum (Europe/Prague)
     const todayStr = getCzechTodayString();
+    const listMode = isListRequest(message);
 
-    const relevanceBlock = buildRelevanceInstructions(message);
-
-    // Tohle je KLÍČ: tvrdší instrukce, ale pořád “normální” (ne robot).
+    // ✅ One-file režim + kontext + odkazy + výjimka pro výpisy
     const runInstructions =
       `Dnes je ${todayStr} (časová zóna: Europe/Prague). ` +
-      `Časové výrazy ("dnes", "zítra", "příští týden") vykládej vzhledem k tomuto datu.\n\n` +
+      `Časové výrazy ("dnes", "zítra", "příští týden", "minulý měsíc") vykládej vzhledem k tomuto datu.\n\n` +
 
-      `Jsi oficiální AI asistent obce Radim. Odpovídej pouze z oficiálních podkladů ve File Search.\n` +
-      `Priorita zdrojů: 1) 00_CORE — OBEC RADIM, 2) 10_LIVE_obec_radim, 3) 01_STATIC_SITE_obec_radim.\n` +
-      `Při rozporu vždy platí 00_CORE.\n\n` +
+      `Jsi oficiální AI asistent obce Radim a odpovídáš jako pracovník obecního úřadu.\n` +
+      `Smíš používat pouze informace z oficiálního dokumentu ve znalostní bázi, který odpovídá FULL obsahu webu obce (99_FULL_obec_radim.txt).\n` +
+      `Nic nedoplňuj z domněnek. Neimprovizuj.\n\n` +
+
+      `KONTEXT (kritické):\n` +
+      `- Navazující dotazy ("a ten", "který", "nejnovější", "pošli odkaz") vždy vyhodnocuj v kontextu předchozí otázky v tomto vlákně.\n` +
+      `- "Nejnovější" posuzuj vždy v rámci tématu, o kterém se právě mluví (např. úřední deska / vyhlášky / zpravodaj / zápisy), ne jako obecnou novinku na webu.\n\n` +
+
+      `ODKAZY (kritické):\n` +
+      `- Pokud se dotaz týká dokumentu, vyhlášky, zápisu, zasedání, formuláře, zpravodaje, územního plánu, oznámení, úřední desky nebo jakékoli informace "na webu", vždy se pokus dohledat a uvést PŘÍMÝ ODKAZ na konkrétní stránku nebo soubor.\n` +
+      `- Přímý odkaz uveď i tehdy, pokud o něj uživatel výslovně nepožádá.\n` +
+      `- Pokud existuje více odkazů, uveď pouze nejrelevantnější/nejaktuálnější.\n` +
+      `- URL nikdy neukončuj tečkou ani čárkou.\n\n` +
+
+      `AKTUÁLNOST:\n` +
+      `- Vždy preferuj nejnovější platnou zmínku k tématu v rámci dokumentu.\n` +
+      `- Starší informace uváděj jen pokud novější neexistuje.\n` +
+      `- Historii uváděj pouze pokud se uživatel výslovně ptá na minulost.\n` +
+      `- Pokud odpověď vychází z časově omezené informace, uveď datum/období.\n\n` +
+
+      `DOTAZY "JAK…":\n` +
+      `- Pokud se uživatel ptá "jak se přihlásit/jak postupovat/co mám udělat", odpověz pouze dostupnými kontaktními údaji a/nebo oficiálním odkazem z dokumentu. Bez návodu.\n\n` +
+
+      `NEJASNÝ DOTAZ:\n` +
+      `- Pokud dotaz nedává smysl nebo vypadá jako překlep, polož jednu krátkou upřesňující otázku.\n\n` +
 
       `STYL:\n` +
-      `- piš česky, úředně a stručně\n` +
-      `- max 5 vět nebo krátké odrážky\n` +
-      `- žádné emoji, žádný marketing\n\n` +
+      `- Česky, úředně, věcně.\n` +
+      (listMode
+        ? `- Uživatel žádá výpis/seznam: napiš přehledný seznam všech relevantních položek; každá položka musí mít název + datum/období (pokud je) + přímý odkaz (pokud je).\n`
+        : `- Maximálně 5 vět, případně krátké odrážky.\n`) +
+      `- Žádné emoji, žádný marketing.\n\n` +
 
       `ZÁKAZY:\n` +
-      `- nepiš metakomentáře typu "v dokumentech jsem nenašel / není uvedeno"\n` +
-      `- nepoužívej doporučení ("doporučuji", "můžete", "je možné") ani obecné rady\n` +
-      `- pokud se uživatel ptá "jak postupovat", odpověz pouze konkrétními kontakty/odkazy ze zdrojů, bez návodu\n` +
-      `- nezmiňuj scraping/crawling/technické detaily ani názvy souborů\n\n` +
-
-      `KONTAKTY:\n` +
-      `- kontakt na obecní úřad uváděj jen tehdy, když se dotaz týká obecního úřadu\n` +
-      `- u spolků/organizací používej přímé kontakty těchto subjektů z 00_CORE\n\n` +
-
-      (relevanceBlock ? relevanceBlock + "\n" : "") +
-
-      `ODKAZY:\n` +
-      `- URL nikdy neukončuj tečkou ani jiným znakem\n` +
-      `- LIVE odkazy jsou aktuální; STATIC odkazy označ jako orientační, pokud to dává smysl.\n`;
+      `- Neuváděj technické detaily (AI, systém, databáze, scraping).\n` +
+      `- Nepsat metakomenty typu "v dokumentech jsem nenašel". Pokud informace chybí, řekni to jednou stručně.\n` +
+      `- Nepoužívej doporučení ("doporučuji", "můžete", "je možné").\n`;
 
     // Thread: pokud přijde thread_id, pokračujeme; jinak založíme nový
     let threadId = body?.thread_id;
@@ -322,7 +284,7 @@ export default async function handler(req) {
 
     // 3) Poll run status
     const started = Date.now();
-    const timeoutMs = 45_000;
+    const timeoutMs = 60_000;
 
     while (true) {
       if (Date.now() - started > timeoutMs) {
@@ -354,8 +316,12 @@ export default async function handler(req) {
     // 4) Read messages
     const messages = await api(`/threads/${threadId}/messages?limit=50`, {}, apiKey);
     let answer = extractLatestAssistantText(messages);
+
     answer = stripCitations(answer);
     answer = postProcessAnswer(answer, message);
+
+    // Pokud i po tom všem zůstane prázdno:
+    if (!answer) answer = "Tuto informaci bohužel nemám k dispozici v oficiálních podkladech obce Radim.";
 
     return jsonResponse(200, { ok: true, answer, thread_id: threadId });
   } catch (err) {

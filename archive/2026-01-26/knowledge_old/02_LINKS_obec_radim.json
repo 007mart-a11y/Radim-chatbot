@@ -1,0 +1,4300 @@
+{
+  "generated_at": "2026-01-24T16:58:17.463Z",
+  "base": "https://www.obec-radim.cz",
+  "max_pages": 250,
+  "discovered": 899,
+  "crawled_pages": 173,
+  "pages": [
+    {
+      "url": "https://obec-radim.cz/",
+      "title": "Obce Radim - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 126
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/kalendar-akci/",
+      "title": "Kalendář akcí - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 114
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/fotogalerie/stripky-z-minulosti/",
+      "title": "Střípky z minulosti - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 129
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/obecni-zpravodaj/",
+      "title": "Obecní zpravodaj - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 132
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/napsali-o-nas/",
+      "title": "Napsali o nás - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 156
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/",
+      "title": "Aktuálně - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 139
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/aktuality/",
+      "title": "Aktuality - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 197
+    },
+    {
+      "url": "https://obec-radim.cz/obec-7/o-obci/",
+      "title": "O obci - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 110
+    },
+    {
+      "url": "https://obec-radim.cz/obec-7/skola-a-skolka/",
+      "title": "Škola a školka - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 113
+    },
+    {
+      "url": "https://obec-radim.cz/obec-7/knihovna/",
+      "title": "Knihovna - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 111
+    },
+    {
+      "url": "https://obec-radim.cz/obec-7/hrbitov-radim/",
+      "title": "Hřbitov Radim - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 112
+    },
+    {
+      "url": "https://obec-radim.cz/obec-7/nase-visky/tuzin/",
+      "title": "Tužín - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 117
+    },
+    {
+      "url": "https://obec-radim.cz/obec-7/turisticke-cile/do-10-km/",
+      "title": "Do 10 km - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 134
+    },
+    {
+      "url": "https://obec-radim.cz/obec-7/zajimave-odkazy/",
+      "title": "Zajímavé odkazy - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 119
+    },
+    {
+      "url": "https://obec-radim.cz/obec-7/tuzin-podhaji/historie/tuzin/",
+      "title": "Tužín - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 125
+    },
+    {
+      "url": "https://obec-radim.cz/obec-7/sluzby-a-firmy/",
+      "title": "Služby a firmy - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 118
+    },
+    {
+      "url": "https://obec-radim.cz/obec-7/tuzin-podhaji/aktuality/",
+      "title": "Aktuality - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 119
+    },
+    {
+      "url": "https://obec-radim.cz/obec-7/tuzin-podhaji/",
+      "title": "Tužín-Podhájí - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 117
+    },
+    {
+      "url": "https://obec-radim.cz/obec-7/tuzin-podhaji/kronika-obci/",
+      "title": "Kronika obcí - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 118
+    },
+    {
+      "url": "https://obec-radim.cz/obec-7/tuzin-podhaji/fotogalerie/nejstarsi-fota/",
+      "title": "Nejstarší fota - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 128
+    },
+    {
+      "url": "https://obec-radim.cz/obec-7/tuzin-podhaji/fotogalerie/nova-fota-staveni/",
+      "title": "Nová fota stavení - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 127
+    },
+    {
+      "url": "https://obec-radim.cz/obec-7/tuzin-podhaji/fotogalerie/aktualni-fota/",
+      "title": "Aktuální fota - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 142
+    },
+    {
+      "url": "https://obec-radim.cz/obec-7/tuzin-podhaji/fotogalerie/zajimava-fota/",
+      "title": "Zajímavá fota - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 127
+    },
+    {
+      "url": "https://obec-radim.cz/obec-7/tuzin-podhaji/fotogalerie/fota-staveni-rok-2008/",
+      "title": "Fota stavení rok 2008 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 128
+    },
+    {
+      "url": "https://obec-radim.cz/obec-7/tuzin-podhaji/fotogalerie/",
+      "title": "Fotogalerie - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 132
+    },
+    {
+      "url": "https://obec-radim.cz/obec-7/tuzin-podhaji/fotogalerie/oprava-prostredniho-mlyna/",
+      "title": "Oprava prostředního mlýna - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 127
+    },
+    {
+      "url": "https://obec-radim.cz/obec-7/tuzin-podhaji/fotogalerie/sjezd-rodaku/",
+      "title": "Sjezd rodáků - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 127
+    },
+    {
+      "url": "https://obec-radim.cz/obec-7/tuzin-podhaji/zajimavosti/",
+      "title": "Zajímavosti - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 132
+    },
+    {
+      "url": "https://obec-radim.cz/obec-7/tuzin-podhaji/zajimavosti/kaple-andela-strazce/",
+      "title": "Kaple Anděla Strážce - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 127
+    },
+    {
+      "url": "https://obec-radim.cz/obec-7/tuzin-podhaji/zajimavosti/mlyny-na-tuzine/",
+      "title": "Mlýny na Tužíně - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 126
+    },
+    {
+      "url": "https://obec-radim.cz/obec-7/tuzin-podhaji/zajimavosti/sdh-tuzin/",
+      "title": "SDH Tužín - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 127
+    },
+    {
+      "url": "https://obec-radim.cz/obec-7/tuzin-podhaji/zajimavosti/pametihodnosti/",
+      "title": "Pamětihodnosti - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 128
+    },
+    {
+      "url": "https://obec-radim.cz/obec-7/tuzin-podhaji/zajimavosti/divadelni-cinnost-na-tuzine/",
+      "title": "Divadelní činnost na Tužíně - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 127
+    },
+    {
+      "url": "https://obec-radim.cz/obec-7/tuzin-podhaji/lesan-tuzin/",
+      "title": "Lesan Tužín - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 120
+    },
+    {
+      "url": "https://obec-radim.cz/obec-7/tuzin-podhaji/zajimavosti/pozary-v-obci/",
+      "title": "Požáry v obci - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 127
+    },
+    {
+      "url": "https://obec-radim.cz/obec-7/tuzin-podhaji/lesan-tuzin/aktualne/",
+      "title": "Aktuálně - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 122
+    },
+    {
+      "url": "https://obec-radim.cz/obec-7/tuzin-podhaji/zajimavosti/sest-stoleti-u-nas/",
+      "title": "Šest století u nás - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 126
+    },
+    {
+      "url": "https://obec-radim.cz/obec-7/tuzin-podhaji/lesan-tuzin/historie-oddilu/",
+      "title": "Historie oddílu - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 121
+    },
+    {
+      "url": "https://obec-radim.cz/obec-7/tuzin-podhaji/zajimave-odkazy/",
+      "title": "Zajímavé odkazy - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 122
+    },
+    {
+      "url": "https://obec-radim.cz/urad/mobilni-rozhlas/",
+      "title": "Mobilní rozhlas - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": false,
+      "links_count": 113
+    },
+    {
+      "url": "https://obec-radim.cz/urad/",
+      "title": "Úřad - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": false,
+      "links_count": 118
+    },
+    {
+      "url": "https://obec-radim.cz/urad/e-podatelna/",
+      "title": "E-podatelna - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": false,
+      "links_count": 111
+    },
+    {
+      "url": "https://obec-radim.cz/urad/uredni-deska/",
+      "title": "Úřední deska - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": true,
+      "links_count": 168
+    },
+    {
+      "url": "https://obec-radim.cz/urad/zapisy-usneseni/",
+      "title": "Zápisy / usnesení - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": false,
+      "links_count": 135
+    },
+    {
+      "url": "https://obec-radim.cz/urad/povinne-informace/",
+      "title": "Povinné informace - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": false,
+      "links_count": 125
+    },
+    {
+      "url": "https://obec-radim.cz/urad/vybory/",
+      "title": "Výbory - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": false,
+      "links_count": 112
+    },
+    {
+      "url": "https://obec-radim.cz/urad/vybory/studenany/",
+      "title": "Studeňany - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": false,
+      "links_count": 119
+    },
+    {
+      "url": "https://obec-radim.cz/urad/czech-point/",
+      "title": "Czech Point - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": false,
+      "links_count": 121
+    },
+    {
+      "url": "https://obec-radim.cz/urad/czech-point/vypis-z-bodoveho-hodnoceni-ridice/",
+      "title": "Výpis z bodového hodnocení řidiče - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": false,
+      "links_count": 118
+    },
+    {
+      "url": "https://obec-radim.cz/urad/czech-point/vypis-z-rejstriku-trestu/",
+      "title": "Výpis z rejstříku trestů - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": false,
+      "links_count": 117
+    },
+    {
+      "url": "https://obec-radim.cz/urad/skladka-bioodpadu/",
+      "title": "Skládka bioodpadu - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": false,
+      "links_count": 114
+    },
+    {
+      "url": "https://obec-radim.cz/urad/czech-point/vypis-z-zivnostenskeho-rejstriku/",
+      "title": "Výpis z Živnostenského rejstříku - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": false,
+      "links_count": 117
+    },
+    {
+      "url": "https://obec-radim.cz/urad/czech-point/vypis-z-obchodniho-rejstriku/",
+      "title": "Výpis z Obchodního rejstříku - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": false,
+      "links_count": 117
+    },
+    {
+      "url": "https://obec-radim.cz/urad/czech-point/vypis-z-katastru-nemovitosti/",
+      "title": "Výpis z katastru nemovitostí - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": false,
+      "links_count": 117
+    },
+    {
+      "url": "https://obec-radim.cz/urad/uzemni-a-rozvojovy-plan/",
+      "title": "Územní a rozvojový plán - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": false,
+      "links_count": 126
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/",
+      "title": "Organizace a spolky - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 114
+    },
+    {
+      "url": "https://obec-radim.cz/urad/kontakty/",
+      "title": "Kontakty - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": false,
+      "links_count": 115
+    },
+    {
+      "url": "https://obec-radim.cz/urad/kontakty/anketa/",
+      "title": "Anketa - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": false,
+      "links_count": 115
+    },
+    {
+      "url": "https://obec-radim.cz/urad/kontakty/mapa-webu/",
+      "title": "Mapa webu - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": false,
+      "links_count": 253
+    },
+    {
+      "url": "https://obec-radim.cz/urad/kontakty/napiste-nam/",
+      "title": "Napište nám - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": false,
+      "links_count": 115
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/sokolove/",
+      "title": "Sokolové - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 146
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/sokolove/sportovni-oddily/volejbal/",
+      "title": "Volejbal - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 119
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/sokolove/o-nas/soucasnost/",
+      "title": "Současnost - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 122
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/sokolove/sportovni-areal/kde-sportujeme/",
+      "title": "Kde sportujeme - Kde sportujeme - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 142
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/sokolove/detsky-tabor/aktualni-tabor/",
+      "title": "Aktuální tábor - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 119
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/sokolove/zapisy/vyborove-schuze/",
+      "title": "Výborové schůze - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 140
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/sokolove/fotogalerie/2024/",
+      "title": "2024 - Volejbalové soustředění Radim 22.7.-26.7. - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 233
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/hasici/aktualne-o-sboru/",
+      "title": "Aktuálně o sboru - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 117
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/zahradkari/",
+      "title": "Zahrádkáři - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 115
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/zahradkari/foto/",
+      "title": "FOTO - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 113
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/zahradkari/o-nas/",
+      "title": "O nás - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 112
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/zahradkari/zahradkari-radi/",
+      "title": "Zahrádkáři radí - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 114
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/zahradkari/zahradkari-radi/leden/",
+      "title": "leden - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 114
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/myslivci/",
+      "title": "Myslivci - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 108
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/anna-mackova-josef-vachal-a-fotografove-zs/",
+      "title": "Anna Macková, Josef Váchal a fotografové z.s. - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 112
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/anna-mackova-josef-vachal-a-fotografove-zs/o-nas/",
+      "title": "O nás - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 111
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/vcelari/",
+      "title": "Včelaři - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 108
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/anna-mackova-josef-vachal-a-fotografove-zs/fotogalerie/",
+      "title": "Fotogalerie - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 111
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/vachaluv-spolek-zanikl/",
+      "title": "Váchalův spolek - zanikl - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 110
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/",
+      "title": "Oficiální stránky obce Radim - Verze pro seniory",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 8
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/hasici/fotogalerie/soustredeni-radim-554cs.html",
+      "title": "Fotogalerie - Soustředění Radim - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 127
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/kalendar-akci/sokolsky-ples-614_188cs.html",
+      "title": "Kalendář akcí - Sokolský ples - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 111
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/kalendar-akci/vyrocni-clenska-schuze-spolku-tj-sokol-radim-616_190cs.html",
+      "title": "Kalendář akcí - Výroční členská schůze spolku TJ Sokol Radim - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 111
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/aktuality/obnova-a-rekonstrukce-sportovniho-arealu-613cs.html",
+      "title": "Aktuality - OBNOVA A REKONSTRUKCE SPORTOVNÍHO AREÁLU - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 113
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/aktuality/uplna-uzavirka-silnice-iii-tr-c-2861-obce-drevenice-604cs.html",
+      "title": "Aktuality - Úplná uzavírka silnice III. tř. č. 2861 obce Dřevěnice - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 119
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/aktuality/adventni-hra-adventni-putovani-582cs.html",
+      "title": "Aktuality - Adventní hra -  Adventní putování - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 111
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/aktuality/valdstejnuv-jicin-recenze-knihy-na-vrcholu-rodove-historie-valdstejnu-vycniva-cisarsky-generalissimus-a-frydlantsky-vevoda-albrecht-jeho-slava-a-smrt-vzdy-vzbuzovaly-zajem-odborniku-kteri-se-prevazne-venovali-ci-venuji-vyzkumu-vojenstvi-historikove-577cs.html",
+      "title": "Aktuality - Valdštejnův Jičín   recenze knihy \tNa vrcholu rodové historie Valdštejnů vyčnívá císařský generalissimus a frýdlantský vévoda Albrecht - jeho sláva a smrt vždy vzbuzovaly zájem odborníků, kteří se převážně věnovali či věnují výzkumu vojenství. Historikové - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 111
+    },
+    {
+      "url": "https://obec-radim.cz/urad/uredni-deska/obecne-zavazna-vyhlaska-obce-radim-o-mistnim-poplatku-ze-psu-548.html",
+      "title": "Úřední deska - Obecně závazná vyhláška obce Radim o místním poplatku ze psů - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": true,
+      "links_count": 115
+    },
+    {
+      "url": "https://obec-radim.cz/urad/uredni-deska/zamer-propachtovani-nemovite-veci-552.html",
+      "title": "Úřední deska - Záměr propachtování nemovité věci - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": true,
+      "links_count": 115
+    },
+    {
+      "url": "https://obec-radim.cz/urad/uredni-deska/obecne-zavazna-vyhlaska-obce-radim-o-mistnim-poplatku-za-obecni-system-odpadoveho-hospodarstvi-549.html",
+      "title": "Úřední deska - Obecně závazná vyhláška obce Radim o místním poplatku za obecní systém odpadového hospodářství - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": true,
+      "links_count": 115
+    },
+    {
+      "url": "https://obec-radim.cz/urad/uredni-deska/zamer-pronajmu-nemovite-veci-studenany-cp-35-551.html",
+      "title": "Úřední deska - Záměr pronájmu nemovité věci - Studeňany č.p. 35 - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": true,
+      "links_count": 115
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/aktuality/advent-v-zeleznici-576cs.html",
+      "title": "Aktuality - Advent v Železnici - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 111
+    },
+    {
+      "url": "https://obec-radim.cz/urad/uredni-deska/pravidla-rozpoctoveho-provizoria-na-rok-2026-550.html",
+      "title": "Úřední deska - Pravidla rozpočtového provizoria na rok 2026 - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": true,
+      "links_count": 115
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/hasici/fotogalerie/hra-plamen-radim-235-2552025-608cs.html",
+      "title": "Fotogalerie - Hra Plamen Radim 23.5.-25.5.2025 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 151
+    },
+    {
+      "url": "https://obec-radim.cz/cs/tiraz/",
+      "title": "Tiráž - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 101
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/hasici/fotogalerie/jarni-soustredeni-605cs.html",
+      "title": "Fotogalerie - Jarní soustředění - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 165
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/hasici/fotogalerie/hra-plamen-2025-609cs.html",
+      "title": "Fotogalerie - Hra Plamen 2025 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 213
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/hasici/fotogalerie/hra-plamen-555cs.html",
+      "title": "Fotogalerie - Hra Plamen - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 212
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/kalendar-akci/detsky-maskarni-karneval-617_191cs.html",
+      "title": "Kalendář akcí - Dětský maškarní karneval - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 111
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/fotogalerie/",
+      "title": "Fotogalerie - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 125
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/fotogalerie/2024/",
+      "title": "2024 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 138
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/fotogalerie/2023/",
+      "title": "2023 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 135
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/fotogalerie/2017/",
+      "title": "2017 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 133
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/fotogalerie/2021-1/",
+      "title": "2021 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 133
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/fotogalerie/2020/",
+      "title": "2020 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 147
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/fotogalerie/2018-1/",
+      "title": "2018 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 141
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/fotogalerie/2022/",
+      "title": "2022 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 134
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/fotogalerie/2019/",
+      "title": "2019 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 145
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/fotogalerie/2015/",
+      "title": "2015 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 133
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/fotogalerie/2016/",
+      "title": "2016 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 136
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/fotogalerie/2014/",
+      "title": "2014 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 139
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/fotogalerie/2013/",
+      "title": "2013 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 135
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/fotogalerie/2012/",
+      "title": "2012 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 135
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/fotogalerie/2011/",
+      "title": "2011 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 157
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/fotogalerie/2007/",
+      "title": "2007 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 136
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/fotogalerie/2008/",
+      "title": "2008 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 128
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/fotogalerie/historicke-fotografie/",
+      "title": "Historické fotografie - Radim ve vlnách času - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 142
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/napsali-o-nas/radimsti-si-prohledli-nove-byty-327cs.html",
+      "title": "Napsali o nás - Radimští si prohlédli nové byty - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 110
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/napsali-o-nas/studenany-oslavily-vyroci-vachala-program-nabidl-tanec-hudbu-i-dobroty-560cs.html",
+      "title": "Napsali o nás - Studeňany oslavily výročí Váchala. Program nabídl tanec, hudbu i dobroty - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 111
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/napsali-o-nas/v-radimi-padaly-kroupy-jako-angresty-silna-boure-se-prohnala-jicinskem-zdroj-https-jicinskydenikcz-zpravyregion-u-jicina-padaly-kroupy-jako-angresty-silna-boure-se-prohnala-celym-krajem-202208html-432cs.html",
+      "title": "Napsali o nás - V Radimi padaly kroupy jako angrešty. Silná bouře se prohnala Jičínskem Zdroj: https://jicinsky.denik.cz/zpravy_region/u-jicina-padaly-kroupy-jako-angresty-silna-boure-se-prohnala-celym-krajem-202208.html - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 111
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/napsali-o-nas/capi-se-na-novem-hnizde-zabydleli-po-lonskem-dramatu-roste-nova-generace-542cs.html",
+      "title": "Napsali o nás - Čápi se na novém hnízdě zabydleli. Po loňském dramatu roste nová generace - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 111
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/napsali-o-nas/pravidla-mostarny-zmenila-pandemie-uz-35-let-tece-z-mostovny-na-koleckach-v-radimi-lahodny-napoj-298cs.html",
+      "title": "Napsali o nás - Pravidla moštárny změnila pandemie. Už 35 let teče z moštovny na kolečkách v Radimi lahodný nápoj - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 111
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/napsali-o-nas/studenany-hostily-vinarskou-slavnost-burcakobrani-nabidlo-zabavu-pro-vsechny-561cs.html",
+      "title": "Napsali o nás - Studeňany hostily vinařskou slavnost. Burčákobraní nabídlo zábavu pro všechny - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 111
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/napsali-o-nas/154-vyroci-bitvy-u-jicina-285cs.html",
+      "title": "Napsali o nás - 154. výročí bitvy u Jičína - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 118
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/napsali-o-nas/jicinsky-denik-249cs.html",
+      "title": "Napsali o nás - Jičínský deník - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 111
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/napsali-o-nas/jablecny-most-tece-proudem-297cs.html",
+      "title": "Napsali o nás - Jablečný mošt teče proudem - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 111
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/napsali-o-nas/cesky-rozhlas-259cs.html",
+      "title": "Napsali o nás - Český rozhlas - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 111
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/napsali-o-nas/halali-s-gulaskem-a-taborankou-263cs.html",
+      "title": "Napsali o nás - Halali s guláškem a Táborankou - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 111
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/napsali-o-nas/jicinsky-denik-199cs.html",
+      "title": "Napsali o nás - Jičínský deník - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 111
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/napsali-o-nas/vanocni-vystava-17cs.html",
+      "title": "Napsali o nás - Vánoční výstava - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 111
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/napsali-o-nas/wimbledon-v-radimi-vysel-skvele-19cs.html",
+      "title": "Napsali o nás - Wimbledon v Radimi vyšel škvěle - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 111
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/napsali-o-nas/oslava-125-let-hasicu-v-radimi-154cs.html",
+      "title": "Napsali o nás - Oslava 125 let hasičů v Radimi - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 111
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/napsali-o-nas/jicinsky-denik-16cs.html",
+      "title": "Napsali o nás - Jičínský deník - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 111
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/napsali-o-nas/jicinsky-denik-18cs.html",
+      "title": "Napsali o nás - Jičínský deník - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 111
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/napsali-o-nas/tuzinem-se-nese-hlas-zvonu-21cs.html",
+      "title": "Napsali o nás - Tužínem se nese hlas zvonu - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 111
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/napsali-o-nas/definitivni-konec-leta-skolaci-vyrukovali-za-vedomostmi-23cs.html",
+      "title": "Napsali o nás - Definitivní konec léta! Školáci vyrukovali za vědomostmi - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 111
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/napsali-o-nas/radim-chce-investovat-do-nemovitosti-ma-i-vlastni-hospodu-20cs.html",
+      "title": "Napsali o nás - Radim chce investovat do nemovitostí, má i vlastní hospodu - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 111
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/napsali-o-nas/v-radimske-skole-o-prazdninach-nezahaleli-vcera-obedvali-v-novem-22cs.html",
+      "title": "Napsali o nás - V radimské škole o prázdninách nezaháleli, včera obědvali v novém - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 111
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/napsali-o-nas/prvnacci-dostali-prukazky-do-radimske-knihovny-26cs.html",
+      "title": "Napsali o nás - Prvňáčci dostali průkazky do radimské knihovny - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 111
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/napsali-o-nas/svetova-premiera-ve-stodole-ve-studenanech-27cs.html",
+      "title": "Napsali o nás - Světová premiéra ve stodole ve Studeňanech - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 111
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/napsali-o-nas/v-radimi-pres-leto-kompletne-opravi-skolni-jidelnu-25cs.html",
+      "title": "Napsali o nás - V Radimi přes léto kompletně opraví školní jídelnu - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 111
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/napsali-o-nas/oslavy-650-let-od-prvni-zminky-o-obci-radim-24cs.html",
+      "title": "Napsali o nás - Oslavy 650 let od první zmínky o obci Radim - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 111
+    },
+    {
+      "url": "https://obec-radim.cz/kontakt/",
+      "title": "Kontakty - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 115
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/hasici/fotogalerie/paleni-carodejnic-606cs.html",
+      "title": "Fotogalerie - Pálení čarodějnic - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 120
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/hasici/fotogalerie/vylet-do-narodniho-muzea-v-praze-1522025-591cs.html",
+      "title": "Fotogalerie - Výlet do Národního muzea v Praze 15.2.2025 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 167
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/aktuality/upozorneni-568cs.html",
+      "title": "Aktuality - UPOZORNĚNÍ - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 110
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/aktuality/rozsviceni-vanocniho-stromu-575cs.html",
+      "title": "Aktuality - Rozsvícení vánočního stromu - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 111
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/aktuality/upozorneni-572cs.html",
+      "title": "Aktuality - UPOZORNĚNÍ - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 111
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/aktuality/odstavka-elektriny-571cs.html",
+      "title": "Aktuality - Odstávka elektřiny - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 112
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/aktuality/pozvani-na-predvanocni-jarmark-567cs.html",
+      "title": "Aktuality - Pozvání na předvánoční jarmark - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 111
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/aktuality/divadelni-vystoupeni-569cs.html",
+      "title": "Aktuality - Divadelní vystoupení - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 111
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/aktuality/zaciname-cvicit-566cs.html",
+      "title": "Aktuality - Začínáme cvičit - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 113
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/aktuality/otevreni-hospody-radim-544cs.html",
+      "title": "Aktuality - Otevření Hospody Radim - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 112
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/aktuality/zampelband-rock-556cs.html",
+      "title": "Aktuality - ZAMPELBAND ROCK - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 111
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/aktuality/male-ohlednuti-za-oslavou-hasicu-565cs.html",
+      "title": "Aktuality - Malé ohlédnutí za oslavou hasičů - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 112
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/aktuality/oslava-130-let-od-zalozeni-sdh-radim-532cs.html",
+      "title": "Aktuality - Oslava 130 let od založení SDH Radim - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 111
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/aktuality/olympijsky-beh-539cs.html",
+      "title": "Aktuality - Olympijský běh - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 111
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/aktuality/capi-kamera-radim-541cs.html",
+      "title": "Aktuality - Čapí kamera Radim - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 111
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/aktuality/projekt-odbahneni-a-oprava-rybniku-v-obci-radim-lhan-527cs.html",
+      "title": "Aktuality - PROJEKT:  „Odbahnění a oprava rybníku v obci Radim - Lháň“ - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 112
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/aktuality/prodej-palivoveho-dreva-523cs.html",
+      "title": "Aktuality - Prodej palivového dřeva - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 111
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/aktuality/kotlikove-dotace-520cs.html",
+      "title": "Aktuality - Kotlíkové dotace - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 113
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/aktuality/vanocni-koncert-510cs.html",
+      "title": "Aktuality - Vánoční koncert - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 111
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/aktuality/vanocni-vystava-509cs.html",
+      "title": "Aktuality - Vánoční výstava - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 111
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/aktuality/slavnostni-rozsviceni-vanocniho-stromu-508cs.html",
+      "title": "Aktuality - Slavnostní rozsvícení vánočního stromu - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 111
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/aktuality/den-otevrenych-dveri-519cs.html",
+      "title": "Aktuality - Den otevřených dveří - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 111
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/aktuality/jarni-brigada-518cs.html",
+      "title": "Aktuality - Jarní brigáda - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 111
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/aktuality/tyden-vzdelavani-dospelych-505cs.html",
+      "title": "Aktuality - Týden vzdělávání dospělých - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 115
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/aktuality/divadlo-v-radimi-504cs.html",
+      "title": "Aktuality - Divadlo v Radimi - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 111
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/aktuality/radimsky-halloween-494cs.html",
+      "title": "Aktuality - Radimský halloween - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 111
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/aktuality/otevreni-detskeh-hriste-492cs.html",
+      "title": "Aktuality - Otevření dětskéh hřiště - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 111
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/fotogalerie/2024/rozsveceni-vanocniho-stromu-579cs.html",
+      "title": "2024 - Rozsvěcení vánočního stromu - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 213
+    },
+    {
+      "url": "https://obec-radim.cz/obec-7/",
+      "title": "O obci - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 110
+    },
+    {
+      "url": "https://obec-radim.cz/obec-7/nase-visky/",
+      "title": "Naše vísky - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 113
+    },
+    {
+      "url": "https://obec-radim.cz/obec-7/nase-visky/studenany/",
+      "title": "Studeňany - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 114
+    },
+    {
+      "url": "https://obec-radim.cz/obec-7/nase-visky/lhan/",
+      "title": "Lháň - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 114
+    },
+    {
+      "url": "https://obec-radim.cz/obec-7/turisticke-cile/",
+      "title": "Turistické cíle - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 112
+    },
+    {
+      "url": "https://obec-radim.cz/obec-7/turisticke-cile/do-10-km/jinolicke-rybniky-9-km-38cs.html",
+      "title": "Do 10 km - JINOLICKÉ RYBNÍKY – 9 km - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 116
+    },
+    {
+      "url": "https://obec-radim.cz/obec-7/turisticke-cile/do-10-km/bradlec-5-km-31cs.html",
+      "title": "Do 10 km - BRADLEC – 5 km - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 116
+    },
+    {
+      "url": "https://obec-radim.cz/obec-7/turisticke-cile/do-10-km/kumburk-6-km-32cs.html",
+      "title": "Do 10 km - KUMBURK – 6 km - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 116
+    },
+    {
+      "url": "https://obec-radim.cz/obec-7/turisticke-cile/nad-10-km/",
+      "title": "Nad 10 km - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 127
+    },
+    {
+      "url": "https://obec-radim.cz/obec-7/turisticke-cile/do-10-km/jicin-8-km-35cs.html",
+      "title": "Do 10 km - JIČÍN – 8 km - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 116
+    },
+    {
+      "url": "https://obec-radim.cz/obec-7/turisticke-cile/do-10-km/zamek-jicin-8-km-36cs.html",
+      "title": "Do 10 km - ZÁMEK JIČÍN – 8 km - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 115
+    },
+    {
+      "url": "https://obec-radim.cz/obec-7/turisticke-cile/do-10-km/valdstejnska-lodzie-libosad-6-km-34cs.html",
+      "title": "Do 10 km - Valdštejnská lodžie - Libosad – 6 km - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 116
+    },
+    {
+      "url": "https://obec-radim.cz/obec-7/turisticke-cile/do-10-km/zebin-6-km-33cs.html",
+      "title": "Do 10 km - ZEBÍN – 6 km - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 116
+    },
+    {
+      "url": "https://obec-radim.cz/obec-7/turisticke-cile/do-10-km/tabor-10-km-39cs.html",
+      "title": "Do 10 km - TÁBOR – 10 km - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 116
+    },
+    {
+      "url": "https://obec-radim.cz/obec-7/turisticke-cile/do-10-km/prachovske-skaly-9km-37cs.html",
+      "title": "Do 10 km - PRACHOVSKÉ SKÁLY – 9km - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 116
+    },
+    {
+      "url": "https://obec-radim.cz/obec-7/turisticke-cile/do-10-km/studenany-2-km-29cs.html",
+      "title": "Do 10 km - STUDEŇANY – 2 km - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 115
+    },
+    {
+      "url": "https://obec-radim.cz/obec-7/turisticke-cile/do-10-km/zeleznice-5-km-30cs.html",
+      "title": "Do 10 km - ŽELEZNICE – 5 km - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 116
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/fotogalerie/2024/setkani-se-seniory-581cs.html",
+      "title": "2024 - Setkání se seniory - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 137
+    },
+    {
+      "url": "https://obec-radim.cz/obec-7/tuzin-podhaji/historie/",
+      "title": "Historie - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 122
+    },
+    {
+      "url": "https://obec-radim.cz/obec-7/tuzin-podhaji/historie/chaty/",
+      "title": "Chaty - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 124
+    },
+    {
+      "url": "https://obec-radim.cz/obec-7/tuzin-podhaji/historie/podhaji/",
+      "title": "Podhájí - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 125
+    },
+    {
+      "url": "https://obec-radim.cz/obec-7/tuzin-podhaji/historie/chronologie/",
+      "title": "Chronologie - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 123
+    },
+    {
+      "url": "https://obec-radim.cz/obec-7/sluzby-a-firmy/obchod-jednota-49cs.html",
+      "title": "Služby a firmy - Obchod Jednota - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 114
+    },
+    {
+      "url": "https://obec-radim.cz/obec-7/sluzby-a-firmy/posta-radim-presunuta-na-adresu-radim-91-50cs.html",
+      "title": "Služby a firmy - Pošta Radim - přesunuta na adresu Radim 91 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 114
+    },
+    {
+      "url": "https://obec-radim.cz/obec-7/sluzby-a-firmy/jizdni-rady-48cs.html",
+      "title": "Služby a firmy - Jízdní řády - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 115
+    },
+    {
+      "url": "https://obec-radim.cz/obec-7/sluzby-a-firmy/prakticky-lekar-mudr-vladimir-klos-47cs.html",
+      "title": "Služby a firmy - Praktický lékař  MUDr. Vladimír Klos - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 115
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/hasici/fotogalerie/zavod-hasicske-vsestrannosti-a-brannosti-radim-20102024-589cs.html",
+      "title": "Fotogalerie - Závod hasičské všestrannosti a brannosti Radim 20.10.2024 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 121
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/hasici/fotogalerie/zhvb-kraj-12112024-590cs.html",
+      "title": "Fotogalerie - ZHVB kraj 12.11.2024 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 151
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/hasici/fotogalerie/trikralova-sbirka-2025-592cs.html",
+      "title": "Fotogalerie - Tříkrálová sbírka 2025 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 124
+    },
+    {
+      "url": "https://obec-radim.cz/urad/uredni-deska/protokol-o-zkousce-c-3442-22-vodohospodarske-laboratore-sro-396.html",
+      "title": "Úřední deska - Protokol o zkoušce č. 3442/22 Vodohospodářské laboratoře, s.r.o. - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": true,
+      "links_count": 115
+    },
+    {
+      "url": "https://obec-radim.cz/urad/uredni-deska/protokol-o-zkousce-c-5911-24-a-c-5912-24-495.html",
+      "title": "Úřední deska - Protokol o zkoušce č. 5911/24 a č. 5912/24 - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": true,
+      "links_count": 116
+    },
+    {
+      "url": "https://obec-radim.cz/urad/uredni-deska/protokol-o-zkousce-c-1363-22-vodohospodarske-laboratore-sro-397.html",
+      "title": "Úřední deska - Protokol o zkoušce č. 1363/22 Vodohospodářské laboratoře, s.r.o. - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": true,
+      "links_count": 115
+    },
+    {
+      "url": "https://obec-radim.cz/urad/uredni-deska/jednaci-rad-407.html",
+      "title": "Úřední deska - Jednací řád - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": true,
+      "links_count": 115
+    },
+    {
+      "url": "https://obec-radim.cz/urad/uredni-deska/porovnani-vsech-polozek-vypoctu-kalkulace-cen-pro-vodne-a-stocne-za-kalendarni-rok-2024-a-dosazene-skutecnosti-v-temze-roce-525.html",
+      "title": "Úřední deska - Porovnání všech položek výpočtu (kalkulace) cen pro vodné a stočné  za kalendářní rok 2024 a dosažené skutečnosti v témže roce - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": true,
+      "links_count": 115
+    },
+    {
+      "url": "https://obec-radim.cz/urad/uredni-deska/narizeni-obce-o-zakazu-podomniho-a-pochuzkoveho-prodeje-na-uzemi-obce-520.html",
+      "title": "Úřední deska - Nařízení obce o zákazu podomního a pochůzkového prodeje na území obce - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": true,
+      "links_count": 119
+    },
+    {
+      "url": "https://obec-radim.cz/urad/uredni-deska/sbirka-pravnich-predpisu-523.html",
+      "title": "Úřední deska - Sbírka právních předpisů - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": true,
+      "links_count": 115
+    },
+    {
+      "url": "https://obec-radim.cz/urad/uredni-deska/obecne-zavazna-vyhlaska-obce-radim-o-mistnim-poplatku-za-obecni-system-odpadoveho-hospodarstvi-505.html",
+      "title": "Úřední deska - Obecně závazná vyhláška obce Radim o místním poplatku za obecní systém odpadového hospodářství - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": true,
+      "links_count": 115
+    },
+    {
+      "url": "https://obec-radim.cz/urad/uredni-deska/obecne-zavazna-vyhlaska-obce-radim-o-stanoveni-obecniho-systemu-odpadoveho-hospodarstvi-506.html",
+      "title": "Úřední deska - Obecně závazná vyhláška obce Radim  o stanovení obecního systému odpadového hospodářství - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": true,
+      "links_count": 115
+    },
+    {
+      "url": "https://obec-radim.cz/urad/uredni-deska/oznameni-o-vyhlaseni-pravnich-predpisu-ve-sbirce-pravnich-predpisu-507.html",
+      "title": "Úřední deska - Oznámení o vyhlášení právních předpisů ve Sbírce právních předpisů - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": true,
+      "links_count": 120
+    },
+    {
+      "url": "https://obec-radim.cz/urad/uredni-deska/kalkulace-vodneho-pro-rok-2025-508.html",
+      "title": "Úřední deska - Kalkulace vodného pro rok 2025 - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": true,
+      "links_count": 115
+    },
+    {
+      "url": "https://obec-radim.cz/urad/uredni-deska/obecne-zavazna-vyhlaska-obce-radim-o-mistnim-poplatku-ze-psu-464.html",
+      "title": "Úřední deska - Obecně závazná vyhláška obce Radim o místním poplatku ze psů - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": true,
+      "links_count": 115
+    },
+    {
+      "url": "https://obec-radim.cz/urad/uredni-deska/radim-oup1-kov-152.html",
+      "title": "Úřední deska - Radim - OUP1 - KOV - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": true,
+      "links_count": 115
+    },
+    {
+      "url": "https://obec-radim.cz/urad/uredni-deska/radim-oup3-zpf-150.html",
+      "title": "Úřední deska - Radim - OUP3 - ZPF - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": true,
+      "links_count": 115
+    },
+    {
+      "url": "https://obec-radim.cz/urad/uredni-deska/kalkulace-vodne-2022-radim-362.html",
+      "title": "Úřední deska - Kalkulace vodné 2022 Radim - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": true,
+      "links_count": 115
+    },
+    {
+      "url": "https://obec-radim.cz/urad/uredni-deska/radim-oup2-suv-151.html",
+      "title": "Úřední deska - Radim - OUP2 - SUV - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": true,
+      "links_count": 115
+    },
+    {
+      "url": "https://obec-radim.cz/urad/uredni-deska/radim-up2-hlv-148.html",
+      "title": "Úřední deska - Radim - UP2 - HLV - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": true,
+      "links_count": 115
+    },
+    {
+      "url": "https://obec-radim.cz/urad/uredni-deska/radim-up1-zcu-149.html",
+      "title": "Úřední deska - Radim - UP1 - ZCU - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": true,
+      "links_count": 115
+    },
+    {
+      "url": "https://obec-radim.cz/urad/uredni-deska/graficka-cast-uz-planu-113.html",
+      "title": "Úřední deska - Grafická část úz. plánu - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": true,
+      "links_count": 115
+    },
+    {
+      "url": "https://obec-radim.cz/urad/uredni-deska/graf-cast-uz-planu-111.html",
+      "title": "Úřední deska - Graf. část úz. plánu - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": true,
+      "links_count": 115
+    },
+    {
+      "url": "https://obec-radim.cz/urad/uredni-deska/graf-cast-uz-planu-110.html",
+      "title": "Úřední deska - Graf. část úz. plánu - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": true,
+      "links_count": 115
+    },
+    {
+      "url": "https://obec-radim.cz/urad/uredni-deska/graf-cast-uz-planu-112.html",
+      "title": "Úřední deska - Graf. část úz. plánu - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": true,
+      "links_count": 115
+    },
+    {
+      "url": "https://obec-radim.cz/urad/uredni-deska/graf-cast-uz-planu-109.html",
+      "title": "Úřední deska - Graf. část úz. plánu - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": true,
+      "links_count": 115
+    },
+    {
+      "url": "https://obec-radim.cz/urad/uredni-deska/graf-cast-uz-planu-108.html",
+      "title": "Úřední deska - Graf. část úz. plánu - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": true,
+      "links_count": 115
+    },
+    {
+      "url": "https://obec-radim.cz/urad/uredni-deska/vysledky-krajskych-voleb-v-obci-radim-494.html",
+      "title": "Úřední deska - VÝSLEDKY KRAJSKÝCH VOLEB V OBCI RADIM - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": true,
+      "links_count": 115
+    },
+    {
+      "url": "https://obec-radim.cz/urad/uredni-deska/rozpoctove-provizorium-na-rok-2026-547.html",
+      "title": "Úřední deska - Rozpočtové provizorium na rok 2026 - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": true,
+      "links_count": 115
+    },
+    {
+      "url": "https://obec-radim.cz/urad/uredni-deska/rozpoctove-opatreni-c-4-545.html",
+      "title": "Úřední deska - Rozpočtové opatření č. 4 - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": true,
+      "links_count": 115
+    },
+    {
+      "url": "https://obec-radim.cz/urad/uredni-deska/zaverecny-uctu-za-rok-2024-534.html",
+      "title": "Úřední deska - Závěrečný účtu za rok 2024 - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": true,
+      "links_count": 123
+    },
+    {
+      "url": "https://obec-radim.cz/urad/uredni-deska/rozpoctove-opatreni-c-3-536.html",
+      "title": "Úřední deska - Rozpočtové opatření č. 3 - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": true,
+      "links_count": 115
+    },
+    {
+      "url": "https://obec-radim.cz/urad/uredni-deska/zmena-rozpisu-rozpoctu-c-1-535.html",
+      "title": "Úřední deska - Změna rozpisu rozpočtu č. 1 - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": true,
+      "links_count": 115
+    },
+    {
+      "url": "https://obec-radim.cz/urad/uredni-deska/rozpoctove-opatreni-c-2-2025-531.html",
+      "title": "Úřední deska - Rozpočtové opatření č. 2/2025 - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": true,
+      "links_count": 115
+    },
+    {
+      "url": "https://obec-radim.cz/urad/uredni-deska/schvaleny-rozpocet-na-rok-2025-521.html",
+      "title": "Úřední deska - Schválený rozpočet na rok 2025 - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": true,
+      "links_count": 115
+    },
+    {
+      "url": "https://obec-radim.cz/urad/uredni-deska/strednedoby-vyhled-rozpoctu-na-obdobi-2026-2027-522.html",
+      "title": "Úřední deska - Střednědobý výhled rozpočtu na období 2026-2027 - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": true,
+      "links_count": 115
+    },
+    {
+      "url": "https://obec-radim.cz/urad/uredni-deska/rozpoctove-opatreni-c-1-2025-526.html",
+      "title": "Úřední deska - Rozpočtové opatření č. 1/2025 - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": true,
+      "links_count": 115
+    },
+    {
+      "url": "https://obec-radim.cz/urad/uredni-deska/dodatek-c-1-k-verejnopravnim-smlouvam-ze-dne-2082020-a-15122020-434.html",
+      "title": "Úřední deska - Dodatek č. 1 k veřejnoprávním smlouvám ze dne 20.8.2020 a 15.12.2020 - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": true,
+      "links_count": 115
+    },
+    {
+      "url": "https://obec-radim.cz/urad/uredni-deska/schvaleny-strednedoby-vyhled-rozpoctu-na-obdobi-2025-2026-476.html",
+      "title": "Úřední deska - schválený střednědobý výhled rozpočtu na období 2025-2026 - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": true,
+      "links_count": 115
+    },
+    {
+      "url": "https://obec-radim.cz/urad/uredni-deska/verejnopravni-smlouva-rimskokatolicka-farnost-429.html",
+      "title": "Úřední deska - Veřejnoprávní smlouva Římskokatolická farnost - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": true,
+      "links_count": 115
+    },
+    {
+      "url": "https://obec-radim.cz/urad/uredni-deska/dodatek-c-1-verejnopravni-smlouvy-1-2021-376.html",
+      "title": "Úřední deska - Dodatek č. 1 veřejnoprávní smlouvy 1/2021 - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": true,
+      "links_count": 115
+    },
+    {
+      "url": "https://obec-radim.cz/urad/uredni-deska/verejnopravni-smlouva-tj-sokol-radim-zs-2021-363.html",
+      "title": "Úřední deska - Veřejnoprávní smlouva - TJ Sokol Radim z.s. 2021 - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": true,
+      "links_count": 115
+    },
+    {
+      "url": "https://obec-radim.cz/urad/uredni-deska/dodatky-ke-smlouvam-c-1-a-2-tj-sokol-radim-324.html",
+      "title": "Úřední deska - Dodatky ke smlouvám č. 1  a 2 TJ Sokol Radim - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": true,
+      "links_count": 116
+    },
+    {
+      "url": "https://obec-radim.cz/urad/uredni-deska/verejnopravni-smlouva-rimskokatolicka-farnost-359.html",
+      "title": "Úřední deska - Veřejnoprávní smlouva Římskokatolická farnost - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": true,
+      "links_count": 115
+    },
+    {
+      "url": "https://obec-radim.cz/urad/uredni-deska/verejnopravni-smlouva-s-tj-sokol-radim-zsc-2-2020-325.html",
+      "title": "Úřední deska - veřejnoprávní smlouva s TJ Sokol Radim z.s.č. 2-2020 - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": true,
+      "links_count": 115
+    },
+    {
+      "url": "https://obec-radim.cz/urad/uredni-deska/verejnopravni-smlouva-tj-sokol-radim-zs-c-1-2020-281.html",
+      "title": "Úřední deska - Veřejnoprávní smlouva - TJ Sokol Radim z.s. č. 1-2020 - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": true,
+      "links_count": 115
+    },
+    {
+      "url": "https://obec-radim.cz/urad/uredni-deska/verejnopravni-smlouva-tj-sokol-radim-zs-2019-219.html",
+      "title": "Úřední deska - Veřejnoprávní smlouva - TJ Sokol Radim z.s. 2019 - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": true,
+      "links_count": 115
+    },
+    {
+      "url": "https://obec-radim.cz/urad/uredni-deska/verejnopravni-smlouva-tj-sokol-radim-zs-2018-183.html",
+      "title": "Úřední deska - Veřejnoprávní smlouva - TJ Sokol Radim z.s. 2018 - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": true,
+      "links_count": 115
+    },
+    {
+      "url": "https://obec-radim.cz/urad/uredni-deska/strednedoby-vyhled-rozpoctu-na-obdobi-2027-2028-544.html",
+      "title": "Úřední deska - Střednědobý výhled rozpočtu na období 2027 - 2028 - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": true,
+      "links_count": 115
+    },
+    {
+      "url": "https://obec-radim.cz/urad/uredni-deska/schvaleny-zaverecny-ucet-obce-za-rok-2024-537.html",
+      "title": "Úřední deska - Schválený závěrečný účet obce za rok 2024 - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": true,
+      "links_count": 123
+    },
+    {
+      "url": "https://obec-radim.cz/urad/uredni-deska/strednedoby-vyhled-rozpoctu-na-obdobi-2027-2028-543.html",
+      "title": "Úřední deska - Střednědobý výhled rozpočtu na období 2027 - 2028 - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": true,
+      "links_count": 115
+    },
+    {
+      "url": "https://obec-radim.cz/urad/uredni-deska/navrh-rozpoctu-roku-2026-vcetne-plneni-za-predchazejici-rok-542.html",
+      "title": "Úřední deska - Návrh rozpočtu roku 2026 včetně plnění za předcházející rok - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": true,
+      "links_count": 115
+    },
+    {
+      "url": "https://obec-radim.cz/urad/uredni-deska/navrh-zaverecneho-uctu-za-rok-2024-528.html",
+      "title": "Úřední deska - Návrh Závěrečného účtu za rok 2024 - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": true,
+      "links_count": 115
+    },
+    {
+      "url": "https://obec-radim.cz/urad/uredni-deska/oznameni-svazku-obci-brada-o-povinne-zverejnovanych-dokumentech-364.html",
+      "title": "Úřední deska - OZNÁMENÍ Svazku obcí Brada O POVINNĚ ZVEŘEJŇOVANÝCH DOKUMENTECH - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": true,
+      "links_count": 115
+    },
+    {
+      "url": "https://obec-radim.cz/urad/uredni-deska/oznameni-svazku-obci-brada-o-povinne-zverejnovanych-dokumentech-355.html",
+      "title": "Úřední deska - OZNÁMENÍ Svazku obcí Brada O POVINNĚ ZVEŘEJŇOVANÝCH DOKUMENTECH - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": true,
+      "links_count": 115
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/hasici/fotogalerie/vyrocni-schuze-sdh-593cs.html",
+      "title": "Fotogalerie - Výroční schůze SDH - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 138
+    },
+    {
+      "url": "https://obec-radim.cz/urad/povinne-informace/subjekt-financni-vybor-zastupitelstva-4.html",
+      "title": "Povinné informace - Finanční výbor zastupitelstva - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": false,
+      "links_count": 119
+    },
+    {
+      "url": "https://obec-radim.cz/urad/povinne-informace/subjekt-kontrolni-vybor-zastupitelstva-5.html",
+      "title": "Povinné informace - Kontrolní výbor zastupitelstva - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": false,
+      "links_count": 119
+    },
+    {
+      "url": "https://obec-radim.cz/urad/povinne-informace/subjekt-zastupitelstvo-2.html",
+      "title": "Povinné informace - Zastupitelstvo - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": false,
+      "links_count": 123
+    },
+    {
+      "url": "https://obec-radim.cz/urad/povinne-informace/subjekt-obec-radim-1.html",
+      "title": "Povinné informace - Obec Radim - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": false,
+      "links_count": 116
+    },
+    {
+      "url": "https://obec-radim.cz/urad/povinne-informace/subjekt-kulturni-vybor-zastupitelstva-6.html",
+      "title": "Povinné informace - Kulturní výbor zastupitelstva - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": false,
+      "links_count": 123
+    },
+    {
+      "url": "https://obec-radim.cz/urad/uredni-deska/obecne-zavazna-vyhlaska-obce-c-1-2020-o-stanoveni-systemu-shromazdovani-sberu-prepravy-trideni-vyuzivani-a-odstranovani-komunalnich-odpadu-a-nakladani-se-stavebnim-odpadem-na-uzemi-obce-radim-263.html?kshowback=",
+      "title": "Úřední deska - Obecně závazná vyhláška obce č. 1/2020, o stanovení systému shromažďování, sběru, přepravy, třídění, využívání a odstraňování komunálních odpadů a nakládání se stavebním odpadem na území obce Radim - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": true,
+      "links_count": 115
+    },
+    {
+      "url": "https://obec-radim.cz/obecni-urad/povinne-informace/",
+      "title": "Povinné informace - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 125
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/sokolove/sportovni-oddily/stolni-tenis/",
+      "title": "Stolní tenis - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 121
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/sokolove/o-nas/historie/",
+      "title": "Historie - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 154
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/sokolove/o-nas/hospodareni/",
+      "title": "Hospodaření - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 138
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/sokolove/o-nas/kontakty/",
+      "title": "Kontakty - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 126
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/sokolove/o-nas/clenska-zakladna/",
+      "title": "Členská základna - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 123
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/sokolove/zapisy/vyrocni-schuze/",
+      "title": "Výroční schůze - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 128
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/sokolove/detsky-tabor/historie/",
+      "title": "Historie - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 118
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/sokolove/sportovni-oddily/aspv/",
+      "title": "ASPV - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 119
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/sokolove/fotogalerie/2023/",
+      "title": "2023 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 141
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/sokolove/fotogalerie/2020/",
+      "title": "2020 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 140
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/sokolove/fotogalerie/2022/",
+      "title": "2022 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 155
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/sokolove/fotogalerie/2021/",
+      "title": "2021 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 138
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/sokolove/fotogalerie/2019/",
+      "title": "2019 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 145
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/sokolove/fotogalerie/2006-2010/",
+      "title": "2006-2010 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 147
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/sokolove/fotogalerie/2011-2015/",
+      "title": "2011-2015 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 164
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/sokolove/fotogalerie/2016/",
+      "title": "2016 - Zastřešení terasy - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 138
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/sokolove/fotogalerie/2017/",
+      "title": "2017 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 130
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/sokolove/fotogalerie/2018/",
+      "title": "2018 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 143
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/sokolove/fotogalerie/historicke-fotografie/",
+      "title": "historické fotografie - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 141
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/sokolove/fotogalerie/2001-2005/",
+      "title": "2001-2005 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 135
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/hasici/fotogalerie/aktualni/",
+      "title": "Aktuální - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 114
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/hasici/mladi-hasici/",
+      "title": "Mladí hasiči - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 126
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/hasici/fotogalerie/",
+      "title": "Fotogalerie - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 177
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/hasici/historie/",
+      "title": "Historie - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 117
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/hasici/fotogalerie/starsi-a-historicke-foto/",
+      "title": "Starší a historické foto - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 114
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/sokolove/sportovni-oddily/",
+      "title": "Sportovní oddíly - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 118
+    },
+    {
+      "url": "https://obec-radim.cz/evt_image.php?img=3601",
+      "title": "",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 0
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/sokolove/o-nas/",
+      "title": "O nás - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 121
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/sokolove/sportovni-areal/",
+      "title": "Sportovní areál - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 118
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/sokolove/detsky-tabor/",
+      "title": "Dětský tábor - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 117
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/sokolove/zapisy/",
+      "title": "Zápisy - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 117
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/fotogalerie/2018-1/posezeni-se-seniory-57cs.html",
+      "title": "2018 - Posezení se seniory - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 161
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/sokolove/fotogalerie/",
+      "title": "Fotogalerie - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 128
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/hasici/",
+      "title": "Hasiči - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 112
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/fotogalerie/2018-1/rozsveceni-stromku-59cs.html",
+      "title": "2018 - Rozsvěcení stromku - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 163
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/fotogalerie/",
+      "title": "Oficiální stránky obce Radim - Verze pro seniory",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 20
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/urad/zapisy-usneseni/",
+      "title": "Oficiální stránky obce Radim - Verze pro seniory",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 30
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/aktuality/",
+      "title": "Oficiální stránky obce Radim - Verze pro seniory",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 46
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/kalendar-akci/",
+      "title": "Oficiální stránky obce Radim - Verze pro seniory",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 7
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/obecni-zpravodaj/",
+      "title": "Oficiální stránky obce Radim - Verze pro seniory",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 29
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/fotogalerie/2018-1/vanocni-vystava-papirove-vanoce-61cs.html",
+      "title": "2018 - Vánoční výstava - PAPÍROVÉ VÁNOCE - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 143
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/urad/uredni-deska/",
+      "title": "Oficiální stránky obce Radim - Verze pro seniory",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 59
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/urad/povinne-informace/",
+      "title": "Oficiální stránky obce Radim - Verze pro seniory",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 16
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/fotogalerie/2018-1/den-matek-62cs.html",
+      "title": "2018 - Den matek - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 148
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/fotogalerie/2018-1/lipa-svobody-63cs.html",
+      "title": "2018 - Lípa Svobody - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 143
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/sokolove/fotogalerie/2018/carodejnice-2018-72cs.html",
+      "title": "2018 - Čarodějnice 2018 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 150
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/sokolove/fotogalerie/2018/turnaj-v-barevnem-volejbalu-5-2018-73cs.html",
+      "title": "2018 - Turnaj v barevném volejbalu 5/2018 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 193
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/sokolove/fotogalerie/2018/cviceni-malych-deti-78cs.html",
+      "title": "2018 - Cvičení malých dětí - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 127
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/sokolove/fotogalerie/2018/atleticky-ctyrboj-jicin-2018-77cs.html",
+      "title": "2018 - Atletický čtyřboj Jičín 2018 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 128
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/fotogalerie/2023/oprava-kostela-506cs.html",
+      "title": "2023 - Oprava kostela - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 121
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/fotogalerie/2023/setkani-se-seniory-537cs.html",
+      "title": "2023 - Setkání se seniory - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 136
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/fotogalerie/2024/radimsky-halloween-580cs.html",
+      "title": "2024 - Radimský Halloween - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 193
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/fotogalerie/2024/den-matek-536cs.html",
+      "title": "2024 - Den matek - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 139
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/fotogalerie/2023/radimsky-halloween-29102023-501cs.html",
+      "title": "2023 - Radimský halloween 29.10.2023 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 261
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/fotogalerie/2024/jarni-brigada-538cs.html",
+      "title": "2024 - Jarní brigáda - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 150
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/sokolove/fotogalerie/2018/soustredeni-jilemnice-2018-79cs.html",
+      "title": "2018 - Soustředění Jilemnice 2018 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 154
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/fotogalerie/2020/kampelicka-3092020-291cs.html",
+      "title": "2020 - Kampelička 30.9.2020 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 127
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/fotogalerie/2020/kampelicka-1482020-280cs.html",
+      "title": "2020 - Kampelička 14.8.2020 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 125
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/fotogalerie/2020/kampelicka-2392020-292cs.html",
+      "title": "2020 - Kampelička 23.9.2020 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 122
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/fotogalerie/2021-1/foto-martina-novakova-356cs.html",
+      "title": "2021 - foto Martina Nováková - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 125
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/fotogalerie/2021-1/setkani-se-seniory-357cs.html",
+      "title": "2021 - Setkání se seniory - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 111
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/fotogalerie/2020/154-vyroci-bitvy-u-jicina-293cs.html",
+      "title": "2020 - 154. výročí bitvy u Jičína - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 188
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/fotogalerie/2020/rozsireni-telocvicny-272cs.html",
+      "title": "2020 - Rozšíření tělocvičny - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 120
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/fotogalerie/2020/radim-kveten-2020-258cs.html",
+      "title": "2020 - Radim květen 2020 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 112
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/fotogalerie/2020/kampelicka-2972020-271cs.html",
+      "title": "2020 - Kampelička 29.7.2020 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 119
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/fotogalerie/2020/kampelicka-2272020-269cs.html",
+      "title": "2020 - Kampelička 22.7.2020 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 132
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/fotogalerie/2020/obecni-urad-v-rouskach-246cs.html",
+      "title": "2020 - Obecní úřad v rouškách - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 115
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/sokolove/fotogalerie/2018/ucast-na-oslavach-100-let-republiky-80cs.html",
+      "title": "2018 - Účast na oslavách 100 let republiky - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 131
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/fotogalerie/2020/zasedani-zastupitelstva-1542020-248cs.html",
+      "title": "2020 - Zasedání zastupitelstva 15.4.2020 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 118
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/fotogalerie/2022/jarni-brigada-394cs.html",
+      "title": "2022 - Jarní brigáda - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 168
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/fotogalerie/2022/rozsveceni-vanocniho-stromu-443cs.html",
+      "title": "2022 - Rozsvěcení vánočního stromu - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 211
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/fotogalerie/2022/posezeni-se-seniory-442cs.html",
+      "title": "2022 - Posezení se seniory - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 134
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/fotogalerie/2019/den-matek-148cs.html",
+      "title": "2019 - Den matek - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 189
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/fotogalerie/2019/uklidme-cesko-128cs.html",
+      "title": "2019 - Ukliďme Česko - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 197
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/fotogalerie/2019/rozsviceni-vanocniho-stromu-200cs.html",
+      "title": "2019 - Rozsvícení vánočního stromu - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 148
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/fotogalerie/2019/posezeni-se-seniory-197cs.html",
+      "title": "2019 - Posezení se seniory - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 154
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/fotogalerie/2019/vanocni-vystava-2019-210cs.html",
+      "title": "2019 - Vánoční výstava 2019 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 150
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/fotogalerie/2019/vitani-obcanku-1122019-204cs.html",
+      "title": "2019 - Vítání občánků 1.12.2019 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 320
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/fotogalerie/historicke-fotografie/radim-ve-vlnach-casu-81cs.html",
+      "title": "Historické fotografie - Radim ve vlnách času - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 123
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/fotogalerie/2019/vitani-obcanku-2612019-107cs.html",
+      "title": "2019 - Vítání občánků 26.1.2019 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 198
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/fotogalerie/2007/video-posezeni-s-duchodci-24112007-87cs.html",
+      "title": "2007 - Video - Posezení s důchodci 24.11.2007 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 111
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/fotogalerie/2007/video-vanocni-koncert-2007-86cs.html",
+      "title": "2007 - Video - Vánoční koncert 2007 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 111
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/fotogalerie/2007/video-vanocni-vystava-2007-85cs.html",
+      "title": "2007 - Video - Vánoční výstava 2007 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 111
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/fotogalerie/2007/vystava-ve-studenanech-84cs.html",
+      "title": "2007 - Výstava ve Studeňanech - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 113
+    },
+    {
+      "url": "https://obec-radim.cz/aktualne/fotogalerie/2007/vitani-obcanku-2007-83cs.html",
+      "title": "2007 - Vítání občánků 2007 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 148
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/hasici/fotogalerie/krouzek-mladych-hasicu-brezen-2019-134cs.html",
+      "title": "Fotogalerie - Kroužek mladých hasičů - březen 2019 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 140
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/hasici/fotogalerie/okresni-kolo-jicin-662015-136cs.html",
+      "title": "Fotogalerie - Okresní kolo Jičín - 6.6.2015 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 124
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/hasici/fotogalerie/starsi-a-historicke-foto-108cs.html",
+      "title": "Fotogalerie - Starší a historické foto - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 144
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/hasici/fotogalerie/okrskova-soutez-cidlina-752016-137cs.html",
+      "title": "Fotogalerie - Okrsková soutěž Cidlina - 7.5.2016 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 125
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/hasici/fotogalerie/vyroci-sdh-ubislavice-2011-139cs.html",
+      "title": "Fotogalerie - Výročí SDH Úbislavice 2011 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 120
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/hasici/fotogalerie/okrskova-soutez-drevenice-2052017-138cs.html",
+      "title": "Fotogalerie - Okrsková soutěž Dřevěnice - 20.5.2017 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 126
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/sokolove/fotogalerie/2019/detsky-den-26-157cs.html",
+      "title": "2019 - Dětský den 2.6. - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 157
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/hasici/fotogalerie/vylet-na-kumburk-dracata-radim-162cs.html",
+      "title": "Fotogalerie - Výlet na Kumburk - Dráčata Radim - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 115
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/hasici/fotogalerie/125-let-zalozeni-sdh-radim-161cs.html",
+      "title": "Fotogalerie - 125 let založení SDH Radim - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 115
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/sokolove/fotogalerie/2019/sokolska-brigada-185cs.html",
+      "title": "2019 - Sokolská brigáda - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 134
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/sokolove/fotogalerie/2019/oprava-plotu-186cs.html",
+      "title": "2019 - Oprava plotu - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 129
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/hasici/fotogalerie/branny-zavod-miletin-dracata-radim-183cs.html",
+      "title": "Fotogalerie - Branný závod Miletín - Dráčata Radim - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 115
+    },
+    {
+      "url": "https://obec-radim.cz/obec-7/turisticke-cile/nad-10-km/humprecht-25-km-46cs.html",
+      "title": "Nad 10 km - HUMPRECHT – 25 km - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 115
+    },
+    {
+      "url": "https://obec-radim.cz/obec-7/turisticke-cile/nad-10-km/hruba-skala-22-km-44cs.html",
+      "title": "Nad 10 km - HRUBÁ SKÁLA – 22 km - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 116
+    },
+    {
+      "url": "https://obec-radim.cz/obec-7/turisticke-cile/nad-10-km/pecka-19-km-41cs.html",
+      "title": "Nad 10 km - PECKA – 19 km - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 116
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/sokolove/fotogalerie/2019/petiboj-horice-2019-187cs.html",
+      "title": "2019 - Pětiboj Hořice 2019 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 138
+    },
+    {
+      "url": "https://obec-radim.cz/obec-7/turisticke-cile/nad-10-km/rovensko-pod-troskami-20-km-42cs.html",
+      "title": "Nad 10 km - ROVENSKO POD TROSKAMI – 20 km - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 116
+    },
+    {
+      "url": "https://obec-radim.cz/obec-7/turisticke-cile/nad-10-km/lomnice-nad-popelkou-12-km-40cs.html",
+      "title": "Nad 10 km - LOMNICE NAD POPELKOU - 12 km - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 116
+    },
+    {
+      "url": "https://obec-radim.cz/obec-7/turisticke-cile/nad-10-km/sobotka-24-km-45cs.html",
+      "title": "Nad 10 km - SOBOTKA – 24 km - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 116
+    },
+    {
+      "url": "https://obec-radim.cz/obec-7/turisticke-cile/nad-10-km/trosky-20-km-43cs.html",
+      "title": "Nad 10 km - TROSKY – 20 km - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 116
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/sokolove/fotogalerie/2019/turnaj-v-barevnem-minivolejbale-nova-paka-191cs.html",
+      "title": "2019 - Turnaj v barevném minivolejbale Nová Paka - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 144
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/sokolove/fotogalerie/2019/detsky-maskarni-karneval-192cs.html",
+      "title": "2019 - Dětský maškarní karneval - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 157
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/sokolove/fotogalerie/2019/turnaj-v-barevnem-minivolejbale-jicin-189cs.html",
+      "title": "2019 - Turnaj v barevném minivolejbale Jičín - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 194
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/hasici/fotogalerie/vylet-do-narodniho-zemedelskeho-muzea-v-praze-202cs.html",
+      "title": "Fotogalerie - Výlet do Národního zemědělského muzea v Praze - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 115
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/sokolove/fotogalerie/2019/zimni-soustredeni-jilemnice-194cs.html",
+      "title": "2019 - Zimní soustředění Jilemnice - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 247
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/hasici/fotogalerie/miletinsky-smodrch-2222020-220cs.html",
+      "title": "Fotogalerie - Miletínský šmodrch 22.2.2020 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 115
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/hasici/fotogalerie/zaplavena-silnice-soberaz-radim-265cs.html",
+      "title": "Fotogalerie - Zaplavená silnice Soběraz - Radim - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 117
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/sokolove/fotogalerie/2020/detsky-maskarni-karneval-1522020-221cs.html",
+      "title": "2020 - Dětský maškarní karneval 15.2.2020 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 177
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/hasici/fotogalerie/sber-zelezneho-srotu-a-brigada-261cs.html",
+      "title": "Fotogalerie - Sběr železného šrotu a brigáda - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 138
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/hasici/fotogalerie/pozarni-ochrana-ocima-deti-240cs.html",
+      "title": "Fotogalerie - Požární ochrana očima dětí - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 115
+    },
+    {
+      "url": "https://obec-radim.cz/urad/povinne-informace/osoba-martina-rihova-8.html",
+      "title": "Povinné informace - Martina Říhová - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": false,
+      "links_count": 116
+    },
+    {
+      "url": "https://obec-radim.cz/urad/povinne-informace/osoba-lukas-karban-3.html",
+      "title": "Povinné informace - Lukáš Karban - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": false,
+      "links_count": 118
+    },
+    {
+      "url": "https://obec-radim.cz/urad/povinne-informace/osoba-zdenka-stribrna-1.html",
+      "title": "Povinné informace - Zdeňka Stříbrná - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": false,
+      "links_count": 117
+    },
+    {
+      "url": "https://obec-radim.cz/urad/povinne-informace/osoba-marketa-bernatova-5.html",
+      "title": "Povinné informace - Markéta Bernátová - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": false,
+      "links_count": 118
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/hasici/fotogalerie/vylet-sdh-radim-do-zoo-praha-266cs.html",
+      "title": "Fotogalerie - Výlet SDH Radim do ZOO Praha - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 270
+    },
+    {
+      "url": "https://obec-radim.cz/urad/povinne-informace/osoba-jan-odvarko-4.html",
+      "title": "Povinné informace - Jan Odvárko - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": false,
+      "links_count": 118
+    },
+    {
+      "url": "https://obec-radim.cz/urad/povinne-informace/osoba-vaclav-nidrle-12.html",
+      "title": "Povinné informace - Václav Nidrle - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": false,
+      "links_count": 116
+    },
+    {
+      "url": "https://obec-radim.cz/urad/povinne-informace/osoba-stepanka-korinkova-10.html",
+      "title": "Povinné informace - Štěpánka Kořínková - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": false,
+      "links_count": 116
+    },
+    {
+      "url": "https://obec-radim.cz/urad/povinne-informace/osoba-miroslav-riha-13.html",
+      "title": "Povinné informace - Miroslav Říha - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": false,
+      "links_count": 116
+    },
+    {
+      "url": "https://obec-radim.cz/urad/povinne-informace/osoba-mgr-marcela-danisova-2.html",
+      "title": "Povinné informace - Mgr. Marcela Danišová - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": false,
+      "links_count": 117
+    },
+    {
+      "url": "https://obec-radim.cz/urad/povinne-informace/osoba-petra-stribrna-11.html",
+      "title": "Povinné informace - Petra Stříbrná - Oficiální stránky obce Radim",
+      "section": "URAD",
+      "volatile": false,
+      "links_count": 116
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/hasici/fotogalerie/soustredeni-dracata-269-289-286cs.html",
+      "title": "Fotogalerie - Soustředění Dráčata 26.9.-28.9. - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 230
+    },
+    {
+      "url": "https://obec-radim.cz/data/editor/96cs_1_big.jpg?gcm_date=1545213433",
+      "title": "",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 0
+    },
+    {
+      "url": "https://obec-radim.cz/data/editor/96cs_2_big.jpg?gcm_date=1545213478",
+      "title": "",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 0
+    },
+    {
+      "url": "https://obec-radim.cz/data/editor/96cs_3_big.jpg?gcm_date=1545213552",
+      "title": "",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 0
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/sokolove/fotogalerie/2023/92023-detsky-den-487cs.html",
+      "title": "2023 - 9.2023 Dětský den - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 242
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/sokolove/fotogalerie/2023/52023-brigada-2-490cs.html",
+      "title": "2023 - 5.2023 Brigáda 2 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 128
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/sokolove/fotogalerie/2023/52023-brigada-3-491cs.html",
+      "title": "2023 - 5.2023 Brigáda 3 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 129
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/sokolove/fotogalerie/2023/72023-volejbalove-soustredeni-dolni-cermna-486cs.html",
+      "title": "2023 - 7.2023 Volejbalové soustředění Dolní Čermná - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 220
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/sokolove/fotogalerie/2023/42023-carodejnice-488cs.html",
+      "title": "2023 - 4.2023 Čarodějnice - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 247
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/sokolove/fotogalerie/2023/42023-brigada-1-489cs.html",
+      "title": "2023 - 4.2023 Brigáda 1 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 139
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/sokolove/fotogalerie/2020/priprava-na-prestavbu-haly-382cs.html",
+      "title": "2020 - Příprava na přestavbu haly - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 135
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/sokolove/fotogalerie/2022/rekonstrukce-kurtu-485cs.html",
+      "title": "2022 - Rekonstrukce kurtů - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 153
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/sokolove/fotogalerie/2022/letni-zabava-72022-482cs.html",
+      "title": "2022 - Letní zábava 7.2022 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 137
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/sokolove/fotogalerie/2020/prestavba-haly-2-381cs.html",
+      "title": "2020 - Přestavba haly 2 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 186
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/sokolove/fotogalerie/2020/volejbalove-soustredeni-dolni-cermna-274cs.html",
+      "title": "2020 - Volejbalové soustředění Dolní Čermná - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 196
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/sokolove/fotogalerie/2022/volejbalove-soustredeni-dolni-cermna-72022-483cs.html",
+      "title": "2022 - Volejbalové soustředění Dolní Čermná 7.2022 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 223
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/sokolove/fotogalerie/2020/prestavba-haly-1-380cs.html",
+      "title": "2020 - Přestavba haly 1 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 220
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/sokolove/fotogalerie/2022/turnaj-ctyrek-drevenice-62022-480cs.html",
+      "title": "2022 - Turnaj čtyřek Dřevěnice 6.2022 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 123
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/sokolove/fotogalerie/2022/krajske-kolo-atletickeho-ctyrboje-52022-406cs.html",
+      "title": "2022 - Krajské kolo atletického čtyřboje 5.2022 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 142
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/sokolove/fotogalerie/2022/okresni-kolo-atletickeho-ctyrboje-52022-405cs.html",
+      "title": "2022 - Okresní kolo atletického čtyřboje 5.2022 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 149
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/sokolove/fotogalerie/2022/antukove-kurty-pred-rekonstrukci-62022-484cs.html",
+      "title": "2022 - Antukové kurty před rekonstrukcí 6.2022 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 133
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/sokolove/fotogalerie/2022/modry-volejbal-turnaj-drevenice-62022-481cs.html",
+      "title": "2022 - Modrý volejbal - turnaj Dřevěnice 6.2022 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 123
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/sokolove/fotogalerie/2022/detsky-den-62022-410cs.html",
+      "title": "2022 - Dětský den 6.2022 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 248
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/sokolove/fotogalerie/2021/volejbalove-soustredeni-cermna-378cs.html",
+      "title": "2021 - Volejbalové soustředění Čermná - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 218
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/sokolove/fotogalerie/2022/sokolska-brigada-52022-404cs.html",
+      "title": "2022 - Sokolská brigáda 5.2022 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 143
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/sokolove/fotogalerie/2022/carodejnice-42022-396cs.html",
+      "title": "2022 - Čarodějnice 4.2022 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 143
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/sokolove/fotogalerie/2022/cviceni-malych-deti-370cs.html",
+      "title": "2022 - Cvičení malých dětí - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 184
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/sokolove/fotogalerie/2022/detsky-maskarni-karneval-32022-369cs.html",
+      "title": "2022 - Dětský maškarní karneval 3.2022 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 196
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/sokolove/fotogalerie/2021/slavnostni-otevreni-haly-a-posvicensky-turnaj-372cs.html",
+      "title": "2021 - Slavnostní otevření haly a posvícenský turnaj - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 160
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/sokolove/fotogalerie/2021/detsky-den-2021-377cs.html",
+      "title": "2021 - Dětský den 2021 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 150
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/sokolove/fotogalerie/2021/brigada-2021-375cs.html",
+      "title": "2021 - Brigáda 2021 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 128
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/hasici/fotogalerie/okrskova-soutez-552cs.html",
+      "title": "Fotogalerie - Okrsková soutěž - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 157
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/hasici/fotogalerie/pesi-vylet-na-kumburk-553cs.html",
+      "title": "Fotogalerie - Pěší výlet na Kumburk - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 146
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/hasici/fotogalerie/branny-zavod-4102020-294cs.html",
+      "title": "Fotogalerie - Branný závod 4.10.2020 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 162
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/hasici/fotogalerie/trenink-na-lede-551cs.html",
+      "title": "Fotogalerie - Trénink na ledě - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 120
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/hasici/fotogalerie/trikralova-sbirka-548cs.html",
+      "title": "Fotogalerie - Tříkrálová sbírka - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 129
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/hasici/fotogalerie/tombola-na-hasicsky-ples-550cs.html",
+      "title": "Fotogalerie - Tombola na hasičský ples - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 121
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/hasici/fotogalerie/brigad-uklidme-cesko-549cs.html",
+      "title": "Fotogalerie - Brigád Ukliďme Česko - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 128
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/hasici/fotogalerie/zavod-hasicske-vsestrannosti-a-brannosti-22102023-500cs.html",
+      "title": "Fotogalerie - Závod hasičské všestrannosti a brannosti 22.10.2023 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 145
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/hasici/fotogalerie/miletinsky-smodrch-a-halove-tfa-pro-deti-a-dorost-522cs.html",
+      "title": "Fotogalerie - Miletínský šmodrch a halové TFA pro děti a dorost - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 296
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/hasici/fotogalerie/tradicni-podzimni-soustredeni-499cs.html",
+      "title": "Fotogalerie - Tradiční podzimní soustředění - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 171
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/hasici/fotogalerie/trikralova-sbirka-469cs.html",
+      "title": "Fotogalerie - Tříkrálová sbírka - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 119
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/hasici/fotogalerie/brigada-uklidme-cesko-2023-470cs.html",
+      "title": "Fotogalerie - Brigáda Ukliďme Česko 2023 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 125
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/hasici/fotogalerie/branny-zavod-23102022-445cs.html",
+      "title": "Fotogalerie - Branný závod 23.10.2022 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 115
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/hasici/fotogalerie/vylet-do-ceskeho-raje-471cs.html",
+      "title": "Fotogalerie - Výlet do Českého ráje - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 157
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/hasici/fotogalerie/okresni-kolo-hry-plamen-vrchovina-26-2852023-498cs.html",
+      "title": "Fotogalerie - Okresní kolo hry Plamen - Vrchovina 26.-28.5.2023 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 391
+    },
+    {
+      "url": "https://obec-radim.cz/data/editor/109cs_1_big.jpg?gcm_date=1545233206",
+      "title": "",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 0
+    },
+    {
+      "url": "https://obec-radim.cz/data/editor/109cs_2_big.jpg?gcm_date=1545233404",
+      "title": "",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 0
+    },
+    {
+      "url": "https://obec-radim.cz/data/editor/109cs_3_big.jpg?gcm_date=1545233486",
+      "title": "",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 0
+    },
+    {
+      "url": "https://obec-radim.cz/data/editor/109cs_4_big.jpg?gcm_date=1545233555",
+      "title": "",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 0
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/hasici/fotogalerie/podzimni-soustredeni-14-16102022-444cs.html",
+      "title": "Fotogalerie - Podzimní soustředění 14.-.16.10.2022 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 213
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/hasici/fotogalerie/hra-plamen-jarni-cast-27-295-409cs.html",
+      "title": "Fotogalerie - Hra Plamen - jarní část 27.-29.5 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 481
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/hasici/fotogalerie/brigada-natirani-prekazek-397cs.html",
+      "title": "Fotogalerie - Brigáda - natírání překážek - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 131
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/hasici/fotogalerie/okrskova-soutez-ve-drevenici-401cs.html",
+      "title": "Fotogalerie - Okrsková soutěž ve Dřevěnici - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 125
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/hasici/fotogalerie/soustredeni-215-2252022-468cs.html",
+      "title": "Fotogalerie - Soustředění 21.5.-22.5.2022 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 198
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/hasici/fotogalerie/vylet-mestske-lesy-hradec-kralove-325cs.html",
+      "title": "Fotogalerie - Výlet Městské lesy Hradec Králové - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 196
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/hasici/fotogalerie/soustredeni-1-3102021-345cs.html",
+      "title": "Fotogalerie - Soustředění 1.-3.10.2021 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 271
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/fotogalerie/2024/",
+      "title": "Oficiální stránky obce Radim - Verze pro seniory",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 9
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/fotogalerie/2022/",
+      "title": "Oficiální stránky obce Radim - Verze pro seniory",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 7
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/fotogalerie/2021-1/",
+      "title": "Oficiální stránky obce Radim - Verze pro seniory",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 7
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/fotogalerie/2023/",
+      "title": "Oficiální stránky obce Radim - Verze pro seniory",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 8
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/fotogalerie/stripky-z-minulosti/",
+      "title": "Oficiální stránky obce Radim - Verze pro seniory",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 5
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/sokolove/sportovni-areal/kde-sportujeme/kde-sportujeme-371cs.html",
+      "title": "Kde sportujeme - Kde sportujeme - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 139
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/fotogalerie/2020/",
+      "title": "Oficiální stránky obce Radim - Verze pro seniory",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 13
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/fotogalerie/2017/",
+      "title": "Oficiální stránky obce Radim - Verze pro seniory",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 9
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/fotogalerie/2019/",
+      "title": "Oficiální stránky obce Radim - Verze pro seniory",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 14
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/fotogalerie/2016/",
+      "title": "Oficiální stránky obce Radim - Verze pro seniory",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 12
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/fotogalerie/2018-1/",
+      "title": "Oficiální stránky obce Radim - Verze pro seniory",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 12
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/fotogalerie/2015/",
+      "title": "Oficiální stránky obce Radim - Verze pro seniory",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 9
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/fotogalerie/2014/",
+      "title": "Oficiální stránky obce Radim - Verze pro seniory",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 15
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/fotogalerie/2013/",
+      "title": "Oficiální stránky obce Radim - Verze pro seniory",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 11
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/fotogalerie/2012/",
+      "title": "Oficiální stránky obce Radim - Verze pro seniory",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 11
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/fotogalerie/2008/",
+      "title": "Oficiální stránky obce Radim - Verze pro seniory",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 4
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/fotogalerie/2011/",
+      "title": "Oficiální stránky obce Radim - Verze pro seniory",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 33
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/fotogalerie/2007/",
+      "title": "Oficiální stránky obce Radim - Verze pro seniory",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 7
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/fotogalerie/historicke-fotografie/",
+      "title": "Oficiální stránky obce Radim - Verze pro seniory",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 6
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/aktuality/adventni-hra-adventni-putovani-582cs.html",
+      "title": "Oficiální stránky obce Radim - Adventní hra -  Adventní putování",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 3
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/aktuality/uplna-uzavirka-silnice-iii-tr-c-2861-obce-drevenice-604cs.html",
+      "title": "Oficiální stránky obce Radim - Úplná uzavírka silnice III. tř. č. 2861 obce Dřevěnice",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 11
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/aktuality/obnova-a-rekonstrukce-sportovniho-arealu-613cs.html",
+      "title": "Oficiální stránky obce Radim - OBNOVA A REKONSTRUKCE SPORTOVNÍHO AREÁLU",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 5
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/aktuality/valdstejnuv-jicin-recenze-knihy-na-vrcholu-rodove-historie-valdstejnu-vycniva-cisarsky-generalissimus-a-frydlantsky-vevoda-albrecht-jeho-slava-a-smrt-vzdy-vzbuzovaly-zajem-odborniku-kteri-se-prevazne-venovali-ci-venuji-vyzkumu-vojenstvi-historikove-577cs.html",
+      "title": "Oficiální stránky obce Radim - Valdštejnův Jičín   recenze knihy \tNa vrcholu rodové historie Valdštejnů vyčnívá císařský generalissimus a frýdlantský vévoda Albrecht - jeho sláva a smrt vždy vzbuzovaly zájem odborníků, kteří se převážně věnovali či věnují výzkumu vojenství. Historikové",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 3
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/aktuality/advent-v-zeleznici-576cs.html",
+      "title": "Oficiální stránky obce Radim - Advent v Železnici",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 3
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/aktuality/rozsviceni-vanocniho-stromu-575cs.html",
+      "title": "Oficiální stránky obce Radim - Rozsvícení vánočního stromu",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 3
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/aktuality/upozorneni-572cs.html",
+      "title": "Oficiální stránky obce Radim - UPOZORNĚNÍ",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 3
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/aktuality/odstavka-elektriny-571cs.html",
+      "title": "Oficiální stránky obce Radim - Odstávka elektřiny",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 4
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/aktuality/divadelni-vystoupeni-569cs.html",
+      "title": "Oficiální stránky obce Radim - Divadelní vystoupení",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 3
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/aktuality/upozorneni-568cs.html",
+      "title": "Oficiální stránky obce Radim - UPOZORNĚNÍ",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 2
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/aktuality/pozvani-na-predvanocni-jarmark-567cs.html",
+      "title": "Oficiální stránky obce Radim - Pozvání na předvánoční jarmark",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 3
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/aktuality/zaciname-cvicit-566cs.html",
+      "title": "Oficiální stránky obce Radim - Začínáme cvičit",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 5
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/aktuality/male-ohlednuti-za-oslavou-hasicu-565cs.html",
+      "title": "Oficiální stránky obce Radim - Malé ohlédnutí za oslavou hasičů",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 4
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/aktuality/otevreni-hospody-radim-544cs.html",
+      "title": "Oficiální stránky obce Radim - Otevření Hospody Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 4
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/aktuality/capi-kamera-radim-541cs.html",
+      "title": "Oficiální stránky obce Radim - Čapí kamera Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 3
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/aktuality/zampelband-rock-556cs.html",
+      "title": "Oficiální stránky obce Radim - ZAMPELBAND ROCK",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 3
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/aktuality/olympijsky-beh-539cs.html",
+      "title": "Oficiální stránky obce Radim - Olympijský běh",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 3
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/aktuality/oslava-130-let-od-zalozeni-sdh-radim-532cs.html",
+      "title": "Oficiální stránky obce Radim - Oslava 130 let od založení SDH Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 3
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/aktuality/projekt-odbahneni-a-oprava-rybniku-v-obci-radim-lhan-527cs.html",
+      "title": "Oficiální stránky obce Radim - PROJEKT:  „Odbahnění a oprava rybníku v obci Radim - Lháň“",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 4
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/aktuality/prodej-palivoveho-dreva-523cs.html",
+      "title": "Oficiální stránky obce Radim - Prodej palivového dřeva",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 3
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/aktuality/den-otevrenych-dveri-519cs.html",
+      "title": "Oficiální stránky obce Radim - Den otevřených dveří",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 3
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/aktuality/kotlikove-dotace-520cs.html",
+      "title": "Oficiální stránky obce Radim - Kotlíkové dotace",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 5
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/aktuality/jarni-brigada-518cs.html",
+      "title": "Oficiální stránky obce Radim - Jarní brigáda",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 3
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/aktuality/vanocni-koncert-510cs.html",
+      "title": "Oficiální stránky obce Radim - Vánoční koncert",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 3
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/aktuality/vanocni-vystava-509cs.html",
+      "title": "Oficiální stránky obce Radim - Vánoční výstava",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 3
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/aktuality/slavnostni-rozsviceni-vanocniho-stromu-508cs.html",
+      "title": "Oficiální stránky obce Radim - Slavnostní rozsvícení vánočního stromu",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 3
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/aktuality/otevreni-detskeh-hriste-492cs.html",
+      "title": "Oficiální stránky obce Radim - Otevření dětskéh hřiště",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 3
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/aktuality/tyden-vzdelavani-dospelych-505cs.html",
+      "title": "Oficiální stránky obce Radim - Týden vzdělávání dospělých",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 7
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/kalendar-akci/vyrocni-clenska-schuze-spolku-tj-sokol-radim-616_190cs.html",
+      "title": "Oficiální stránky obce Radim - Výroční členská schůze spolku TJ Sokol Radim",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 3
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/aktuality/radimsky-halloween-494cs.html",
+      "title": "Oficiální stránky obce Radim - Radimský halloween",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 3
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/kalendar-akci/sokolsky-ples-614_188cs.html",
+      "title": "Oficiální stránky obce Radim - Sokolský ples",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 3
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/aktuality/divadlo-v-radimi-504cs.html",
+      "title": "Oficiální stránky obce Radim - Divadlo v Radimi",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 3
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/urad/uredni-deska/zamer-propachtovani-nemovite-veci-552.html?kshow=13",
+      "title": "Oficiální stránky obce Radim - Záměr propachtování nemovité věci",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 3
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/kalendar-akci/detsky-maskarni-karneval-617_191cs.html",
+      "title": "Oficiální stránky obce Radim - Dětský maškarní karneval",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 3
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/urad/uredni-deska/porovnani-vsech-polozek-vypoctu-kalkulace-cen-pro-vodne-a-stocne-za-kalendarni-rok-2024-a-dosazene-skutecnosti-v-temze-roce-525.html?kshow=8",
+      "title": "Oficiální stránky obce Radim - Porovnání všech položek výpočtu (kalkulace) cen pro vodné a stočné  za kalendářní rok 2024 a dosažené skutečnosti v témže roce",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 3
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/urad/uredni-deska/jednaci-rad-407.html?kshow=2",
+      "title": "Oficiální stránky obce Radim - Jednací řád",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 3
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/urad/uredni-deska/zamer-pronajmu-nemovite-veci-studenany-cp-35-551.html?kshow=13",
+      "title": "Oficiální stránky obce Radim - Záměr pronájmu nemovité věci - Studeňany č.p. 35",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 3
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/urad/uredni-deska/protokol-o-zkousce-c-5911-24-a-c-5912-24-495.html?kshow=8",
+      "title": "Oficiální stránky obce Radim - Protokol o zkoušce č. 5911/24 a č. 5912/24",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 4
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/urad/uredni-deska/obecne-zavazna-vyhlaska-obce-radim-o-mistnim-poplatku-ze-psu-548.html?kshow=11",
+      "title": "Oficiální stránky obce Radim - Obecně závazná vyhláška obce Radim o místním poplatku ze psů",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 3
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/urad/uredni-deska/protokol-o-zkousce-c-3442-22-vodohospodarske-laboratore-sro-396.html?kshow=8",
+      "title": "Oficiální stránky obce Radim - Protokol o zkoušce č. 3442/22 Vodohospodářské laboratoře, s.r.o.",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 3
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/urad/uredni-deska/narizeni-obce-o-zakazu-podomniho-a-pochuzkoveho-prodeje-na-uzemi-obce-520.html?kshow=11",
+      "title": "Oficiální stránky obce Radim - Nařízení obce o zákazu podomního a pochůzkového prodeje na území obce",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 7
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/urad/uredni-deska/obecne-zavazna-vyhlaska-obce-radim-o-mistnim-poplatku-za-obecni-system-odpadoveho-hospodarstvi-549.html?kshow=11",
+      "title": "Oficiální stránky obce Radim - Obecně závazná vyhláška obce Radim o místním poplatku za obecní systém odpadového hospodářství",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 3
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/urad/uredni-deska/sbirka-pravnich-predpisu-523.html?kshow=11",
+      "title": "Oficiální stránky obce Radim - Sbírka právních předpisů",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 3
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/urad/uredni-deska/protokol-o-zkousce-c-1363-22-vodohospodarske-laboratore-sro-397.html?kshow=8",
+      "title": "Oficiální stránky obce Radim - Protokol o zkoušce č. 1363/22 Vodohospodářské laboratoře, s.r.o.",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 3
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/urad/uredni-deska/oznameni-o-vyhlaseni-pravnich-predpisu-ve-sbirce-pravnich-predpisu-507.html?kshow=11",
+      "title": "Oficiální stránky obce Radim - Oznámení o vyhlášení právních předpisů ve Sbírce právních předpisů",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 8
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/urad/uredni-deska/obecne-zavazna-vyhlaska-obce-radim-o-mistnim-poplatku-za-obecni-system-odpadoveho-hospodarstvi-505.html?kshow=11",
+      "title": "Oficiální stránky obce Radim - Obecně závazná vyhláška obce Radim o místním poplatku za obecní systém odpadového hospodářství",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 3
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/urad/uredni-deska/kalkulace-vodneho-pro-rok-2025-508.html?kshow=3",
+      "title": "Oficiální stránky obce Radim - Kalkulace vodného pro rok 2025",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 3
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/urad/uredni-deska/obecne-zavazna-vyhlaska-obce-radim-o-stanoveni-obecniho-systemu-odpadoveho-hospodarstvi-506.html?kshow=11",
+      "title": "Oficiální stránky obce Radim - Obecně závazná vyhláška obce Radim  o stanovení obecního systému odpadového hospodářství",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 3
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/urad/uredni-deska/obecne-zavazna-vyhlaska-obce-radim-o-mistnim-poplatku-ze-psu-464.html?kshow=11",
+      "title": "Oficiální stránky obce Radim - Obecně závazná vyhláška obce Radim o místním poplatku ze psů",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 3
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/urad/uredni-deska/kalkulace-vodne-2022-radim-362.html?kshow=3",
+      "title": "Oficiální stránky obce Radim - Kalkulace vodné 2022 Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 3
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/urad/uredni-deska/radim-oup1-kov-152.html?kshow=3",
+      "title": "Oficiální stránky obce Radim - Radim - OUP1 - KOV",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 3
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/urad/uredni-deska/radim-oup3-zpf-150.html?kshow=3",
+      "title": "Oficiální stránky obce Radim - Radim - OUP3 - ZPF",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 3
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/urad/uredni-deska/radim-oup2-suv-151.html?kshow=3",
+      "title": "Oficiální stránky obce Radim - Radim - OUP2 - SUV",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 3
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/urad/uredni-deska/radim-up1-zcu-149.html?kshow=3",
+      "title": "Oficiální stránky obce Radim - Radim - UP1 - ZCU",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 3
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/urad/uredni-deska/radim-up2-hlv-148.html?kshow=3",
+      "title": "Oficiální stránky obce Radim - Radim - UP2 - HLV",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 3
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/urad/uredni-deska/graficka-cast-uz-planu-113.html?kshow=3",
+      "title": "Oficiální stránky obce Radim - Grafická část úz. plánu",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 3
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/urad/uredni-deska/graf-cast-uz-planu-112.html?kshow=3",
+      "title": "Oficiální stránky obce Radim - Graf. část úz. plánu",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 3
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/urad/uredni-deska/graf-cast-uz-planu-110.html?kshow=3",
+      "title": "Oficiální stránky obce Radim - Graf. část úz. plánu",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 3
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/urad/uredni-deska/graf-cast-uz-planu-109.html?kshow=3",
+      "title": "Oficiální stránky obce Radim - Graf. část úz. plánu",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 3
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/urad/uredni-deska/graf-cast-uz-planu-111.html?kshow=3",
+      "title": "Oficiální stránky obce Radim - Graf. část úz. plánu",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 3
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/urad/uredni-deska/vysledky-krajskych-voleb-v-obci-radim-494.html?kshow=12",
+      "title": "Oficiální stránky obce Radim - VÝSLEDKY KRAJSKÝCH VOLEB V OBCI RADIM",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 3
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/urad/uredni-deska/graf-cast-uz-planu-108.html?kshow=3",
+      "title": "Oficiální stránky obce Radim - Graf. část úz. plánu",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 3
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/urad/uredni-deska/pravidla-rozpoctoveho-provizoria-na-rok-2026-550.html?kshow=5",
+      "title": "Oficiální stránky obce Radim - Pravidla rozpočtového provizoria na rok 2026",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 3
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/urad/uredni-deska/rozpoctove-provizorium-na-rok-2026-547.html?kshow=5",
+      "title": "Oficiální stránky obce Radim - Rozpočtové provizorium na rok 2026",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 3
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/urad/uredni-deska/zaverecny-uctu-za-rok-2024-534.html?kshow=5",
+      "title": "Oficiální stránky obce Radim - Závěrečný účtu za rok 2024",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 11
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/urad/uredni-deska/rozpoctove-opatreni-c-4-545.html?kshow=5",
+      "title": "Oficiální stránky obce Radim - Rozpočtové opatření č. 4",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 3
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/urad/uredni-deska/zmena-rozpisu-rozpoctu-c-1-535.html?kshow=5",
+      "title": "Oficiální stránky obce Radim - Změna rozpisu rozpočtu č. 1",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 3
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/urad/uredni-deska/rozpoctove-opatreni-c-3-536.html?kshow=5",
+      "title": "Oficiální stránky obce Radim - Rozpočtové opatření č. 3",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 3
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/urad/uredni-deska/rozpoctove-opatreni-c-2-2025-531.html?kshow=5",
+      "title": "Oficiální stránky obce Radim - Rozpočtové opatření č. 2/2025",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 3
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/urad/uredni-deska/rozpoctove-opatreni-c-1-2025-526.html?kshow=5",
+      "title": "Oficiální stránky obce Radim - Rozpočtové opatření č. 1/2025",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 3
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/urad/uredni-deska/strednedoby-vyhled-rozpoctu-na-obdobi-2026-2027-522.html?kshow=5",
+      "title": "Oficiální stránky obce Radim - Střednědobý výhled rozpočtu na období 2026-2027",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 3
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/urad/uredni-deska/schvaleny-rozpocet-na-rok-2025-521.html?kshow=5",
+      "title": "Oficiální stránky obce Radim - Schválený rozpočet na rok 2025",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 3
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/urad/uredni-deska/schvaleny-strednedoby-vyhled-rozpoctu-na-obdobi-2025-2026-476.html?kshow=5",
+      "title": "Oficiální stránky obce Radim - schválený střednědobý výhled rozpočtu na období 2025-2026",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 3
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/urad/uredni-deska/dodatek-c-1-k-verejnopravnim-smlouvam-ze-dne-2082020-a-15122020-434.html?kshow=9",
+      "title": "Oficiální stránky obce Radim - Dodatek č. 1 k veřejnoprávním smlouvám ze dne 20.8.2020 a 15.12.2020",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 3
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/urad/uredni-deska/verejnopravni-smlouva-tj-sokol-radim-zs-2021-363.html?kshow=9",
+      "title": "Oficiální stránky obce Radim - Veřejnoprávní smlouva - TJ Sokol Radim z.s. 2021",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 3
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/urad/uredni-deska/verejnopravni-smlouva-rimskokatolicka-farnost-359.html?kshow=9",
+      "title": "Oficiální stránky obce Radim - Veřejnoprávní smlouva Římskokatolická farnost",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 3
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/urad/uredni-deska/dodatek-c-1-verejnopravni-smlouvy-1-2021-376.html?kshow=9",
+      "title": "Oficiální stránky obce Radim - Dodatek č. 1 veřejnoprávní smlouvy 1/2021",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 3
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/urad/uredni-deska/verejnopravni-smlouva-rimskokatolicka-farnost-429.html?kshow=9",
+      "title": "Oficiální stránky obce Radim - Veřejnoprávní smlouva Římskokatolická farnost",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 3
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/urad/uredni-deska/dodatky-ke-smlouvam-c-1-a-2-tj-sokol-radim-324.html?kshow=9",
+      "title": "Oficiální stránky obce Radim - Dodatky ke smlouvám č. 1  a 2 TJ Sokol Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 4
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/urad/uredni-deska/verejnopravni-smlouva-s-tj-sokol-radim-zsc-2-2020-325.html?kshow=9",
+      "title": "Oficiální stránky obce Radim - veřejnoprávní smlouva s TJ Sokol Radim z.s.č. 2-2020",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 3
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/urad/uredni-deska/verejnopravni-smlouva-tj-sokol-radim-zs-c-1-2020-281.html?kshow=9",
+      "title": "Oficiální stránky obce Radim - Veřejnoprávní smlouva - TJ Sokol Radim z.s. č. 1-2020",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 3
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/urad/uredni-deska/verejnopravni-smlouva-tj-sokol-radim-zs-2018-183.html?kshow=9",
+      "title": "Oficiální stránky obce Radim - Veřejnoprávní smlouva - TJ Sokol Radim z.s. 2018",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 3
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/urad/uredni-deska/verejnopravni-smlouva-tj-sokol-radim-zs-2019-219.html?kshow=9",
+      "title": "Oficiální stránky obce Radim - Veřejnoprávní smlouva - TJ Sokol Radim z.s. 2019",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 3
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/urad/uredni-deska/strednedoby-vyhled-rozpoctu-na-obdobi-2027-2028-544.html?kshow=6",
+      "title": "Oficiální stránky obce Radim - Střednědobý výhled rozpočtu na období 2027 - 2028",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 3
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/urad/uredni-deska/schvaleny-zaverecny-ucet-obce-za-rok-2024-537.html?kshow=7",
+      "title": "Oficiální stránky obce Radim - Schválený závěrečný účet obce za rok 2024",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 11
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/urad/uredni-deska/strednedoby-vyhled-rozpoctu-na-obdobi-2027-2028-543.html?kshow=6",
+      "title": "Oficiální stránky obce Radim - Střednědobý výhled rozpočtu na období 2027 - 2028",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 3
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/urad/uredni-deska/navrh-zaverecneho-uctu-za-rok-2024-528.html?kshow=6",
+      "title": "Oficiální stránky obce Radim - Návrh Závěrečného účtu za rok 2024",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 3
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/urad/uredni-deska/navrh-rozpoctu-roku-2026-vcetne-plneni-za-predchazejici-rok-542.html?kshow=6",
+      "title": "Oficiální stránky obce Radim - Návrh rozpočtu roku 2026 včetně plnění za předcházející rok",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 3
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/urad/uredni-deska/oznameni-svazku-obci-brada-o-povinne-zverejnovanych-dokumentech-355.html?kshow=6",
+      "title": "Oficiální stránky obce Radim - OZNÁMENÍ Svazku obcí Brada O POVINNĚ ZVEŘEJŇOVANÝCH DOKUMENTECH",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 3
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/urad/uredni-deska/oznameni-svazku-obci-brada-o-povinne-zverejnovanych-dokumentech-364.html?kshow=6",
+      "title": "Oficiální stránky obce Radim - OZNÁMENÍ Svazku obcí Brada O POVINNĚ ZVEŘEJŇOVANÝCH DOKUMENTECH",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 3
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/urad/povinne-informace/subjekt-obec-radim-1.html",
+      "title": "Oficiální stránky obce Radim - Verze pro seniory",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 8
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/urad/povinne-informace/subjekt-financni-vybor-zastupitelstva-4.html",
+      "title": "Oficiální stránky obce Radim - Verze pro seniory",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 6
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/urad/e-podatelna/",
+      "title": "Oficiální stránky obce Radim - Verze pro seniory",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 2
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/urad/povinne-informace/subjekt-kontrolni-vybor-zastupitelstva-5.html",
+      "title": "Oficiální stránky obce Radim - Verze pro seniory",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 6
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/urad/povinne-informace/subjekt-zastupitelstvo-2.html",
+      "title": "Oficiální stránky obce Radim - Verze pro seniory",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 11
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/urad/povinne-informace/subjekt-kulturni-vybor-zastupitelstva-6.html",
+      "title": "Oficiální stránky obce Radim - Verze pro seniory",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 10
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/sokolove/fotogalerie/2016/zastreseni-terasy-383cs.html",
+      "title": "2016 - Zastřešení terasy - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 125
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/hasici/fotogalerie/oslava-1-mista-v-brannem-zavodu-398cs.html",
+      "title": "Fotogalerie - Oslava 1. místa v Branném závodu - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 117
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/hasici/fotogalerie/branny-zavod-10102021-399cs.html",
+      "title": "Fotogalerie - Branný závod 10.10.2021 - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 153
+    },
+    {
+      "url": "https://obec-radim.cz/organizace-a-spolky/hasici/fotogalerie/vylet-do-iq-landie-400cs.html",
+      "title": "Fotogalerie - Výlet do IQ Landie - Oficiální stránky obce Radim",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 160
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/fotogalerie/2024/setkani-se-seniory-581cs.html",
+      "title": "Oficiální stránky obce Radim - Setkání se seniory",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 28
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/fotogalerie/2024/jarni-brigada-538cs.html",
+      "title": "Oficiální stránky obce Radim - Jarní brigáda",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 41
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/fotogalerie/2024/den-matek-536cs.html",
+      "title": "Oficiální stránky obce Radim - Den matek",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 30
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/fotogalerie/2024/radimsky-halloween-580cs.html",
+      "title": "Oficiální stránky obce Radim - Radimský Halloween",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 84
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/fotogalerie/2022/rozsveceni-vanocniho-stromu-443cs.html",
+      "title": "Oficiální stránky obce Radim - Rozsvěcení vánočního stromu",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 102
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/fotogalerie/2024/rozsveceni-vanocniho-stromu-579cs.html",
+      "title": "Oficiální stránky obce Radim - Rozsvěcení vánočního stromu",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 104
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/fotogalerie/2022/posezeni-se-seniory-442cs.html",
+      "title": "Oficiální stránky obce Radim - Posezení se seniory",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 25
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/fotogalerie/2021-1/foto-martina-novakova-356cs.html",
+      "title": "Oficiální stránky obce Radim - foto Martina Nováková",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 16
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/fotogalerie/2021-1/setkani-se-seniory-357cs.html",
+      "title": "Oficiální stránky obce Radim - Setkání se seniory",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 2
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/fotogalerie/2022/jarni-brigada-394cs.html",
+      "title": "Oficiální stránky obce Radim - Jarní brigáda",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 59
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/fotogalerie/2023/oprava-kostela-506cs.html",
+      "title": "Oficiální stránky obce Radim - Oprava kostela",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 12
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/fotogalerie/2023/setkani-se-seniory-537cs.html",
+      "title": "Oficiální stránky obce Radim - Setkání se seniory",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 27
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/fotogalerie/2023/radimsky-halloween-29102023-501cs.html",
+      "title": "Oficiální stránky obce Radim - Radimský halloween 29.10.2023",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 152
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/fotogalerie/2020/kampelicka-3092020-291cs.html",
+      "title": "Oficiální stránky obce Radim - Kampelička 30.9.2020",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 18
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/fotogalerie/2020/rozsireni-telocvicny-272cs.html",
+      "title": "Oficiální stránky obce Radim - Rozšíření tělocvičny",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 11
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/fotogalerie/2020/kampelicka-2972020-271cs.html",
+      "title": "Oficiální stránky obce Radim - Kampelička 29.7.2020",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 10
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/fotogalerie/2020/kampelicka-1482020-280cs.html",
+      "title": "Oficiální stránky obce Radim - Kampelička 14.8.2020",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 16
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/fotogalerie/2020/kampelicka-2392020-292cs.html",
+      "title": "Oficiální stránky obce Radim - Kampelička 23.9.2020",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 13
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/fotogalerie/2020/154-vyroci-bitvy-u-jicina-293cs.html",
+      "title": "Oficiální stránky obce Radim - 154. výročí bitvy u Jičína",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 79
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/fotogalerie/2020/kampelicka-2272020-269cs.html",
+      "title": "Oficiální stránky obce Radim - Kampelička 22.7.2020",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 23
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/fotogalerie/2020/radim-kveten-2020-258cs.html",
+      "title": "Oficiální stránky obce Radim - Radim květen 2020",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 3
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/fotogalerie/2020/obecni-urad-v-rouskach-246cs.html",
+      "title": "Oficiální stránky obce Radim - Obecní úřad v rouškách",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 6
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/fotogalerie/2020/zasedani-zastupitelstva-1542020-248cs.html",
+      "title": "Oficiální stránky obce Radim - Zasedání zastupitelstva 15.4.2020",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 9
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/fotogalerie/2019/vanocni-vystava-2019-210cs.html",
+      "title": "Oficiální stránky obce Radim - Vánoční výstava 2019",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 41
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/fotogalerie/2019/rozsviceni-vanocniho-stromu-200cs.html",
+      "title": "Oficiální stránky obce Radim - Rozsvícení vánočního stromu",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 39
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/fotogalerie/2019/vitani-obcanku-1122019-204cs.html",
+      "title": "Oficiální stránky obce Radim - Vítání občánků 1.12.2019",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 211
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/fotogalerie/2019/den-matek-148cs.html",
+      "title": "Oficiální stránky obce Radim - Den matek",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 80
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/fotogalerie/2019/posezeni-se-seniory-197cs.html",
+      "title": "Oficiální stránky obce Radim - Posezení se seniory",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 45
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/fotogalerie/2019/uklidme-cesko-128cs.html",
+      "title": "Oficiální stránky obce Radim - Ukliďme Česko",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 88
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/fotogalerie/2018-1/vanocni-vystava-papirove-vanoce-61cs.html",
+      "title": "Oficiální stránky obce Radim - Vánoční výstava - PAPÍROVÉ VÁNOCE",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 34
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/fotogalerie/2018-1/rozsveceni-stromku-59cs.html",
+      "title": "Oficiální stránky obce Radim - Rozsvěcení stromku",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 54
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/fotogalerie/2019/vitani-obcanku-2612019-107cs.html",
+      "title": "Oficiální stránky obce Radim - Vítání občánků 26.1.2019",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 89
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/fotogalerie/2018-1/lipa-svobody-63cs.html",
+      "title": "Oficiální stránky obce Radim - Lípa Svobody",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 34
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/fotogalerie/2007/video-posezeni-s-duchodci-24112007-87cs.html",
+      "title": "Oficiální stránky obce Radim - Video - Posezení s důchodci 24.11.2007",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 2
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/fotogalerie/2018-1/posezeni-se-seniory-57cs.html",
+      "title": "Oficiální stránky obce Radim - Posezení se seniory",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 52
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/fotogalerie/2007/video-vanocni-vystava-2007-85cs.html",
+      "title": "Oficiální stránky obce Radim - Video - Vánoční výstava 2007",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 2
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/fotogalerie/2018-1/den-matek-62cs.html",
+      "title": "Oficiální stránky obce Radim - Den matek",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 39
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/fotogalerie/2007/video-vanocni-koncert-2007-86cs.html",
+      "title": "Oficiální stránky obce Radim - Video - Vánoční koncert 2007",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 2
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/fotogalerie/2007/vystava-ve-studenanech-84cs.html",
+      "title": "Oficiální stránky obce Radim - Výstava ve Studeňanech",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 4
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/fotogalerie/2007/vitani-obcanku-2007-83cs.html",
+      "title": "Oficiální stránky obce Radim - Vítání občánků 2007",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 39
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/urad/povinne-informace/osoba-martina-rihova-8.html",
+      "title": "Oficiální stránky obce Radim - Verze pro seniory",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 5
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/aktualne/fotogalerie/historicke-fotografie/radim-ve-vlnach-casu-81cs.html",
+      "title": "Oficiální stránky obce Radim - Radim ve vlnách času",
+      "section": "MISC",
+      "volatile": true,
+      "links_count": 14
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/urad/povinne-informace/osoba-jan-odvarko-4.html",
+      "title": "Oficiální stránky obce Radim - Verze pro seniory",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 7
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/urad/povinne-informace/osoba-lukas-karban-3.html",
+      "title": "Oficiální stránky obce Radim - Verze pro seniory",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 7
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/urad/povinne-informace/osoba-marketa-bernatova-5.html",
+      "title": "Oficiální stránky obce Radim - Verze pro seniory",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 7
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/urad/povinne-informace/osoba-zdenka-stribrna-1.html",
+      "title": "Oficiální stránky obce Radim - Verze pro seniory",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 6
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/urad/povinne-informace/osoba-mgr-marcela-danisova-2.html",
+      "title": "Oficiální stránky obce Radim - Verze pro seniory",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 6
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/urad/povinne-informace/osoba-petra-stribrna-11.html",
+      "title": "Oficiální stránky obce Radim - Verze pro seniory",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 5
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/urad/povinne-informace/osoba-stepanka-korinkova-10.html",
+      "title": "Oficiální stránky obce Radim - Verze pro seniory",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 5
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/urad/povinne-informace/osoba-vaclav-nidrle-12.html",
+      "title": "Oficiální stránky obce Radim - Verze pro seniory",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 5
+    },
+    {
+      "url": "https://obec-radim.cz/seniori/urad/povinne-informace/osoba-miroslav-riha-13.html",
+      "title": "Oficiální stránky obce Radim - Verze pro seniory",
+      "section": "MISC",
+      "volatile": false,
+      "links_count": 5
+    }
+  ]
+}

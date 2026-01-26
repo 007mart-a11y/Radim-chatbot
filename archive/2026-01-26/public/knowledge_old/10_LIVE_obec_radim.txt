@@ -1,0 +1,414 @@
+LIVE_DATA — OBEC RADIM
+Aktualizováno (ISO): 2026-01-23T12:00:20.959Z
+Web: https://www.obec-radim.cz
+
+Poznámka: Tento soubor obsahuje živá data (aktuality, kalendář akcí, úřední deska).
+Při rozporu má přednost CORE (00_CORE_obec_radim.txt).
+
+================================
+AKTUALITY
+================================
+Zdroj: https://www.obec-radim.cz/aktualne/aktuality/
+
+- Titulek: další
+  Stav: AKTUÁLNÍ
+  Odkaz: https://www.obec-radim.cz/aktualne/aktuality/?page=2
+
+- Titulek: poslední
+  Stav: AKTUÁLNÍ
+  Odkaz: https://www.obec-radim.cz/aktualne/aktuality/?page=4
+
+- Titulek: OBNOVA A REKONSTRUKCE SPORTOVNÍHO AREÁLU
+  Stav: AKTUÁLNÍ
+  Odkaz: https://www.obec-radim.cz/aktualne/aktuality/obnova-a-rekonstrukce-sportovniho-arealu-613cs.html
+
+- Titulek: Úplná uzavírka silnice III. tř. č. 2861 obce Dřevěnice
+  Stav: AKTUÁLNÍ
+  Odkaz: https://www.obec-radim.cz/aktualne/aktuality/uplna-uzavirka-silnice-iii-tr-c-2861-obce-drevenice-604cs.html
+
+- Titulek: Adventní hra - Adventní putování
+  Stav: AKTUÁLNÍ
+  Odkaz: https://www.obec-radim.cz/aktualne/aktuality/adventni-hra-adventni-putovani-582cs.html
+
+- Titulek: Valdštejnův Jičín recenze knihy Na vrcholu rodové historie Valdštejnů vyčnívá císařský generalissimus a frýdlantský vévoda Albrecht - jeho sláva a smrt vždy vzbuzovaly zájem odborníků, kteří se převáž
+  Stav: AKTUÁLNÍ
+  Odkaz: https://www.obec-radim.cz/aktualne/aktuality/valdstejnuv-jicin-recenze-knihy-na-vrcholu-rodove-historie-valdstejnu-vycniva-cisarsky-generalissimus-a-frydlantsky-vevoda-albrecht-jeho-slava-a-smrt-vzdy-vzbuzovaly-zajem-odborniku-kteri-se-prevazne-venovali-ci-venuji-vyzkumu-vojenstvi-historikove-577cs.html
+
+- Titulek: Advent v Železnici
+  Stav: AKTUÁLNÍ
+  Odkaz: https://www.obec-radim.cz/aktualne/aktuality/advent-v-zeleznici-576cs.html
+
+- Titulek: Rozsvícení vánočního stromu
+  Stav: AKTUÁLNÍ
+  Odkaz: https://www.obec-radim.cz/aktualne/aktuality/rozsviceni-vanocniho-stromu-575cs.html
+
+- Titulek: UPOZORNĚNÍ
+  Stav: AKTUÁLNÍ
+  Odkaz: https://www.obec-radim.cz/aktualne/aktuality/upozorneni-572cs.html
+
+- Titulek: Odstávka elektřiny
+  Stav: AKTUÁLNÍ
+  Odkaz: https://www.obec-radim.cz/aktualne/aktuality/odstavka-elektriny-571cs.html
+
+- Titulek: Divadelní vystoupení
+  Stav: AKTUÁLNÍ
+  Odkaz: https://www.obec-radim.cz/aktualne/aktuality/divadelni-vystoupeni-569cs.html
+
+- Titulek: UPOZORNĚNÍ
+  Stav: AKTUÁLNÍ
+  Odkaz: https://www.obec-radim.cz/aktualne/aktuality/upozorneni-568cs.html
+
+- Titulek: Pozvání na předvánoční jarmark
+  Stav: AKTUÁLNÍ
+  Odkaz: https://www.obec-radim.cz/aktualne/aktuality/pozvani-na-predvanocni-jarmark-567cs.html
+
+- Titulek: Začínáme cvičit
+  Stav: AKTUÁLNÍ
+  Odkaz: https://www.obec-radim.cz/aktualne/aktuality/zaciname-cvicit-566cs.html
+
+- Titulek: Malé ohlédnutí za oslavou hasičů
+  Stav: AKTUÁLNÍ
+  Odkaz: https://www.obec-radim.cz/aktualne/aktuality/male-ohlednuti-za-oslavou-hasicu-565cs.html
+
+- Titulek: ZAMPELBAND ROCK
+  Stav: AKTUÁLNÍ
+  Odkaz: https://www.obec-radim.cz/aktualne/aktuality/zampelband-rock-556cs.html
+
+- Titulek: Otevření Hospody Radim
+  Stav: AKTUÁLNÍ
+  Odkaz: https://www.obec-radim.cz/aktualne/aktuality/otevreni-hospody-radim-544cs.html
+
+- Titulek: Čapí kamera Radim
+  Stav: AKTUÁLNÍ
+  Odkaz: https://www.obec-radim.cz/aktualne/aktuality/capi-kamera-radim-541cs.html
+
+- Titulek: Olympijský běh
+  Stav: AKTUÁLNÍ
+  Odkaz: https://www.obec-radim.cz/aktualne/aktuality/olympijsky-beh-539cs.html
+
+- Titulek: Oslava 130 let od založení SDH Radim
+  Stav: AKTUÁLNÍ
+  Odkaz: https://www.obec-radim.cz/aktualne/aktuality/oslava-130-let-od-zalozeni-sdh-radim-532cs.html
+
+- Titulek: PROJEKT: „Odbahnění a oprava rybníku v obci Radim - Lháň“
+  Stav: AKTUÁLNÍ
+  Odkaz: https://www.obec-radim.cz/aktualne/aktuality/projekt-odbahneni-a-oprava-rybniku-v-obci-radim-lhan-527cs.html
+
+- Titulek: Prodej palivového dřeva
+  Stav: AKTUÁLNÍ
+  Odkaz: https://www.obec-radim.cz/aktualne/aktuality/prodej-palivoveho-dreva-523cs.html
+
+- Titulek: Kotlíkové dotace
+  Stav: AKTUÁLNÍ
+  Odkaz: https://www.obec-radim.cz/aktualne/aktuality/kotlikove-dotace-520cs.html
+
+- Titulek: Den otevřených dveří
+  Stav: AKTUÁLNÍ
+  Odkaz: https://www.obec-radim.cz/aktualne/aktuality/den-otevrenych-dveri-519cs.html
+
+- Titulek: Jarní brigáda
+  Stav: AKTUÁLNÍ
+  Odkaz: https://www.obec-radim.cz/aktualne/aktuality/jarni-brigada-518cs.html
+
+- Titulek: Vánoční koncert
+  Stav: AKTUÁLNÍ
+  Odkaz: https://www.obec-radim.cz/aktualne/aktuality/vanocni-koncert-510cs.html
+
+- Titulek: Vánoční výstava
+  Stav: AKTUÁLNÍ
+  Odkaz: https://www.obec-radim.cz/aktualne/aktuality/vanocni-vystava-509cs.html
+
+- Titulek: Slavnostní rozsvícení vánočního stromu
+  Stav: AKTUÁLNÍ
+  Odkaz: https://www.obec-radim.cz/aktualne/aktuality/slavnostni-rozsviceni-vanocniho-stromu-508cs.html
+
+- Titulek: Týden vzdělávání dospělých
+  Stav: AKTUÁLNÍ
+  Odkaz: https://www.obec-radim.cz/aktualne/aktuality/tyden-vzdelavani-dospelych-505cs.html
+
+- Titulek: Divadlo v Radimi
+  Stav: AKTUÁLNÍ
+  Odkaz: https://www.obec-radim.cz/aktualne/aktuality/divadlo-v-radimi-504cs.html
+
+- Titulek: Radimský halloween
+  Stav: AKTUÁLNÍ
+  Odkaz: https://www.obec-radim.cz/aktualne/aktuality/radimsky-halloween-494cs.html
+
+- Titulek: Otevření dětskéh hřiště
+  Stav: AKTUÁLNÍ
+  Odkaz: https://www.obec-radim.cz/aktualne/aktuality/otevreni-detskeh-hriste-492cs.html
+
+================================
+KALENDÁŘ AKCÍ
+================================
+Zdroj: https://www.obec-radim.cz/aktualne/kalendar-akci/
+
+- Titulek: Sokolský ples
+  Stav: NEZNÁMÉ
+  Odkaz: https://www.obec-radim.cz/aktualne/kalendar-akci/sokolsky-ples-614_188cs.html
+
+- Titulek: Výroční členská schůze spolku TJ Sokol Radim
+  Stav: NEZNÁMÉ
+  Odkaz: https://www.obec-radim.cz/aktualne/kalendar-akci/vyrocni-clenska-schuze-spolku-tj-sokol-radim-616_190cs.html
+
+- Titulek: Dětský maškarní karneval
+  Stav: NEZNÁMÉ
+  Odkaz: https://www.obec-radim.cz/aktualne/kalendar-akci/detsky-maskarni-karneval-617_191cs.html
+
+================================
+ÚŘEDNÍ DESKA
+================================
+Zdroj: https://www.obec-radim.cz/urad/uredni-deska/
+
+- Titulek: Jednací řád
+  Stav: NEZNÁMÉ
+  Odkaz: https://www.obec-radim.cz/urad/uredni-deska/jednaci-rad-407.html
+
+- Titulek: Záměr propachtování nemovité věci
+  Stav: NEZNÁMÉ
+  Odkaz: https://www.obec-radim.cz/urad/uredni-deska/zamer-propachtovani-nemovite-veci-552.html
+
+- Titulek: Záměr pronájmu nemovité věci - Studeňany č.p. 35
+  Stav: NEZNÁMÉ
+  Odkaz: https://www.obec-radim.cz/urad/uredni-deska/zamer-pronajmu-nemovite-veci-studenany-cp-35-551.html
+
+- Titulek: Porovnání všech položek výpočtu (kalkulace) cen pro vodné a stočné za kalendářní rok 2024 a dosažené skutečnosti v témže roce
+  Rok: 2024
+  Stav: ARCHIV
+  Odkaz: https://www.obec-radim.cz/urad/uredni-deska/porovnani-vsech-polozek-vypoctu-kalkulace-cen-pro-vodne-a-stocne-za-kalendarni-rok-2024-a-dosazene-skutecnosti-v-temze-roce-525.html
+
+- Titulek: Protokol o zkoušce č. 5911/24 a č. 5912/24
+  Stav: NEZNÁMÉ
+  Odkaz: https://www.obec-radim.cz/urad/uredni-deska/protokol-o-zkousce-c-5911-24-a-c-5912-24-495.html
+
+- Titulek: Protokol o zkoušce č. 3442/22 Vodohospodářské laboratoře, s.r.o.
+  Stav: NEZNÁMÉ
+  Odkaz: https://www.obec-radim.cz/urad/uredni-deska/protokol-o-zkousce-c-3442-22-vodohospodarske-laboratore-sro-396.html
+
+- Titulek: Protokol o zkoušce č. 1363/22 Vodohospodářské laboratoře, s.r.o.
+  Stav: NEZNÁMÉ
+  Odkaz: https://www.obec-radim.cz/urad/uredni-deska/protokol-o-zkousce-c-1363-22-vodohospodarske-laboratore-sro-397.html
+
+- Titulek: Obecně závazná vyhláška obce Radim o místním poplatku za obecní systém odpadového hospodářství
+  Stav: NEZNÁMÉ
+  Odkaz: https://www.obec-radim.cz/urad/uredni-deska/obecne-zavazna-vyhlaska-obce-radim-o-mistnim-poplatku-za-obecni-system-odpadoveho-hospodarstvi-549.html
+
+- Titulek: Obecně závazná vyhláška obce Radim o místním poplatku ze psů
+  Stav: NEZNÁMÉ
+  Odkaz: https://www.obec-radim.cz/urad/uredni-deska/obecne-zavazna-vyhlaska-obce-radim-o-mistnim-poplatku-ze-psu-548.html
+
+- Titulek: Nařízení obce o zákazu podomního a pochůzkového prodeje na území obce
+  Stav: NEZNÁMÉ
+  Odkaz: https://www.obec-radim.cz/urad/uredni-deska/narizeni-obce-o-zakazu-podomniho-a-pochuzkoveho-prodeje-na-uzemi-obce-520.html
+
+- Titulek: Sbírka právních předpisů
+  Stav: NEZNÁMÉ
+  Odkaz: https://www.obec-radim.cz/urad/uredni-deska/sbirka-pravnich-predpisu-523.html
+
+- Titulek: Oznámení o vyhlášení právních předpisů ve Sbírce právních předpisů
+  Stav: NEZNÁMÉ
+  Odkaz: https://www.obec-radim.cz/urad/uredni-deska/oznameni-o-vyhlaseni-pravnich-predpisu-ve-sbirce-pravnich-predpisu-507.html
+
+- Titulek: Obecně závazná vyhláška obce Radim o stanovení obecního systému odpadového hospodářství
+  Stav: NEZNÁMÉ
+  Odkaz: https://www.obec-radim.cz/urad/uredni-deska/obecne-zavazna-vyhlaska-obce-radim-o-stanoveni-obecniho-systemu-odpadoveho-hospodarstvi-506.html
+
+- Titulek: Obecně závazná vyhláška obce Radim o místním poplatku za obecní systém odpadového hospodářství
+  Stav: NEZNÁMÉ
+  Odkaz: https://www.obec-radim.cz/urad/uredni-deska/obecne-zavazna-vyhlaska-obce-radim-o-mistnim-poplatku-za-obecni-system-odpadoveho-hospodarstvi-505.html
+
+- Titulek: Obecně závazná vyhláška obce Radim o místním poplatku ze psů
+  Stav: NEZNÁMÉ
+  Odkaz: https://www.obec-radim.cz/urad/uredni-deska/obecne-zavazna-vyhlaska-obce-radim-o-mistnim-poplatku-ze-psu-464.html
+
+- Titulek: Kalkulace vodného pro rok 2025
+  Rok: 2025
+  Stav: ARCHIV
+  Odkaz: https://www.obec-radim.cz/urad/uredni-deska/kalkulace-vodneho-pro-rok-2025-508.html
+
+- Titulek: Kalkulace vodné 2022 Radim
+  Rok: 2022
+  Stav: ARCHIV
+  Odkaz: https://www.obec-radim.cz/urad/uredni-deska/kalkulace-vodne-2022-radim-362.html
+
+- Titulek: Radim - OUP1 - KOV
+  Stav: NEZNÁMÉ
+  Odkaz: https://www.obec-radim.cz/urad/uredni-deska/radim-oup1-kov-152.html
+
+- Titulek: Radim - OUP2 - SUV
+  Stav: NEZNÁMÉ
+  Odkaz: https://www.obec-radim.cz/urad/uredni-deska/radim-oup2-suv-151.html
+
+- Titulek: Radim - OUP3 - ZPF
+  Stav: NEZNÁMÉ
+  Odkaz: https://www.obec-radim.cz/urad/uredni-deska/radim-oup3-zpf-150.html
+
+- Titulek: Radim - UP1 - ZCU
+  Stav: NEZNÁMÉ
+  Odkaz: https://www.obec-radim.cz/urad/uredni-deska/radim-up1-zcu-149.html
+
+- Titulek: Radim - UP2 - HLV
+  Stav: NEZNÁMÉ
+  Odkaz: https://www.obec-radim.cz/urad/uredni-deska/radim-up2-hlv-148.html
+
+- Titulek: Grafická část úz. plánu
+  Stav: NEZNÁMÉ
+  Odkaz: https://www.obec-radim.cz/urad/uredni-deska/graficka-cast-uz-planu-113.html
+
+- Titulek: Graf. část úz. plánu
+  Stav: NEZNÁMÉ
+  Odkaz: https://www.obec-radim.cz/urad/uredni-deska/graf-cast-uz-planu-112.html
+
+- Titulek: Graf. část úz. plánu
+  Stav: NEZNÁMÉ
+  Odkaz: https://www.obec-radim.cz/urad/uredni-deska/graf-cast-uz-planu-111.html
+
+- Titulek: Graf. část úz. plánu
+  Stav: NEZNÁMÉ
+  Odkaz: https://www.obec-radim.cz/urad/uredni-deska/graf-cast-uz-planu-110.html
+
+- Titulek: Graf. část úz. plánu
+  Stav: NEZNÁMÉ
+  Odkaz: https://www.obec-radim.cz/urad/uredni-deska/graf-cast-uz-planu-109.html
+
+- Titulek: Graf. část úz. plánu
+  Stav: NEZNÁMÉ
+  Odkaz: https://www.obec-radim.cz/urad/uredni-deska/graf-cast-uz-planu-108.html
+
+- Titulek: VÝSLEDKY KRAJSKÝCH VOLEB V OBCI RADIM
+  Stav: NEZNÁMÉ
+  Odkaz: https://www.obec-radim.cz/urad/uredni-deska/vysledky-krajskych-voleb-v-obci-radim-494.html
+
+- Titulek: Pravidla rozpočtového provizoria na rok 2026
+  Rok: 2026
+  Stav: AKTUÁLNÍ
+  Odkaz: https://www.obec-radim.cz/urad/uredni-deska/pravidla-rozpoctoveho-provizoria-na-rok-2026-550.html
+
+- Titulek: Rozpočtové provizorium na rok 2026
+  Rok: 2026
+  Stav: AKTUÁLNÍ
+  Odkaz: https://www.obec-radim.cz/urad/uredni-deska/rozpoctove-provizorium-na-rok-2026-547.html
+
+- Titulek: Rozpočtové opatření č. 4
+  Stav: NEZNÁMÉ
+  Odkaz: https://www.obec-radim.cz/urad/uredni-deska/rozpoctove-opatreni-c-4-545.html
+
+- Titulek: Rozpočtové opatření č. 3
+  Stav: NEZNÁMÉ
+  Odkaz: https://www.obec-radim.cz/urad/uredni-deska/rozpoctove-opatreni-c-3-536.html
+
+- Titulek: Změna rozpisu rozpočtu č. 1
+  Stav: NEZNÁMÉ
+  Odkaz: https://www.obec-radim.cz/urad/uredni-deska/zmena-rozpisu-rozpoctu-c-1-535.html
+
+- Titulek: Závěrečný účtu za rok 2024
+  Rok: 2024
+  Stav: ARCHIV
+  Odkaz: https://www.obec-radim.cz/urad/uredni-deska/zaverecny-uctu-za-rok-2024-534.html
+
+- Titulek: Rozpočtové opatření č. 2/2025
+  Rok: 2025
+  Stav: ARCHIV
+  Odkaz: https://www.obec-radim.cz/urad/uredni-deska/rozpoctove-opatreni-c-2-2025-531.html
+
+- Titulek: Rozpočtové opatření č. 1/2025
+  Rok: 2025
+  Stav: ARCHIV
+  Odkaz: https://www.obec-radim.cz/urad/uredni-deska/rozpoctove-opatreni-c-1-2025-526.html
+
+- Titulek: Střednědobý výhled rozpočtu na období 2026-2027
+  Rok: 2026
+  Stav: AKTUÁLNÍ
+  Odkaz: https://www.obec-radim.cz/urad/uredni-deska/strednedoby-vyhled-rozpoctu-na-obdobi-2026-2027-522.html
+
+- Titulek: Schválený rozpočet na rok 2025
+  Rok: 2025
+  Stav: ARCHIV
+  Odkaz: https://www.obec-radim.cz/urad/uredni-deska/schvaleny-rozpocet-na-rok-2025-521.html
+
+- Titulek: schválený střednědobý výhled rozpočtu na období 2025-2026
+  Rok: 2025
+  Stav: ARCHIV
+  Odkaz: https://www.obec-radim.cz/urad/uredni-deska/schvaleny-strednedoby-vyhled-rozpoctu-na-obdobi-2025-2026-476.html
+
+- Titulek: Dodatek č. 1 k veřejnoprávním smlouvám ze dne 20.8.2020 a 15.12.2020
+  Datum: 20.08.2020
+  Rok: 2020
+  Stav: ARCHIV
+  Odkaz: https://www.obec-radim.cz/urad/uredni-deska/dodatek-c-1-k-verejnopravnim-smlouvam-ze-dne-2082020-a-15122020-434.html
+
+- Titulek: Veřejnoprávní smlouva Římskokatolická farnost
+  Stav: NEZNÁMÉ
+  Odkaz: https://www.obec-radim.cz/urad/uredni-deska/verejnopravni-smlouva-rimskokatolicka-farnost-429.html
+
+- Titulek: Dodatek č. 1 veřejnoprávní smlouvy 1/2021
+  Rok: 2021
+  Stav: ARCHIV
+  Odkaz: https://www.obec-radim.cz/urad/uredni-deska/dodatek-c-1-verejnopravni-smlouvy-1-2021-376.html
+
+- Titulek: Veřejnoprávní smlouva - TJ Sokol Radim z.s. 2021
+  Rok: 2021
+  Stav: ARCHIV
+  Odkaz: https://www.obec-radim.cz/urad/uredni-deska/verejnopravni-smlouva-tj-sokol-radim-zs-2021-363.html
+
+- Titulek: Veřejnoprávní smlouva Římskokatolická farnost
+  Stav: NEZNÁMÉ
+  Odkaz: https://www.obec-radim.cz/urad/uredni-deska/verejnopravni-smlouva-rimskokatolicka-farnost-359.html
+
+- Titulek: Dodatky ke smlouvám č. 1 a 2 TJ Sokol Radim
+  Stav: NEZNÁMÉ
+  Odkaz: https://www.obec-radim.cz/urad/uredni-deska/dodatky-ke-smlouvam-c-1-a-2-tj-sokol-radim-324.html
+
+- Titulek: veřejnoprávní smlouva s TJ Sokol Radim z.s.č. 2-2020
+  Rok: 2020
+  Stav: ARCHIV
+  Odkaz: https://www.obec-radim.cz/urad/uredni-deska/verejnopravni-smlouva-s-tj-sokol-radim-zsc-2-2020-325.html
+
+- Titulek: Veřejnoprávní smlouva - TJ Sokol Radim z.s. č. 1-2020
+  Rok: 2020
+  Stav: ARCHIV
+  Odkaz: https://www.obec-radim.cz/urad/uredni-deska/verejnopravni-smlouva-tj-sokol-radim-zs-c-1-2020-281.html
+
+- Titulek: Veřejnoprávní smlouva - TJ Sokol Radim z.s. 2019
+  Rok: 2019
+  Stav: ARCHIV
+  Odkaz: https://www.obec-radim.cz/urad/uredni-deska/verejnopravni-smlouva-tj-sokol-radim-zs-2019-219.html
+
+- Titulek: Veřejnoprávní smlouva - TJ Sokol Radim z.s. 2018
+  Rok: 2018
+  Stav: ARCHIV
+  Odkaz: https://www.obec-radim.cz/urad/uredni-deska/verejnopravni-smlouva-tj-sokol-radim-zs-2018-183.html
+
+- Titulek: Schválený závěrečný účet obce za rok 2024
+  Rok: 2024
+  Stav: ARCHIV
+  Odkaz: https://www.obec-radim.cz/urad/uredni-deska/schvaleny-zaverecny-ucet-obce-za-rok-2024-537.html
+
+- Titulek: Střednědobý výhled rozpočtu na období 2027 - 2028
+  Rok: 2027
+  Stav: AKTUÁLNÍ
+  Odkaz: https://www.obec-radim.cz/urad/uredni-deska/strednedoby-vyhled-rozpoctu-na-obdobi-2027-2028-544.html
+
+- Titulek: Střednědobý výhled rozpočtu na období 2027 - 2028
+  Rok: 2027
+  Stav: AKTUÁLNÍ
+  Odkaz: https://www.obec-radim.cz/urad/uredni-deska/strednedoby-vyhled-rozpoctu-na-obdobi-2027-2028-543.html
+
+- Titulek: Návrh rozpočtu roku 2026 včetně plnění za předcházející rok
+  Rok: 2026
+  Stav: AKTUÁLNÍ
+  Odkaz: https://www.obec-radim.cz/urad/uredni-deska/navrh-rozpoctu-roku-2026-vcetne-plneni-za-predchazejici-rok-542.html
+
+- Titulek: Návrh Závěrečného účtu za rok 2024
+  Rok: 2024
+  Stav: ARCHIV
+  Odkaz: https://www.obec-radim.cz/urad/uredni-deska/navrh-zaverecneho-uctu-za-rok-2024-528.html
+
+- Titulek: OZNÁMENÍ Svazku obcí Brada O POVINNĚ ZVEŘEJŇOVANÝCH DOKUMENTECH
+  Stav: NEZNÁMÉ
+  Odkaz: https://www.obec-radim.cz/urad/uredni-deska/oznameni-svazku-obci-brada-o-povinne-zverejnovanych-dokumentech-364.html
+
+- Titulek: OZNÁMENÍ Svazku obcí Brada O POVINNĚ ZVEŘEJŇOVANÝCH DOKUMENTECH
+  Stav: NEZNÁMÉ
+  Odkaz: https://www.obec-radim.cz/urad/uredni-deska/oznameni-svazku-obci-brada-o-povinne-zverejnovanych-dokumentech-355.html
+

@@ -1,0 +1,8 @@
+01_STATIC_SITE_obec_radim.txt
+Vygenerováno: 2026-01-24T16:58:17.461Z
+Zdroj: https://www.obec-radim.cz
+
+Tento soubor obsahuje stabilní informace z webu obce Radim.
+Proměnlivé sekce (aktuality, úřední deska, kalendář akcí, fotogalerie, zpravodaj) jsou záměrně vynechány.
+
+==============================
