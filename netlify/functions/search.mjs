@@ -12,6 +12,10 @@ const corsHeaders = {
 
 const OPENAI_BASE_URL = "https://api.openai.com/v1";
 
+// === Site guard (Radim) ===
+const CANONICAL_HOST = "www.obec-radim.cz";
+const CANONICAL_ORIGIN = `https://${CANONICAL_HOST}`;
+
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
@@ -86,16 +90,15 @@ function extractLatestAssistantText(messagesListJson) {
 
 /**
  * Čištění citací a "bordelu" z File Search.
- * - smaže:  apod.
- * - smaže tokeny jako 6:0 (ale NESMAŽE časy typu 16:00)
+ * - smaže citace typu 
+ * - smaže tokeny typu 6:0 (ale NESMAŽE časy typu 16:00)
+ * - smaže markdown **
  */
 function stripCitations(text) {
   return String(text || "")
-    // typické file_search citace
     .replace(/【\s*\d+\s*:\s*\d+\s*†[^】]*】/g, "")
-    // někdy se objeví samotné tokeny typu 6:0 (jednociferné za dvojtečkou)
-    .replace(/\b\d+:\d\b/g, "")
-    // markdown ** (často zbytečné v úředním tónu)
+    // smaž jen tokeny typu "6:0" nebo "12:3" (jednociferné za dvojtečkou) – časy 16:00 zůstanou
+    .replace(/\b\d{1,3}:\d\b/g, "")
     .replace(/\*\*(.*?)\*\*/g, "$1")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
@@ -122,6 +125,60 @@ function isListRequest(userMessage) {
 }
 
 /**
+ * === URL helpers ===
+ * - opraví nejčastější překlepy domény
+ * - odstraní trailing tečky/čárky z URL
+ * - vyhodí/vrátí jen URL z obec-radim.cz (aby model necucal nesmysly)
+ */
+function fixCommonUrlTypos(text) {
+  let t = String(text || "");
+
+  // nejčastější: chybí tečka před cz
+  t = t.replace(/https?:\/\/www\.obec-radimcz\b/gi, CANONICAL_ORIGIN);
+  t = t.replace(/https?:\/\/obec-radimcz\b/gi, CANONICAL_ORIGIN);
+
+  // někdy to slepí "radim.cz/urad" bez lomítka apod. – necháváme, tohle je jen doména
+  return t;
+}
+
+function stripTrailingPunctuationFromUrls(text) {
+  return String(text || "").replace(/(https?:\/\/[^\s)\]]+)[\.,]+/g, "$1");
+}
+
+function normalizeRadimUrls(text) {
+  // 1) opravy překlepů
+  let t = fixCommonUrlTypos(text);
+
+  // 2) odstranit tečky/čárky za url
+  t = stripTrailingPunctuationFromUrls(t);
+
+  // 3) zkontrolovat URL a nechat jen bezpečné
+  //    (když model vymyslí něco mimo, radši to odstraníme)
+  const urlRegex = /\bhttps?:\/\/[^\s)\]]+/gi;
+  const found = t.match(urlRegex) || [];
+
+  for (const raw of found) {
+    const cleaned = raw.replace(/[)\]]+$/g, ""); // kdyby to končilo závorkou z věty
+    let ok = false;
+
+    try {
+      const u = new URL(cleaned);
+      // povol jen obec-radim.cz (a případně munipolis pro radim, pokud chceš)
+      ok = u.host === CANONICAL_HOST;
+    } catch {
+      ok = false;
+    }
+
+    if (!ok) {
+      // vyhoď jen tu URL, nic dalšího
+      t = t.replace(raw, "").replace(/\n{3,}/g, "\n\n");
+    }
+  }
+
+  return t.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+
+/**
  * Jemný postprocess:
  * - neničí seznamy
  * - nemaže URL a řádky s názvem/datem
@@ -131,10 +188,10 @@ function isListRequest(userMessage) {
 function postProcessAnswer(answerRaw, userMessage) {
   let t = String(answerRaw || "").trim();
 
-  // Základní úklid whitespace
+  // základní whitespace
   t = t.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
 
-  // Meta věty – jen nejhorší, a jen když NEobsahují URL (abychom neodstřelili odkaz)
+  // Meta věty – jen nejhorší, a jen když NEobsahují URL
   const metaRegexes = [
     /(^|\n)\s*(v dostupných (dokumentech|podkladech)[^.\n]*[.\n])/gi,
     /(^|\n)\s*(v oficiálních (dokumentech|podkladech)[^.\n]*[.\n])/gi,
@@ -145,17 +202,15 @@ function postProcessAnswer(answerRaw, userMessage) {
     t = t.replace(re, (m) => (m.includes("http") ? m : "\n"));
   }
 
-  // Nikdy neukončuj URL tečkou/čárkou
-  t = t.replace(/(https?:\/\/[^\s)\]]+)[\.,]+/g, "$1");
-
   // Oprav "nedopsané číslování" na konci (typ: "2." bez obsahu)
-  //  - odstraní trailing řádek typu "2." nebo "2. " apod.
   t = t.replace(/\n?\s*\d+\.\s*$/g, "").trim();
 
-  // Pokud je to výpis / seznam, NEomezuj na 5 vět.
+  // URL: opravy překlepů + validace domény + odstranění teček
+  t = normalizeRadimUrls(t);
+
   const listMode = isListRequest(userMessage);
 
-  // U běžných odpovědí: max 5 vět (ale necháme odrážky)
+  // Limit 5 vět jen když to není seznam a nejsou odrážky
   const hasBullets = /(^|\n)\s*([-•]|\d+\.)\s+/.test(t);
 
   if (!listMode && !hasBullets) {
@@ -163,24 +218,20 @@ function postProcessAnswer(answerRaw, userMessage) {
       .split(/(?<=[.!?])\s+/)
       .map((s) => s.trim())
       .filter(Boolean);
-
     if (sentences.length > 5) t = sentences.slice(0, 5).join(" ");
   }
 
-  // Soft limit, aby se to nerozjelo na 50k znaků (ale nechá to dlouhé výpisy)
+  // Soft hard-limit
   const HARD_LIMIT = 9000;
   if (t.length > HARD_LIMIT) {
     t = t.slice(0, HARD_LIMIT).trim();
-    // dočistit případný rozseknutý poslední řádek
     t = t.replace(/\n[^\n]*$/g, "").trim() + "\n…";
   }
 
-  // Kdyby to zůstalo prázdné, vrať původní
   return t || String(answerRaw || "").trim() || "Bez odpovědi.";
 }
 
 export default async function handler(req) {
-  // CORS preflight
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders });
 
   try {
@@ -199,27 +250,26 @@ export default async function handler(req) {
       return jsonResponse(400, { ok: false, error: "Missing message" });
     }
 
-    // Runtime datum (Europe/Prague)
     const todayStr = getCzechTodayString();
     const listMode = isListRequest(message);
 
-    // ✅ One-file režim + kontext + odkazy + výjimka pro výpisy
+    // Instrukce: co nejvíc “profi úřad” + povinné odkazy + kontext
     const runInstructions =
       `Dnes je ${todayStr} (časová zóna: Europe/Prague). ` +
       `Časové výrazy ("dnes", "zítra", "příští týden", "minulý měsíc") vykládej vzhledem k tomuto datu.\n\n` +
 
       `Jsi oficiální AI asistent obce Radim a odpovídáš jako pracovník obecního úřadu.\n` +
-      `Smíš používat pouze informace z oficiálního dokumentu ve znalostní bázi, který odpovídá FULL obsahu webu obce (99_FULL_obec_radim.txt).\n` +
+      `Smíš používat pouze informace z jediného oficiálního dokumentu ve znalostní bázi (99_FULL_obec_radim.txt).\n` +
       `Nic nedoplňuj z domněnek. Neimprovizuj.\n\n` +
 
       `KONTEXT (kritické):\n` +
       `- Navazující dotazy ("a ten", "který", "nejnovější", "pošli odkaz") vždy vyhodnocuj v kontextu předchozí otázky v tomto vlákně.\n` +
-      `- "Nejnovější" posuzuj vždy v rámci tématu, o kterém se právě mluví (např. úřední deska / vyhlášky / zpravodaj / zápisy), ne jako obecnou novinku na webu.\n\n` +
+      `- "Nejnovější" posuzuj vždy v rámci tématu (úřední deska / vyhlášky / zpravodaj / zápisy), ne jako obecnou novinku na webu.\n\n` +
 
       `ODKAZY (kritické):\n` +
-      `- Pokud se dotaz týká dokumentu, vyhlášky, zápisu, zasedání, formuláře, zpravodaje, územního plánu, oznámení, úřední desky nebo jakékoli informace "na webu", vždy se pokus dohledat a uvést PŘÍMÝ ODKAZ na konkrétní stránku nebo soubor.\n` +
-      `- Přímý odkaz uveď i tehdy, pokud o něj uživatel výslovně nepožádá.\n` +
-      `- Pokud existuje více odkazů, uveď pouze nejrelevantnější/nejaktuálnější.\n` +
+      `- Pokud se dotaz týká dokumentu, vyhlášky, zápisu, zasedání, formuláře, zpravodaje, územního plánu, oznámení, úřední desky nebo informace "na webu", vždy uveď PŘÍMÝ ODKAZ na konkrétní stránku nebo soubor.\n` +
+      `- Odkaz uveď i tehdy, když o něj uživatel výslovně nepožádá.\n` +
+      `- URL kopíruj přesně ze zdrojů, nikdy je nepřepisuj ručně.\n` +
       `- URL nikdy neukončuj tečkou ani čárkou.\n\n` +
 
       `AKTUÁLNOST:\n` +
@@ -229,7 +279,7 @@ export default async function handler(req) {
       `- Pokud odpověď vychází z časově omezené informace, uveď datum/období.\n\n` +
 
       `DOTAZY "JAK…":\n` +
-      `- Pokud se uživatel ptá "jak se přihlásit/jak postupovat/co mám udělat", odpověz pouze dostupnými kontaktními údaji a/nebo oficiálním odkazem z dokumentu. Bez návodu.\n\n` +
+      `- Pokud se uživatel ptá "jak se přihlásit/jak postupovat/co mám udělat", odpověz pouze kontaktními údaji a/nebo oficiálním odkazem z dokumentu. Bez návodu.\n\n` +
 
       `NEJASNÝ DOTAZ:\n` +
       `- Pokud dotaz nedává smysl nebo vypadá jako překlep, polož jednu krátkou upřesňující otázku.\n\n` +
@@ -241,9 +291,11 @@ export default async function handler(req) {
         : `- Maximálně 5 vět, případně krátké odrážky.\n`) +
       `- Žádné emoji, žádný marketing.\n\n` +
 
+      `POKUD INFORMACE CHYBÍ:\n` +
+      `- Řekni to jednou stručně bez metakomentářů.\n\n` +
+
       `ZÁKAZY:\n` +
       `- Neuváděj technické detaily (AI, systém, databáze, scraping).\n` +
-      `- Nepsat metakomenty typu "v dokumentech jsem nenašel". Pokud informace chybí, řekni to jednou stručně.\n` +
       `- Nepoužívej doporučení ("doporučuji", "můžete", "je možné").\n`;
 
     // Thread: pokud přijde thread_id, pokračujeme; jinak založíme nový
@@ -320,8 +372,10 @@ export default async function handler(req) {
     answer = stripCitations(answer);
     answer = postProcessAnswer(answer, message);
 
-    // Pokud i po tom všem zůstane prázdno:
-    if (!answer) answer = "Tuto informaci bohužel nemám k dispozici v oficiálních podkladech obce Radim.";
+    // Když by to i tak bylo prázdné:
+    if (!answer) {
+      answer = "Tuto informaci bohužel nemám k dispozici v oficiálních podkladech obce Radim.";
+    }
 
     return jsonResponse(200, { ok: true, answer, thread_id: threadId });
   } catch (err) {
