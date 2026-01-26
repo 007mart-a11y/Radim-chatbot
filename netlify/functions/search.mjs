@@ -102,6 +102,40 @@ function cleanAnswer(text) {
 }
 
 /**
+ * ✅ Finální normalizace URL pro obec Radim:
+ * - opraví "obec-radimcz" (bez tečky)
+ * - doplní https:// pokud chybí
+ * - sjednotí na https://www.obec-radim.cz
+ * - odstraní trailing tečky/čárky za URL
+ */
+function normalizeRadimLinks(text) {
+  let t = String(text || "");
+
+  // 1) oprav nejčastější překlep domény všude (i bez protokolu)
+  t = t.replace(/\bobec-radimcz\b/gi, "www.obec-radim.cz");
+  t = t.replace(/\bwww\.obec-radimcz\b/gi, "www.obec-radim.cz");
+
+  // 2) doplň https:// když je tam "www.obec-radim.cz/..." bez protokolu
+  t = t.replace(/\bwww\.obec-radim\.cz(\/[^\s)\]]*)?/gi, (m) => `https://${m}`);
+
+  // 3) doplň https:// když je tam "obec-radim.cz/..." bez protokolu
+  //    (a rovnou přepni na www)
+  t = t.replace(/\bobec-radim\.cz(\/[^\s)\]]*)?/gi, (m) => `https://www.${m}`);
+
+  // 4) sjednoť protokol a www
+  t = t.replace(/https?:\/\/obec-radim\.cz/gi, "https://www.obec-radim.cz");
+  t = t.replace(/https?:\/\/www\.obec-radim\.cz/gi, "https://www.obec-radim.cz");
+
+  // 5) zahoď tečky/čárky za URL (když to vznikne po úpravách)
+  t = t.replace(/(https:\/\/www\.obec-radim\.cz[^\s)\]]+)[\.,]+/g, "$1");
+
+  // 6) whitespace cleanup
+  t = t.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+
+  return t;
+}
+
+/**
  * Krátký prompt, který funguje.
  * Pozn.: Tohle je INSTRUCTIONS pro run (přebije blbosti v UI, pokud tam něco je).
  */
@@ -171,7 +205,6 @@ export default async function handler(req) {
         body: JSON.stringify({
           assistant_id: assistantId,
           instructions: buildRunInstructions(),
-          // Pokud API tyto parametry ignoruje, nic se nestane; pokud je bere, pomůže to stabilitě.
           temperature: 0.1,
           top_p: 1,
         }),
@@ -213,7 +246,9 @@ export default async function handler(req) {
     // 4) read messages
     const messages = await api(`/threads/${threadId}/messages?limit=50`, {}, apiKey);
     let answer = extractLatestAssistantText(messages);
+
     answer = cleanAnswer(answer);
+    answer = normalizeRadimLinks(answer);
 
     if (!answer) {
       answer = "Tuto informaci bohužel nemám k dispozici v oficiálních podkladech obce Radim.";
