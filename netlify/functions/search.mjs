@@ -12,6 +12,12 @@ const corsHeaders = {
 
 const OPENAI_BASE_URL = "https://api.openai.com/v1";
 
+// Canonical web
+const CANONICAL_ORIGIN = "https://www.obec-radim.cz";
+
+// Optional allowed extra origins (munipolis for Radim) — pokud nechceš, smaž řádek.
+const ALLOWED_EXTRA_ORIGINS = new Set(["https://obec-radim.munipolis.cz"]);
+
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
@@ -63,15 +69,13 @@ async function api(path, { method = "GET", body, headers = {} } = {}, apiKey) {
 }
 
 /**
- * ✅ Vezmi poslední assistant zprávu podle created_at.
+ * Vezme poslední assistant zprávu podle created_at.
  */
 function extractLatestAssistantText(messagesListJson) {
   const data = Array.isArray(messagesListJson?.data) ? messagesListJson.data : [];
-
   const assistantMsgs = data.filter(
     (m) => m?.role === "assistant" && Array.isArray(m?.content) && m.content.length
   );
-
   if (!assistantMsgs.length) return "Bez odpovědi.";
 
   assistantMsgs.sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
@@ -85,58 +89,7 @@ function extractLatestAssistantText(messagesListJson) {
 }
 
 /**
- * Čištění citací z File Search + drobné úpravy.
- */
-function cleanAnswer(text) {
-  let t = String(text || "");
-
-  // file_search citace
-  t = t.replace(/【\s*\d+\s*:\s*\d+\s*†[^】]*】/g, "");
-
-  // tokeny typu 6:0 (ale ne časy 16:00)
-  t = t.replace(/\b\d{1,3}:\d\b/g, "");
-
-  // markdown **bold**
-  t = t.replace(/\*\*(.*?)\*\*/g, "$1");
-
-  // oprava překlepů domény
-  t = t.replace(/https?:\/\/(www\.)?obec-radimcz\b/gi, "https://www.obec-radim.cz");
-
-  // odstranit tečku/čárku za URL
-  t = t.replace(/(https?:\/\/[^\s)\]]+)[\.,]+/g, "$1");
-
-  // zrušit prázdné markdown odkazy: [text]()
-  t = t.replace(/\[([^\]]+)\]\(\s*\)/g, "$1");
-
-  // odstranit řádky typu "Odkaz:" bez URL
-  t = t.replace(/^\s*Odkaz:\s*$/gim, "");
-  t = t.replace(/^\s*Odkaz:\s*(Odkaz na tuto informaci není[^]*?)$/gim, "");
-
-  // odstranit "Více informací je k dispozici..." pokud není URL v okolí (často to generuje blbě)
-  // (necháme to, jen když se v tom řádku vyskytuje http)
-  t = t
-    .split("\n")
-    .filter((line) => {
-      const s = line.trim();
-      if (!s) return true;
-      const lower = s.toLowerCase();
-      const looksLikeFiller =
-        lower.startsWith("více informací je k dispozici") ||
-        lower.startsWith("více informací najdete") ||
-        lower.startsWith("podrobnosti jsou k dispozici");
-      if (looksLikeFiller && !s.includes("http")) return false;
-      return true;
-    })
-    .join("\n");
-
-  // whitespace
-  t = t.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
-
-  return t.trim();
-}
-
-/**
- * Výpisy: u nich nepoužívej limit 5 vět.
+ * Dotazy na seznam / výpis (u nich nepoužívat limit 5 vět).
  */
 function isListRequest(userMessage) {
   const m = String(userMessage || "").toLowerCase();
@@ -154,12 +107,15 @@ function isListRequest(userMessage) {
     m.includes("jaké vyhlášky") ||
     m.includes("jake vyhlasky") ||
     m.includes("jaké akce") ||
-    m.includes("jake akce")
+    m.includes("jake akce") ||
+    m.includes("vypiš vše") ||
+    m.includes("vypsat vše")
   );
 }
 
 /**
- * Relevance guard: spolek vs úřad (silnější, jasnější).
+ * Relevance guard: spolek vs úřad.
+ * Cíl: u sokola/SDH apod. necpat úřad jako kontakt, pokud existuje přímý kontakt organizace.
  */
 function buildRelevanceBlock(userMessage) {
   const msg = String(userMessage || "").toLowerCase();
@@ -185,28 +141,136 @@ function buildRelevanceBlock(userMessage) {
   if (isOrg && !askingOffice) {
     return (
       `RELEVANCE (kritické):\n` +
-      `- Dotaz míří na spolek/organizaci, nikoli na obecní úřad.\n` +
-      `- Neuváděj starostku ani kontakty obecního úřadu.\n` +
-      `- Pokud uživatel chce kontakt, uveď pouze kontakty dané organizace nalezené ve zdrojích.\n`
+      `- Dotaz míří na organizaci/spolek (např. TJ Sokol / SDH / Zahrádkáři), nikoli na obecní úřad.\n` +
+      `- Pokud existuje přímý kontakt organizace ve zdroji, uveď pouze tento přímý kontakt.\n` +
+      `- Neuváděj starostku ani kontakty obecního úřadu jako "fallback", pokud přímý kontakt organizace existuje.\n`
     );
   }
 
   return "";
 }
 
-function limitTo5SentencesIfNeeded(answer, userMessage) {
+/**
+ * URL helpers
+ */
+function fixCommonUrlTypos(text) {
+  let t = String(text || "");
+  // časté: chybí tečka před cz
+  t = t.replace(/https?:\/\/(www\.)?obec-radimcz\b/gi, CANONICAL_ORIGIN);
+  return t;
+}
+
+function toAbsoluteRadimUrl(u) {
+  const s = String(u || "").trim();
+  if (!s) return null;
+  if (s.startsWith("http://") || s.startsWith("https://")) return s;
+  if (s.startsWith("/")) return CANONICAL_ORIGIN + s;
+  return null;
+}
+
+function stripTrailingPunctuationFromUrls(text) {
+  return String(text || "").replace(/(https?:\/\/[^\s)\]]+)[\.,]+/g, "$1");
+}
+
+function normalizeUrlsInText(text) {
+  let t = fixCommonUrlTypos(text);
+  t = stripTrailingPunctuationFromUrls(t);
+
+  // převod relativních odkazů "/urad/..." na plné URL (jen Radim)
+  // Pozor: nechceme rozbít běžný text s lomítky, tak jen ty, co vypadají jako URL cesta.
+  t = t.replace(
+    /(^|\s)(\/(urad|aktualne|obec|seniori|organizace-a-spolky|uredni-deska|kalendar-akci|e_download\.php)[^\s)\]]*)/gi,
+    (m, pre, path) => `${pre}${CANONICAL_ORIGIN}${path}`
+  );
+
+  // bezpečnost: vyhoď jen úplně nesmyslné URL, ale NEodstraňuj radim + munipolis
+  const urlRegex = /\bhttps?:\/\/[^\s)\]]+/gi;
+  const found = t.match(urlRegex) || [];
+
+  for (const raw of found) {
+    const cleaned = raw.replace(/[)\]]+$/g, "");
+    let ok = false;
+    try {
+      const u = new URL(cleaned);
+      ok = u.origin === CANONICAL_ORIGIN || ALLOWED_EXTRA_ORIGINS.has(u.origin);
+    } catch {
+      ok = false;
+    }
+    if (!ok) {
+      // smaž jen ten token
+      t = t.replace(raw, "");
+    }
+  }
+
+  return t.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+
+/**
+ * Čištění citací z File Search + šetrné úpravy bez ničení URL.
+ */
+function cleanAnswer(text) {
+  let t = String(text || "");
+
+  // odstranit file_search citace
+  t = t.replace(/【\s*\d+\s*:\s*\d+\s*†[^】]*】/g, "");
+
+  // opatrně odstranit tokeny typu "6:0" / "12:3" (jednociferné za dvojtečkou)
+  // (nechává časy typu 16:00)
+  t = t.replace(/\b\d{1,3}:\d\b/g, "");
+
+  // markdown bold
+  t = t.replace(/\*\*(.*?)\*\*/g, "$1");
+
+  // prázdné markdown odkazy [text]()
+  t = t.replace(/\[([^\]]+)\]\(\s*\)/g, "$1");
+
+  // pryč řádky "Odkaz:" bez URL
+  t = t.replace(/^\s*Odkaz:\s*$/gim, "");
+
+  // whitespace
+  t = t.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+
+  // normalizace URL (typo + relativní -> absolutní)
+  t = normalizeUrlsInText(t);
+
+  return t.trim();
+}
+
+/**
+ * Limit 5 vět – ALE NIKDY nesmí odstranit odkazy.
+ * Strategie:
+ * - pokud v odpovědi jsou URL, vytáhneme je, zkrátíme text bez URL, a URL přidáme nakonec.
+ */
+function limitTo5SentencesPreserveLinks(answer, userMessage) {
   const listMode = isListRequest(userMessage);
   const hasBullets = /(^|\n)\s*([-•]|\d+\.)\s+/.test(answer);
 
   if (listMode || hasBullets) return answer;
 
-  const sentences = answer
+  // najdi URL
+  const urlRegex = /\bhttps?:\/\/[^\s)\]]+/gi;
+  const urls = Array.from(new Set(answer.match(urlRegex) || []));
+
+  // text bez URL (abychom nerezali uprostřed linku)
+  let textNoUrls = answer.replace(urlRegex, "").replace(/\s{2,}/g, " ").trim();
+
+  const sentences = textNoUrls
     .split(/(?<=[.!?])\s+/)
     .map((s) => s.trim())
     .filter(Boolean);
 
-  if (sentences.length > 5) return sentences.slice(0, 5).join(" ");
-  return answer;
+  let shortened = textNoUrls;
+  if (sentences.length > 5) shortened = sentences.slice(0, 5).join(" ");
+
+  // pokud byly URL, přidej je na konec
+  if (urls.length) {
+    const linksBlock = urls.map((u) => u.replace(/[)\].,]+$/g, "")).join("\n");
+    // když je text prázdný, vrať jen linky
+    if (!shortened) return linksBlock;
+    return `${shortened}\n\n${linksBlock}`.trim();
+  }
+
+  return shortened || answer;
 }
 
 export default async function handler(req) {
@@ -229,42 +293,45 @@ export default async function handler(req) {
     }
 
     const todayStr = getCzechTodayString();
+    const listMode = isListRequest(message);
     const relevanceBlock = buildRelevanceBlock(message);
 
-    // ✅ Tady je hlavní oprava: synonyma ("vede" = předseda) + osoba napříč výskyty + odkazy bez bullshit labelů.
+    // ✅ ZÁSADNÍ: jednoduché instrukce, ale tvrdé na "fakta jen s odkazem"
+    // (bez pobízení k opakování staré odpovědi z chatu jako faktu)
     const runInstructions =
       `Dnes je ${todayStr} (časová zóna: Europe/Prague).\n\n` +
       `Jsi oficiální AI asistent obce Radim a odpovídáš jako pracovník obecního úřadu.\n` +
-      `Používej výhradně informace z jediného zdroje: 99_FULL_obec_radim.txt.\n` +
-      `Neimprovizuj.\n\n` +
+      `Používej výhradně informace z jediného zdroje: 99_FULL_obec_radim.txt. Neimprovizuj.\n\n` +
 
       `KONTEXT:\n` +
       `- Navazující dotazy vyhodnocuj v kontextu předchozích zpráv v tomto vlákně.\n` +
       `- "Nejnovější" vždy vztahuj k právě řešenému tématu.\n\n` +
 
-      `INTELIGENCE (kritické):\n` +
-      `- Pokud se uživatel ptá "kdo vede" / "kdo je ve vedení" organizace, považuj to za dotaz na předsedu/předsedkyni a výbor (vedení).\n` +
-      `- Pokud už znáš předsedu/předsedkyni z dřívější odpovědi v tomto vlákně, použij to a přidej případně další členy vedení, pokud jsou ve zdrojích.\n` +
-      `- Pokud se uživatel ptá na telefon/e-mail osoby, projdi všechny relevantní výskyty této osoby ve zdrojích (může být ve více rolích).\n` +
-      `- Pokud se osoba vyskytuje ve více rolích a kontakty se liší, polož 1 krátkou upřesňující otázku (např. "Myslíte ji ve spojení s TJ Sokol, nebo s obecním výborem?").\n` +
-      `- Nikdy netvrď "kontakt není uveden", pokud je u některého výskytu osoby kontakt uveden.\n\n` +
-
-      `ODKAZY:\n` +
-      `- Pokud je ve zdrojích přímý odkaz na stránku nebo soubor k tématu, uveď jej.\n` +
-      `- URL kopíruj přesně ze zdrojů.\n` +
-      `- Nepiš "Odkaz:" pokud za tím nebude skutečná URL.\n\n` +
-
-      `STYL:\n` +
-      `- Úředně, věcně, bez pozdravů a bez upozornění typu "ověřte si to".\n` +
-      `- Max 5 vět, případně krátké odrážky. U výpisů/seznamů může být delší seznam.\n\n` +
-      (relevanceBlock ? relevanceBlock + "\n" : "") +
-
-      `POKUD INFORMACE CHYBÍ:\n` +
-      `- Řekni přesně jen tuto větu a nic dalšího:\n` +
+      `PRAVIDLO PRO FAKTA (kritické):\n` +
+      `- Pokud uvádíš konkrétní jméno osoby, telefon, e-mail, datum dokumentu nebo konkrétní dokument, vždy přidej 1 přímý odkaz na stránku/soubor, kde je to uvedeno.\n` +
+      `- Pokud odkaz ve zdroji nenajdeš, nepřidávej domněnky a použij přesně větu:\n` +
       `"Tuto informaci bohužel nemám k dispozici v oficiálních podkladech obce Radim."\n\n` +
 
+      `ODKAZY:\n` +
+      `- Pokud je k tématu dostupný přímý odkaz, uveď jej.\n` +
+      `- URL kopíruj přesně ze zdrojů. Neukončuj URL tečkou ani čárkou.\n\n` +
+
+      `VÝKLAD DOTAZŮ:\n` +
+      `- "kdo vede" / "vedení" organizace = předseda/předsedkyně a členové výboru (pokud jsou ve zdroji).\n` +
+      `- U organizací vždy preferuj přímý kontakt organizace, pokud existuje.\n\n` +
+
+      `STYL:\n` +
+      `- Úředně a věcně. Bez pozdravů a bez upozornění typu "ověřte si to".\n` +
+      (listMode
+        ? `- Uživatel chce výpis/seznam: napiš přehledný seznam všech relevantních položek (název + datum/období + přímý odkaz, pokud existuje).\n`
+        : `- Max 5 vět, případně krátké odrážky.\n`) +
+      `\n` +
+
+      (relevanceBlock ? relevanceBlock + "\n" : "") +
+
       `ZÁKAZY:\n` +
-      `- Neuváděj technické detaily. Nepoužívej doporučení ("doporučuji", "můžete", "je možné").\n`;
+      `- Neuváděj technické detaily (AI, scraping, databáze).\n` +
+      `- Nepoužívej doporučení ("doporučuji", "můžete", "je možné").\n`;
 
     // Thread
     let threadId = body?.thread_id;
@@ -273,7 +340,7 @@ export default async function handler(req) {
       threadId = created.id;
     }
 
-    // 1) user msg
+    // 1) user message
     await api(
       `/threads/${threadId}/messages`,
       {
@@ -284,7 +351,7 @@ export default async function handler(req) {
       apiKey
     );
 
-    // 2) run (stabilnější = méně náhodné blbosti)
+    // 2) run — nízká teplota = méně halucinací
     const run = await api(
       `/threads/${threadId}/runs`,
       {
@@ -293,14 +360,14 @@ export default async function handler(req) {
         body: JSON.stringify({
           assistant_id: assistantId,
           instructions: runInstructions,
-          temperature: 0.2,
+          temperature: 0.1,
           top_p: 1,
         }),
       },
       apiKey
     );
 
-    // 3) poll (rychle)
+    // 3) poll
     const started = Date.now();
     const timeoutMs = 45_000;
 
@@ -334,9 +401,13 @@ export default async function handler(req) {
     const messages = await api(`/threads/${threadId}/messages?limit=50`, {}, apiKey);
     let answer = extractLatestAssistantText(messages);
 
+    // clean without destroying links
     answer = cleanAnswer(answer);
-    answer = limitTo5SentencesIfNeeded(answer, message);
 
+    // limit without cutting links
+    answer = limitTo5SentencesPreserveLinks(answer, message);
+
+    // fallback
     if (!answer) {
       answer = "Tuto informaci bohužel nemám k dispozici v oficiálních podkladech obce Radim.";
     }
