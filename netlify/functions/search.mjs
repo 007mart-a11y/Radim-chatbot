@@ -11,6 +11,7 @@ const corsHeaders = {
 };
 
 const OPENAI_BASE_URL = "https://api.openai.com/v1";
+const CANONICAL_ORIGIN = "https://www.obec-radim.cz";
 
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
@@ -74,7 +75,6 @@ function extractLatestAssistantText(messagesListJson) {
 /**
  * Minimum cleaning:
  * - odstraní file_search citace 【x:y†...】
- * - opraví známý překlep domény obec-radimcz
  * - odstraní tečku/čárku na konci URL
  * - odstraní prázdné markdown odkazy [text]()
  *
@@ -85,9 +85,6 @@ function cleanAnswer(text) {
 
   // file_search citace
   t = t.replace(/【\s*\d+\s*:\s*\d+\s*†[^】]*】/g, "");
-
-  // oprava překlepů domény
-  t = t.replace(/https?:\/\/(www\.)?obec-radimcz\b/gi, "https://www.obec-radim.cz");
 
   // odstranit tečku/čárku za URL
   t = t.replace(/(https?:\/\/[^\s)\]]+)[\.,]+/g, "$1");
@@ -102,34 +99,73 @@ function cleanAnswer(text) {
 }
 
 /**
- * ✅ Finální normalizace URL pro obec Radim:
- * - opraví "obec-radimcz" (bez tečky)
- * - doplní https:// pokud chybí
- * - sjednotí na https://www.obec-radim.cz
- * - odstraní trailing tečky/čárky za URL
+ * Bezpečné odsekání interpunkce a závorek na konci URL
+ */
+function stripUrlTail(url) {
+  return String(url || "").replace(/[)\],.]+$/g, "");
+}
+
+/**
+ * Vezmi URL-like token a udělej z něj canonical URL na obec-radim.cz.
+ * Opraví:
+ * - https://https://...
+ * - www.https://www....
+ * - obec-radimcz (bez tečky)
+ * - chybějící lomítko po .cz
+ */
+function canonicalizeRadimUrl(raw) {
+  let s = String(raw || "").trim();
+  if (!s) return "";
+
+  // pryč tail
+  s = stripUrlTail(s);
+
+  // když to nemá protokol, ale obsahuje obec-radim, doplníme https://
+  if (!/^https?:\/\//i.test(s) && /obec-radim/i.test(s)) {
+    s = "https://" + s;
+  }
+
+  // zredukuj vícenásobné "https://https://..."
+  s = s.replace(/^(https?:\/\/)+/i, "https://");
+
+  // oprava "www.https://www...."
+  s = s.replace(/^https?:\/\/www\.https?:\/\/(www\.)?/i, "https://www.");
+  s = s.replace(/^https?:\/\/https?:\/\/(www\.)?/i, "https://www.");
+
+  // sjednotit doménu (i překlep bez tečky)
+  s = s.replace(/^https?:\/\/(www\.)?obec-radimcz/i, CANONICAL_ORIGIN);
+  s = s.replace(/^https?:\/\/(www\.)?obec-radim\.cz/i, CANONICAL_ORIGIN);
+
+  // pokud po .cz hned pokračuje text bez lomítka, doplň /
+  s = s.replace(/^https:\/\/www\.obec-radim\.cz(?!\/)/i, "https://www.obec-radim.cz/");
+
+  // ještě jednou pryč trailing tečky/čárky
+  s = s.replace(/[\.,]+$/g, "");
+
+  return s;
+}
+
+/**
+ * Finální normalizace odkazů v textu:
+ * - najde všechny tokeny, které obsahují obec-radim(.cz / radimcz)
+ * - canonicalizuje je
  */
 function normalizeRadimLinks(text) {
   let t = String(text || "");
 
-  // 1) oprav nejčastější překlep domény všude (i bez protokolu)
-  t = t.replace(/\bobec-radimcz\b/gi, "www.obec-radim.cz");
-  t = t.replace(/\bwww\.obec-radimcz\b/gi, "www.obec-radim.cz");
+  // najdi "URL-like" tokeny obsahující obec-radim
+  // zahrnuje i případy, kdy je to rozbité (www.https://..., obec-radimcz, bez protokolu)
+  const re = /\b(?:https?:\/\/)?[^\s)\]]*obec-radim(?:\.cz|cz)[^\s)\]]*/gi;
 
-  // 2) doplň https:// když je tam "www.obec-radim.cz/..." bez protokolu
-  t = t.replace(/\bwww\.obec-radim\.cz(\/[^\s)\]]*)?/gi, (m) => `https://${m}`);
+  t = t.replace(re, (m) => {
+    const fixed = canonicalizeRadimUrl(m);
+    return fixed || m;
+  });
 
-  // 3) doplň https:// když je tam "obec-radim.cz/..." bez protokolu
-  //    (a rovnou přepni na www)
-  t = t.replace(/\bobec-radim\.cz(\/[^\s)\]]*)?/gi, (m) => `https://www.${m}`);
-
-  // 4) sjednoť protokol a www
-  t = t.replace(/https?:\/\/obec-radim\.cz/gi, "https://www.obec-radim.cz");
-  t = t.replace(/https?:\/\/www\.obec-radim\.cz/gi, "https://www.obec-radim.cz");
-
-  // 5) zahoď tečky/čárky za URL (když to vznikne po úpravách)
+  // ještě: odstranění teček/čárek za canonical URL
   t = t.replace(/(https:\/\/www\.obec-radim\.cz[^\s)\]]+)[\.,]+/g, "$1");
 
-  // 6) whitespace cleanup
+  // whitespace cleanup
   t = t.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
 
   return t;
