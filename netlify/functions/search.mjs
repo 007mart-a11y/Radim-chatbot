@@ -63,7 +63,7 @@ async function api(path, { method = "GET", body, headers = {} } = {}, apiKey) {
 }
 
 /**
- * ✅ Neber "první assistant zprávu", ale POSLEDNÍ podle created_at.
+ * ✅ Vezmi poslední assistant zprávu podle created_at.
  */
 function extractLatestAssistantText(messagesListJson) {
   const data = Array.isArray(messagesListJson?.data) ? messagesListJson.data : [];
@@ -108,12 +108,29 @@ function cleanAnswer(text) {
   // zrušit prázdné markdown odkazy: [text]()
   t = t.replace(/\[([^\]]+)\]\(\s*\)/g, "$1");
 
+  // odstranit řádky typu "Odkaz:" bez URL
+  t = t.replace(/^\s*Odkaz:\s*$/gim, "");
+  t = t.replace(/^\s*Odkaz:\s*(Odkaz na tuto informaci není[^]*?)$/gim, "");
+
+  // odstranit "Více informací je k dispozici..." pokud není URL v okolí (často to generuje blbě)
+  // (necháme to, jen když se v tom řádku vyskytuje http)
+  t = t
+    .split("\n")
+    .filter((line) => {
+      const s = line.trim();
+      if (!s) return true;
+      const lower = s.toLowerCase();
+      const looksLikeFiller =
+        lower.startsWith("více informací je k dispozici") ||
+        lower.startsWith("více informací najdete") ||
+        lower.startsWith("podrobnosti jsou k dispozici");
+      if (looksLikeFiller && !s.includes("http")) return false;
+      return true;
+    })
+    .join("\n");
+
   // whitespace
   t = t.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
-
-  // pokud někde zůstalo "Odkaz:" bez URL, pryč (tohle nechceme vůbec)
-  t = t.replace(/\n?Odkaz:\s*Odkaz na tuto informaci není v oficiálních podkladech uveden\.?/gi, "");
-  t = t.replace(/\n?Odkaz:\s*$/gi, "");
 
   return t.trim();
 }
@@ -142,21 +159,15 @@ function isListRequest(userMessage) {
 }
 
 /**
- * Relevance guard: spolek vs úřad.
+ * Relevance guard: spolek vs úřad (silnější, jasnější).
  */
 function buildRelevanceBlock(userMessage) {
   const msg = String(userMessage || "").toLowerCase();
 
-  const isOrg =
-    msg.includes("sokol") ||
-    msg.includes("tj sokol") ||
-    msg.includes("t j sokol") ||
-    msg.includes("sdh") ||
-    msg.includes("hasič") ||
-    msg.includes("hasic") ||
-    msg.includes("spolek") ||
-    msg.includes("zahrádk") ||
-    msg.includes("zahradk");
+  const isSokol = msg.includes("sokol");
+  const isSdh = msg.includes("sdh") || msg.includes("hasič") || msg.includes("hasic");
+  const isZahr = msg.includes("zahrádk") || msg.includes("zahradk");
+  const isOrg = isSokol || isSdh || isZahr || msg.includes("spolek");
 
   const askingOffice =
     msg.includes("obecní úřad") ||
@@ -174,8 +185,9 @@ function buildRelevanceBlock(userMessage) {
   if (isOrg && !askingOffice) {
     return (
       `RELEVANCE (kritické):\n` +
-      `- Dotaz míří na spolek/organizaci, ne na obecní úřad.\n` +
-      `- Neuváděj kontakt na obecní úřad ani starostku, pokud se uživatel neptá přímo na úřad.\n`
+      `- Dotaz míří na spolek/organizaci, nikoli na obecní úřad.\n` +
+      `- Neuváděj starostku ani kontakty obecního úřadu.\n` +
+      `- Pokud uživatel chce kontakt, uveď pouze kontakty dané organizace nalezené ve zdrojích.\n`
     );
   }
 
@@ -219,22 +231,38 @@ export default async function handler(req) {
     const todayStr = getCzechTodayString();
     const relevanceBlock = buildRelevanceBlock(message);
 
-    // Jednoduché, čisté instrukce. Žádné vynucování “Odkaz:” na backendu.
+    // ✅ Tady je hlavní oprava: synonyma ("vede" = předseda) + osoba napříč výskyty + odkazy bez bullshit labelů.
     const runInstructions =
       `Dnes je ${todayStr} (časová zóna: Europe/Prague).\n\n` +
       `Jsi oficiální AI asistent obce Radim a odpovídáš jako pracovník obecního úřadu.\n` +
       `Používej výhradně informace z jediného zdroje: 99_FULL_obec_radim.txt.\n` +
-      `Neimprovizuj. Pokud informaci nemáš, řekni přesně: "Tuto informaci bohužel nemám k dispozici v oficiálních podkladech obce Radim."\n\n` +
+      `Neimprovizuj.\n\n` +
+
       `KONTEXT:\n` +
       `- Navazující dotazy vyhodnocuj v kontextu předchozích zpráv v tomto vlákně.\n` +
       `- "Nejnovější" vždy vztahuj k právě řešenému tématu.\n\n` +
+
+      `INTELIGENCE (kritické):\n` +
+      `- Pokud se uživatel ptá "kdo vede" / "kdo je ve vedení" organizace, považuj to za dotaz na předsedu/předsedkyni a výbor (vedení).\n` +
+      `- Pokud už znáš předsedu/předsedkyni z dřívější odpovědi v tomto vlákně, použij to a přidej případně další členy vedení, pokud jsou ve zdrojích.\n` +
+      `- Pokud se uživatel ptá na telefon/e-mail osoby, projdi všechny relevantní výskyty této osoby ve zdrojích (může být ve více rolích).\n` +
+      `- Pokud se osoba vyskytuje ve více rolích a kontakty se liší, polož 1 krátkou upřesňující otázku (např. "Myslíte ji ve spojení s TJ Sokol, nebo s obecním výborem?").\n` +
+      `- Nikdy netvrď "kontakt není uveden", pokud je u některého výskytu osoby kontakt uveden.\n\n` +
+
       `ODKAZY:\n` +
-      `- Pokud je ve zdrojích dostupný přímý odkaz na stránku nebo soubor k tématu, uveď jej.\n` +
-      `- URL kopíruj přesně ze zdrojů.\n\n` +
+      `- Pokud je ve zdrojích přímý odkaz na stránku nebo soubor k tématu, uveď jej.\n` +
+      `- URL kopíruj přesně ze zdrojů.\n` +
+      `- Nepiš "Odkaz:" pokud za tím nebude skutečná URL.\n\n` +
+
       `STYL:\n` +
       `- Úředně, věcně, bez pozdravů a bez upozornění typu "ověřte si to".\n` +
       `- Max 5 vět, případně krátké odrážky. U výpisů/seznamů může být delší seznam.\n\n` +
       (relevanceBlock ? relevanceBlock + "\n" : "") +
+
+      `POKUD INFORMACE CHYBÍ:\n` +
+      `- Řekni přesně jen tuto větu a nic dalšího:\n` +
+      `"Tuto informaci bohužel nemám k dispozici v oficiálních podkladech obce Radim."\n\n` +
+
       `ZÁKAZY:\n` +
       `- Neuváděj technické detaily. Nepoužívej doporučení ("doporučuji", "můžete", "je možné").\n`;
 
@@ -256,18 +284,23 @@ export default async function handler(req) {
       apiKey
     );
 
-    // 2) run
+    // 2) run (stabilnější = méně náhodné blbosti)
     const run = await api(
       `/threads/${threadId}/runs`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ assistant_id: assistantId, instructions: runInstructions }),
+        body: JSON.stringify({
+          assistant_id: assistantId,
+          instructions: runInstructions,
+          temperature: 0.2,
+          top_p: 1,
+        }),
       },
       apiKey
     );
 
-    // 3) poll (rychleji)
+    // 3) poll (rychle)
     const started = Date.now();
     const timeoutMs = 45_000;
 
