@@ -12,12 +12,6 @@ const corsHeaders = {
 
 const OPENAI_BASE_URL = "https://api.openai.com/v1";
 
-// Canonical web
-const CANONICAL_ORIGIN = "https://www.obec-radim.cz";
-
-// Optional allowed extra origins (munipolis for Radim) — pokud nechceš, smaž řádek.
-const ALLOWED_EXTRA_ORIGINS = new Set(["https://obec-radim.munipolis.cz"]);
-
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
@@ -27,18 +21,6 @@ function jsonResponse(status, data) {
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json; charset=utf-8" },
   });
-}
-
-function getCzechTodayString() {
-  const now = new Date();
-  const fmt = new Intl.DateTimeFormat("cs-CZ", {
-    timeZone: "Europe/Prague",
-    weekday: "long",
-    day: "numeric",
-    month: "numeric",
-    year: "numeric",
-  });
-  return fmt.format(now);
 }
 
 async function api(path, { method = "GET", body, headers = {} } = {}, apiKey) {
@@ -76,7 +58,8 @@ function extractLatestAssistantText(messagesListJson) {
   const assistantMsgs = data.filter(
     (m) => m?.role === "assistant" && Array.isArray(m?.content) && m.content.length
   );
-  if (!assistantMsgs.length) return "Bez odpovědi.";
+
+  if (!assistantMsgs.length) return "";
 
   assistantMsgs.sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
   const msg = assistantMsgs[0];
@@ -85,192 +68,61 @@ function extractLatestAssistantText(messagesListJson) {
     .map((c) => (c?.type === "text" ? c.text?.value : ""))
     .filter(Boolean);
 
-  return parts.length ? parts.join("\n\n") : "Bez odpovědi.";
+  return parts.join("\n\n");
 }
 
 /**
- * Dotazy na seznam / výpis (u nich nepoužívat limit 5 vět).
- */
-function isListRequest(userMessage) {
-  const m = String(userMessage || "").toLowerCase();
-  return (
-    m.includes("vypiš") ||
-    m.includes("vypsat") ||
-    m.includes("všechny") ||
-    m.includes("seznam") ||
-    m.includes("výčet") ||
-    m.includes("co je vyvěšeno") ||
-    m.includes("co je na úřední desce") ||
-    m.includes("co je na uredni desce") ||
-    m.includes("jaké dokumenty") ||
-    m.includes("jake dokumenty") ||
-    m.includes("jaké vyhlášky") ||
-    m.includes("jake vyhlasky") ||
-    m.includes("jaké akce") ||
-    m.includes("jake akce") ||
-    m.includes("vypiš vše") ||
-    m.includes("vypsat vše")
-  );
-}
-
-/**
- * Relevance guard: spolek vs úřad.
- * Cíl: u sokola/SDH apod. necpat úřad jako kontakt, pokud existuje přímý kontakt organizace.
- */
-function buildRelevanceBlock(userMessage) {
-  const msg = String(userMessage || "").toLowerCase();
-
-  const isSokol = msg.includes("sokol");
-  const isSdh = msg.includes("sdh") || msg.includes("hasič") || msg.includes("hasic");
-  const isZahr = msg.includes("zahrádk") || msg.includes("zahradk");
-  const isOrg = isSokol || isSdh || isZahr || msg.includes("spolek");
-
-  const askingOffice =
-    msg.includes("obecní úřad") ||
-    msg.includes("obecni urad") ||
-    msg.includes("úřad") ||
-    msg.includes("urad") ||
-    msg.includes("úřední hodiny") ||
-    msg.includes("uredni hodiny") ||
-    msg.includes("datová schránka") ||
-    msg.includes("datova schranka") ||
-    msg.includes("e-podatelna") ||
-    msg.includes("podatelna") ||
-    msg.includes("czech point");
-
-  if (isOrg && !askingOffice) {
-    return (
-      `RELEVANCE (kritické):\n` +
-      `- Dotaz míří na organizaci/spolek (např. TJ Sokol / SDH / Zahrádkáři), nikoli na obecní úřad.\n` +
-      `- Pokud existuje přímý kontakt organizace ve zdroji, uveď pouze tento přímý kontakt.\n` +
-      `- Neuváděj starostku ani kontakty obecního úřadu jako "fallback", pokud přímý kontakt organizace existuje.\n`
-    );
-  }
-
-  return "";
-}
-
-/**
- * URL helpers
- */
-function fixCommonUrlTypos(text) {
-  let t = String(text || "");
-  // časté: chybí tečka před cz
-  t = t.replace(/https?:\/\/(www\.)?obec-radimcz\b/gi, CANONICAL_ORIGIN);
-  return t;
-}
-
-function toAbsoluteRadimUrl(u) {
-  const s = String(u || "").trim();
-  if (!s) return null;
-  if (s.startsWith("http://") || s.startsWith("https://")) return s;
-  if (s.startsWith("/")) return CANONICAL_ORIGIN + s;
-  return null;
-}
-
-function stripTrailingPunctuationFromUrls(text) {
-  return String(text || "").replace(/(https?:\/\/[^\s)\]]+)[\.,]+/g, "$1");
-}
-
-function normalizeUrlsInText(text) {
-  let t = fixCommonUrlTypos(text);
-  t = stripTrailingPunctuationFromUrls(t);
-
-  // převod relativních odkazů "/urad/..." na plné URL (jen Radim)
-  // Pozor: nechceme rozbít běžný text s lomítky, tak jen ty, co vypadají jako URL cesta.
-  t = t.replace(
-    /(^|\s)(\/(urad|aktualne|obec|seniori|organizace-a-spolky|uredni-deska|kalendar-akci|e_download\.php)[^\s)\]]*)/gi,
-    (m, pre, path) => `${pre}${CANONICAL_ORIGIN}${path}`
-  );
-
-  // bezpečnost: vyhoď jen úplně nesmyslné URL, ale NEodstraňuj radim + munipolis
-  const urlRegex = /\bhttps?:\/\/[^\s)\]]+/gi;
-  const found = t.match(urlRegex) || [];
-
-  for (const raw of found) {
-    const cleaned = raw.replace(/[)\]]+$/g, "");
-    let ok = false;
-    try {
-      const u = new URL(cleaned);
-      ok = u.origin === CANONICAL_ORIGIN || ALLOWED_EXTRA_ORIGINS.has(u.origin);
-    } catch {
-      ok = false;
-    }
-    if (!ok) {
-      // smaž jen ten token
-      t = t.replace(raw, "");
-    }
-  }
-
-  return t.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
-}
-
-/**
- * Čištění citací z File Search + šetrné úpravy bez ničení URL.
+ * Minimum cleaning:
+ * - odstraní file_search citace 【x:y†...】
+ * - opraví známý překlep domény obec-radimcz
+ * - odstraní tečku/čárku na konci URL
+ * - odstraní prázdné markdown odkazy [text]()
+ *
+ * NIC DALŠÍHO – žádné mazání vět/řádků.
  */
 function cleanAnswer(text) {
   let t = String(text || "");
 
-  // odstranit file_search citace
+  // file_search citace
   t = t.replace(/【\s*\d+\s*:\s*\d+\s*†[^】]*】/g, "");
 
-  // opatrně odstranit tokeny typu "6:0" / "12:3" (jednociferné za dvojtečkou)
-  // (nechává časy typu 16:00)
-  t = t.replace(/\b\d{1,3}:\d\b/g, "");
+  // oprava překlepů domény
+  t = t.replace(/https?:\/\/(www\.)?obec-radimcz\b/gi, "https://www.obec-radim.cz");
 
-  // markdown bold
-  t = t.replace(/\*\*(.*?)\*\*/g, "$1");
+  // odstranit tečku/čárku za URL
+  t = t.replace(/(https?:\/\/[^\s)\]]+)[\.,]+/g, "$1");
 
-  // prázdné markdown odkazy [text]()
+  // zrušit prázdné markdown odkazy: [text]()
   t = t.replace(/\[([^\]]+)\]\(\s*\)/g, "$1");
-
-  // pryč řádky "Odkaz:" bez URL
-  t = t.replace(/^\s*Odkaz:\s*$/gim, "");
 
   // whitespace
   t = t.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
 
-  // normalizace URL (typo + relativní -> absolutní)
-  t = normalizeUrlsInText(t);
-
-  return t.trim();
+  return t;
 }
 
 /**
- * Limit 5 vět – ALE NIKDY nesmí odstranit odkazy.
- * Strategie:
- * - pokud v odpovědi jsou URL, vytáhneme je, zkrátíme text bez URL, a URL přidáme nakonec.
+ * Krátký prompt, který funguje.
+ * Pozn.: Tohle je INSTRUCTIONS pro run (přebije blbosti v UI, pokud tam něco je).
  */
-function limitTo5SentencesPreserveLinks(answer, userMessage) {
-  const listMode = isListRequest(userMessage);
-  const hasBullets = /(^|\n)\s*([-•]|\d+\.)\s+/.test(answer);
-
-  if (listMode || hasBullets) return answer;
-
-  // najdi URL
-  const urlRegex = /\bhttps?:\/\/[^\s)\]]+/gi;
-  const urls = Array.from(new Set(answer.match(urlRegex) || []));
-
-  // text bez URL (abychom nerezali uprostřed linku)
-  let textNoUrls = answer.replace(urlRegex, "").replace(/\s{2,}/g, " ").trim();
-
-  const sentences = textNoUrls
-    .split(/(?<=[.!?])\s+/)
-    .map((s) => s.trim())
-    .filter(Boolean);
-
-  let shortened = textNoUrls;
-  if (sentences.length > 5) shortened = sentences.slice(0, 5).join(" ");
-
-  // pokud byly URL, přidej je na konec
-  if (urls.length) {
-    const linksBlock = urls.map((u) => u.replace(/[)\].,]+$/g, "")).join("\n");
-    // když je text prázdný, vrať jen linky
-    if (!shortened) return linksBlock;
-    return `${shortened}\n\n${linksBlock}`.trim();
-  }
-
-  return shortened || answer;
+function buildRunInstructions() {
+  return (
+    `Jsi oficiální AI asistent obce Radim.\n\n` +
+    `Odpovídáš výhradně na základě dokumentu: 99_FULL_obec_radim.txt.\n\n` +
+    `Zásady:\n` +
+    `- Neimprovizuj a nevymýšlej informace, které nejsou ve zdroji.\n` +
+    `- Můžeš logicky shrnout informace, které jsou ve zdroji obsaženy (např. "vede"/"vedení" = předseda/předsedkyně + výbor, pokud je ve zdroji uveden).\n` +
+    `- Pokud je osoba ve více rolích, použij nejnovější platnou informaci.\n` +
+    `- Pokud je u osoby kontakt uveden alespoň na jednom místě ve zdroji, považuj jej za dostupný.\n\n` +
+    `Odkazy:\n` +
+    `- Pokud je ve zdroji přímý odkaz na relevantní stránku nebo soubor, uveď jej.\n` +
+    `- URL kopíruj přesně ze zdroje, URL nikdy neukončuj tečkou.\n\n` +
+    `Styl:\n` +
+    `- Úřední, věcný, stručný.\n` +
+    `- Bez upozornění, bez řečí o AI.\n\n` +
+    `Pokud informace ve zdroji skutečně není, odpověz přesně:\n` +
+    `"Tuto informaci bohužel nemám k dispozici v oficiálních podkladech obce Radim."\n`
+  );
 }
 
 export default async function handler(req) {
@@ -292,55 +144,14 @@ export default async function handler(req) {
       return jsonResponse(400, { ok: false, error: "Missing message" });
     }
 
-    const todayStr = getCzechTodayString();
-    const listMode = isListRequest(message);
-    const relevanceBlock = buildRelevanceBlock(message);
-
-    // ✅ ZÁSADNÍ: jednoduché instrukce, ale tvrdé na "fakta jen s odkazem"
-    // (bez pobízení k opakování staré odpovědi z chatu jako faktu)
-    const runInstructions =
-      `Dnes je ${todayStr} (časová zóna: Europe/Prague).\n\n` +
-      `Jsi oficiální AI asistent obce Radim a odpovídáš jako pracovník obecního úřadu.\n` +
-      `Používej výhradně informace z jediného zdroje: 99_FULL_obec_radim.txt. Neimprovizuj.\n\n` +
-
-      `KONTEXT:\n` +
-      `- Navazující dotazy vyhodnocuj v kontextu předchozích zpráv v tomto vlákně.\n` +
-      `- "Nejnovější" vždy vztahuj k právě řešenému tématu.\n\n` +
-
-      `PRAVIDLO PRO FAKTA (kritické):\n` +
-      `- Pokud uvádíš konkrétní jméno osoby, telefon, e-mail, datum dokumentu nebo konkrétní dokument, vždy přidej 1 přímý odkaz na stránku/soubor, kde je to uvedeno.\n` +
-      `- Pokud odkaz ve zdroji nenajdeš, nepřidávej domněnky a použij přesně větu:\n` +
-      `"Tuto informaci bohužel nemám k dispozici v oficiálních podkladech obce Radim."\n\n` +
-
-      `ODKAZY:\n` +
-      `- Pokud je k tématu dostupný přímý odkaz, uveď jej.\n` +
-      `- URL kopíruj přesně ze zdrojů. Neukončuj URL tečkou ani čárkou.\n\n` +
-
-      `VÝKLAD DOTAZŮ:\n` +
-      `- "kdo vede" / "vedení" organizace = předseda/předsedkyně a členové výboru (pokud jsou ve zdroji).\n` +
-      `- U organizací vždy preferuj přímý kontakt organizace, pokud existuje.\n\n` +
-
-      `STYL:\n` +
-      `- Úředně a věcně. Bez pozdravů a bez upozornění typu "ověřte si to".\n` +
-      (listMode
-        ? `- Uživatel chce výpis/seznam: napiš přehledný seznam všech relevantních položek (název + datum/období + přímý odkaz, pokud existuje).\n`
-        : `- Max 5 vět, případně krátké odrážky.\n`) +
-      `\n` +
-
-      (relevanceBlock ? relevanceBlock + "\n" : "") +
-
-      `ZÁKAZY:\n` +
-      `- Neuváděj technické detaily (AI, scraping, databáze).\n` +
-      `- Nepoužívej doporučení ("doporučuji", "můžete", "je možné").\n`;
-
-    // Thread
+    // Thread: pokud přijde thread_id, pokračujeme; jinak založíme nový
     let threadId = body?.thread_id;
     if (!threadId || typeof threadId !== "string" || !threadId.startsWith("thread_")) {
       const created = await api("/threads", { method: "POST" }, apiKey);
       threadId = created.id;
     }
 
-    // 1) user message
+    // 1) user msg
     await api(
       `/threads/${threadId}/messages`,
       {
@@ -351,7 +162,7 @@ export default async function handler(req) {
       apiKey
     );
 
-    // 2) run — nízká teplota = méně halucinací
+    // 2) run
     const run = await api(
       `/threads/${threadId}/runs`,
       {
@@ -359,7 +170,8 @@ export default async function handler(req) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           assistant_id: assistantId,
-          instructions: runInstructions,
+          instructions: buildRunInstructions(),
+          // Pokud API tyto parametry ignoruje, nic se nestane; pokud je bere, pomůže to stabilitě.
           temperature: 0.1,
           top_p: 1,
         }),
@@ -375,6 +187,7 @@ export default async function handler(req) {
       if (Date.now() - started > timeoutMs) {
         return jsonResponse(504, { ok: false, error: "Timeout waiting for response" });
       }
+
       await sleep(650);
 
       const check = await api(`/threads/${threadId}/runs/${run.id}`, {}, apiKey);
@@ -400,14 +213,8 @@ export default async function handler(req) {
     // 4) read messages
     const messages = await api(`/threads/${threadId}/messages?limit=50`, {}, apiKey);
     let answer = extractLatestAssistantText(messages);
-
-    // clean without destroying links
     answer = cleanAnswer(answer);
 
-    // limit without cutting links
-    answer = limitTo5SentencesPreserveLinks(answer, message);
-
-    // fallback
     if (!answer) {
       answer = "Tuto informaci bohužel nemám k dispozici v oficiálních podkladech obce Radim.";
     }
