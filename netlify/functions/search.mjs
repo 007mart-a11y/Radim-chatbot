@@ -298,6 +298,55 @@ async function addUserMessageWithFallback(threadId, content, apiKey) {
   }
 }
 
+/* =========================================================
+   ✅ SAFETY GUARD: anti-historie + anti-"doporučuji kontaktovat"
+   - když user chce aktuální stav, nenecháme projít historickou odpověď
+   - když model přidá zakázané doporučení, nahradíme povinnou větou
+   ========================================================= */
+
+const REQUIRED_FALLBACK =
+  "Tuto informaci bohužel nemám k dispozici v oficiálních podkladech obce Radim.";
+
+function wantsCurrentInfo(userMsg) {
+  const s = String(userMsg || "").toLowerCase();
+
+  // dotazy, kde nechceme historické úryvky "v roce 2010..."
+  return /\b(aktu(á|a)ln(ě|i)|kdo\s+vede|vede\s+kdo|kdo\s+je|spr(á|a)vce|spravuje|veden(í|i)|p(ř|r)edsed|m(í|i)stop(ř|r)edsed|zodpov(ě|e)dn|na\s+starosti)\b/.test(
+    s
+  );
+}
+
+function containsHistoricalSignals(answer) {
+  const t = String(answer || "");
+
+  // spolehlivé „historické“ signály
+  // - rok 19xx/20xx
+  // - typické fráze pro historické zápisy
+  return (
+    /\b(19\d{2}|20\d{2})\b/.test(t) ||
+    /\b(v\s+roce|roku|od\s+roku|do\s+roku|byla\s+zvolen|byl\s+zvolen|zvolen[ay]?|působil|zastával|vystřídal|dlouholet[ýá])\b/i.test(
+      t
+    )
+  );
+}
+
+function containsForbiddenRecommend(answer) {
+  const t = String(answer || "").toLowerCase();
+  return /\b(doporu(č|c)uji\s+kontaktovat|obra(ť|t)te\s+se|pro\s+p(ř|r)esn(é|e)\s+informace\s+doporu(č|c)uji|kontaktujte)\b/.test(
+    t
+  );
+}
+
+function shouldForceFallback(userMsg, answer) {
+  // 1) user chce aktuální stav + answer nese historické signály => fallback
+  if (wantsCurrentInfo(userMsg) && containsHistoricalSignals(answer)) return true;
+
+  // 2) zakázané doporučení kontaktovat => fallback (máš to v promptu zakázané)
+  if (containsForbiddenRecommend(answer)) return true;
+
+  return false;
+}
+
 export default async function handler(req) {
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders });
 
@@ -392,8 +441,13 @@ export default async function handler(req) {
     answer = cleanAnswer(answer);
     answer = normalizeUrlsInText(answer);
 
+    // ✅ SAFETY GUARD (po cleanu, před fallbackem)
+    if (shouldForceFallback(outgoingMessage, answer)) {
+      answer = REQUIRED_FALLBACK;
+    }
+
     if (!answer) {
-      answer = "Tuto informaci bohužel nemám k dispozici v oficiálních podkladech obce Radim.";
+      answer = REQUIRED_FALLBACK;
     }
 
     return jsonResponse(200, { ok: true, answer, thread_id: threadId });
