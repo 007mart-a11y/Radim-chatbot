@@ -11,7 +11,6 @@ const corsHeaders = {
 };
 
 const OPENAI_BASE_URL = "https://api.openai.com/v1";
-const CANONICAL_ORIGIN = "https://www.obec-radim.cz";
 
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
@@ -99,75 +98,50 @@ function cleanAnswer(text) {
 }
 
 /**
- * Bezpečné odsekání interpunkce a závorek na konci URL
+ * Minimal URL normalization:
+ * - opraví https://https://..., http://https://..., www.https://...
+ * - ořeže interpunkci na konci URL (.),],),, atd.
+ * - opraví občas useknuté ".pd" -> ".pdf"
+ * - zredukuje // v cestě (mimo https://)
+ *
+ * Neřeší domény a nic "nekanonikalizuje".
  */
-function stripUrlTail(url) {
-  return String(url || "").replace(/[)\],.]+$/g, "");
+function normalizeSingleUrl(raw) {
+  let u = String(raw || "").trim();
+  if (!u) return u;
+
+  // ořez koncových znaků, co se lepí v textu za URL
+  u = u.replace(/[)\]}>,.;:!?]+$/g, "");
+
+  // www.https://www... -> https://www...
+  u = u.replace(/^www\.(https?:\/\/)/i, "$1");
+
+  // http(s)://https://... -> https://...
+  u = u.replace(/^https?:\/\/https:\/\//i, "https://");
+  u = u.replace(/^https?:\/\/http:\/\//i, "http://");
+
+  // vícenásobné schéma (https://https://...) -> jednou
+  u = u.replace(/^(https?:\/\/)(https?:\/\/)+/i, "$1");
+
+  // občas useknuté .pdf
+  u = u.replace(/\.pd$/i, ".pdf");
+
+  // zredukuj dvojité // v cestě, ale nech https://
+  u = u.replace(/([^:]\/)\/+/g, "$1");
+
+  return u;
 }
 
-/**
- * Vezmi URL-like token a udělej z něj canonical URL na obec-radim.cz.
- * Opraví:
- * - https://https://...
- * - www.https://www....
- * - obec-radimcz (bez tečky)
- * - chybějící lomítko po .cz
- */
-function canonicalizeRadimUrl(raw) {
-  let s = String(raw || "").trim();
-  if (!s) return "";
-
-  // pryč tail
-  s = stripUrlTail(s);
-
-  // když to nemá protokol, ale obsahuje obec-radim, doplníme https://
-  if (!/^https?:\/\//i.test(s) && /obec-radim/i.test(s)) {
-    s = "https://" + s;
-  }
-
-  // zredukuj vícenásobné "https://https://..."
-  s = s.replace(/^(https?:\/\/)+/i, "https://");
-
-  // oprava "www.https://www...."
-  s = s.replace(/^https?:\/\/www\.https?:\/\/(www\.)?/i, "https://www.");
-  s = s.replace(/^https?:\/\/https?:\/\/(www\.)?/i, "https://www.");
-
-  // sjednotit doménu (i překlep bez tečky)
-  s = s.replace(/^https?:\/\/(www\.)?obec-radimcz/i, CANONICAL_ORIGIN);
-  s = s.replace(/^https?:\/\/(www\.)?obec-radim\.cz/i, CANONICAL_ORIGIN);
-
-  // pokud po .cz hned pokračuje text bez lomítka, doplň /
-  s = s.replace(/^https:\/\/www\.obec-radim\.cz(?!\/)/i, "https://www.obec-radim.cz/");
-
-  // ještě jednou pryč trailing tečky/čárky
-  s = s.replace(/[\.,]+$/g, "");
-
-  return s;
-}
-
-/**
- * Finální normalizace odkazů v textu:
- * - najde všechny tokeny, které obsahují obec-radim(.cz / radimcz)
- * - canonicalizuje je
- */
-function normalizeRadimLinks(text) {
+function normalizeUrlsInText(text) {
   let t = String(text || "");
+  if (!t) return t;
 
-  // najdi "URL-like" tokeny obsahující obec-radim
-  // zahrnuje i případy, kdy je to rozbité (www.https://..., obec-radimcz, bez protokolu)
-  const re = /\b(?:https?:\/\/)?[^\s)\]]*obec-radim(?:\.cz|cz)[^\s)\]]*/gi;
+  // klasické URL s protokolem
+  const re = /\bhttps?:\/\/[^\s<>"'(){}\[\]]+/gi;
+  t = t.replace(re, (m) => normalizeSingleUrl(m));
 
-  t = t.replace(re, (m) => {
-    const fixed = canonicalizeRadimUrl(m);
-    return fixed || m;
-  });
-
-  // ještě: odstranění teček/čárek za canonical URL
-  t = t.replace(/(https:\/\/www\.obec-radim\.cz[^\s)\]]+)[\.,]+/g, "$1");
-
-  // whitespace cleanup
+  // whitespace
   t = t.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
-
   return t;
 }
 
@@ -283,8 +257,9 @@ export default async function handler(req) {
     const messages = await api(`/threads/${threadId}/messages?limit=50`, {}, apiKey);
     let answer = extractLatestAssistantText(messages);
 
+    // nejdřív minimum clean, pak URL fix na konci (nekanonikalizuje)
     answer = cleanAnswer(answer);
-    answer = normalizeRadimLinks(answer);
+    answer = normalizeUrlsInText(answer);
 
     if (!answer) {
       answer = "Tuto informaci bohužel nemám k dispozici v oficiálních podkladech obce Radim.";
