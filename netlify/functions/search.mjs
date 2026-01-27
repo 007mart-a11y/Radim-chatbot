@@ -70,56 +70,6 @@ function extractLatestAssistantText(messagesListJson) {
 }
 
 /**
- * ➕ NOVÉ: vezme poslední N zpráv (user+assistant) a udělá krátký kontext.
- * Pozn.: Messages API vrací nejnovější jako první → otočíme pro čitelnost.
- */
-async function getRecentConversationContext(threadId, apiKey, limit = 8, maxTurns = 4) {
-  try {
-    const messages = await api(`/threads/${threadId}/messages?limit=${limit}`, {}, apiKey);
-    const data = Array.isArray(messages?.data) ? messages.data : [];
-    if (!data.length) return "";
-
-    // nejdřív seřadit od nejstarší k nejnovější (kvůli kontextu)
-    const ordered = [...data].sort((a, b) => (a.created_at || 0) - (b.created_at || 0));
-
-    // vyber jen user/assistant a jen textové části
-    const turns = [];
-    for (const m of ordered) {
-      if (!m || (m.role !== "user" && m.role !== "assistant")) continue;
-      if (!Array.isArray(m.content) || !m.content.length) continue;
-
-      const parts = m.content
-        .map((c) => (c?.type === "text" ? c.text?.value : ""))
-        .filter(Boolean);
-
-      const text = parts.join("\n\n").trim();
-      if (!text) continue;
-
-      // zkrať každou zprávu, ať to neexpanduje do nekonečna
-      const clipped = text.length > 900 ? text.slice(0, 900) + "…" : text;
-
-      turns.push({ role: m.role, text: clipped });
-    }
-
-    if (!turns.length) return "";
-
-    // vezmi posledních maxTurns zpráv (user+assistant dohromady)
-    const tail = turns.slice(-maxTurns);
-
-    // formát:
-    // Uživatel: ...
-    // Radim: ...
-    const formatted = tail
-      .map((t) => `${t.role === "user" ? "Uživatel" : "Radim"}:\n${t.text}`)
-      .join("\n\n");
-
-    return formatted.trim();
-  } catch {
-    return "";
-  }
-}
-
-/**
  * Minimum cleaning – beze změn
  */
 function cleanAnswer(text) {
@@ -171,6 +121,137 @@ function buildRunInstructions() {
   );
 }
 
+/* =========================================================
+   ✅ “Once and for all” fix: subject anchoring (coreference)
+   ========================================================= */
+
+/**
+ * Získá posledních N zpráv z threadu a vrátí je seřazené od nejstarší k nejnovější,
+ * včetně role + textu (jen textové části).
+ */
+async function getRecentMessagesRaw(threadId, apiKey, limit = 12) {
+  const messages = await api(`/threads/${threadId}/messages?limit=${limit}`, {}, apiKey);
+  const data = Array.isArray(messages?.data) ? messages.data : [];
+  if (!data.length) return [];
+
+  const ordered = [...data].sort((a, b) => (a.created_at || 0) - (b.created_at || 0));
+
+  const turns = [];
+  for (const m of ordered) {
+    if (!m || (m.role !== "user" && m.role !== "assistant")) continue;
+    if (!Array.isArray(m.content) || !m.content.length) continue;
+
+    const parts = m.content
+      .map((c) => (c?.type === "text" ? c.text?.value : ""))
+      .filter(Boolean);
+
+    const text = parts.join("\n\n").trim();
+    if (!text) continue;
+
+    turns.push({ role: m.role, text });
+  }
+  return turns;
+}
+
+/**
+ * Najde “poslední subjekt”, ke kterému se uživatel pravděpodobně odkazuje:
+ * - preferuje poslední konkrétní OSOBU (jméno příjmení s velkými písmeny)
+ * - jinak poslední ORGANIZACI (TJ/SDH/Spolek/Sokol apod.)
+ *
+ * Vrací string nebo "".
+ */
+function extractLastSubjectFromTurns(turns) {
+  const combined = turns.map((t) => t.text).join("\n\n");
+
+  // 1) Organizace/role (silné kotvy)
+  const orgPatterns = [
+    /\bTJ\s+Sokol\s+Radim\b/gi,
+    /\bSokol\b/gi,
+    /\bSDH\s+Radim\b/gi,
+    /\bObec\s+Radim\b/gi,
+    /\bObecní\s+úřad\s+Radim\b/gi,
+    /\bKulturní\s+výbor\b/gi,
+    /\bSportovní\s+výbor\b/gi,
+    /\bFinanční\s+výbor\b/gi,
+    /\bKontrolní\s+výbor\b/gi,
+  ];
+
+  // 2) Osoba: dvě slova s velkým písmenem (CZ diakritika) – konzervativní
+  // Zachytí např. "Štěpánka Kořínková", "Zdeňka Stříbrná"
+  const personRegex =
+    /\b([A-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ][a-záčďéěíňóřšťúůýž]+)\s+([A-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ][a-záčďéěíňóřšťúůýž]+)\b/g;
+
+  // Projdeme od konce (nejnovější zmínky)
+  for (let i = turns.length - 1; i >= 0; i--) {
+    const txt = turns[i].text;
+
+    // osobní jméno
+    const people = [...txt.matchAll(personRegex)].map((m) => `${m[1]} ${m[2]}`);
+    if (people.length) {
+      // vrať poslední jméno z té zprávy
+      return people[people.length - 1];
+    }
+
+    // organizace
+    for (const re of orgPatterns) {
+      const m = txt.match(re);
+      if (m && m.length) {
+        // vrať “normalizovanou” podobu poslední shody
+        return m[m.length - 1].replace(/\s+/g, " ").trim();
+      }
+    }
+  }
+
+  // fallback: z celého kontextu (kdyby byly zprávy krátké)
+  const peopleAll = [...combined.matchAll(personRegex)].map((m) => `${m[1]} ${m[2]}`);
+  if (peopleAll.length) return peopleAll[peopleAll.length - 1];
+
+  for (const re of orgPatterns) {
+    const m = combined.match(re);
+    if (m && m.length) return m[m.length - 1].replace(/\s+/g, " ").trim();
+  }
+
+  return "";
+}
+
+/**
+ * Rozpozná, že dotaz je “referenční” (zájmena / “na ni/něj/její/jeho/tomu/té”),
+ * a zároveň neobsahuje explicitní jméno/organizaci → potřebuje kotvu.
+ */
+function shouldAnchorSubject(userMessage) {
+  const s = String(userMessage || "").toLowerCase();
+
+  // reference triggers (CZ)
+  const hasPronoun =
+    /\b(na\s+ni|na\s+něj|na\s+ně|na\s+něho|na\s+něm|na\s+něm|na\s+to|její|jeho|jí|mu|něj|ní|tomu|těm|té|toho|tamto|ten|ta|to)\b/.test(
+      s
+    );
+
+  // “kdo”, “kontakt”, “email”, “telefon” často padají na úřad bez kotvy
+  const isContactAsk = /\b(email|e-mail|mail|telefon|kontakt|zavolat|volat)\b/.test(s);
+
+  // pokud už zpráva obsahuje nějaké velké jméno (2 slova) nebo “TJ Sokol”, kotva netřeba
+  const alreadyHasName =
+    /\b[A-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ][a-záčďéěíňóřšťúůýž]+\s+[A-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ][a-záčďéěíňóřšťúůýž]+\b/.test(
+      userMessage
+    ) || /\bTJ\s+Sokol\s+Radim\b/i.test(userMessage);
+
+  return (hasPronoun || isContactAsk) && !alreadyHasName;
+}
+
+/**
+ * Přidá explicitní kotvu “Dotaz se týká: SUBJECT.” před dotaz.
+ * Tím se odstraní “útěk” modelu na obec/úřad.
+ */
+function applySubjectAnchor(userMessage, subject) {
+  const msg = String(userMessage || "").trim();
+  const sub = String(subject || "").trim();
+  if (!msg) return msg;
+  if (!sub) return msg;
+
+  return `Dotaz se týká: ${sub}.\n\n${msg}`;
+}
+
 export default async function handler(req) {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: corsHeaders });
@@ -201,12 +282,16 @@ export default async function handler(req) {
       threadId = created.id;
     }
 
-    // ✅ KONTEXT: poslední zprávy user+assistant (krátký výpis)
-    const recentCtx = await getRecentConversationContext(threadId, apiKey, 10, 4);
+    // ✅ “Once and for all” subject anchoring:
+    // Získej poslední zprávy, vytáhni subjekt, a pokud dotaz používá zájmena,
+    // připiš kotvu "Dotaz se týká: …"
+    const turns = await getRecentMessagesRaw(threadId, apiKey, 12);
+    const lastSubject = extractLastSubjectFromTurns(turns);
 
-    const contextualMessage = recentCtx
-      ? `KONTEXT POSLEDNÍ KONVERZACE:\n${recentCtx}\n\nNOVÝ DOTAZ UŽIVATELE:\n${message.trim()}`
-      : message.trim();
+    let outgoingMessage = message.trim();
+    if (shouldAnchorSubject(outgoingMessage) && lastSubject) {
+      outgoingMessage = applySubjectAnchor(outgoingMessage, lastSubject);
+    }
 
     // USER MESSAGE
     await api(
@@ -216,7 +301,7 @@ export default async function handler(req) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           role: "user",
-          content: contextualMessage,
+          content: outgoingMessage,
         }),
       },
       apiKey
