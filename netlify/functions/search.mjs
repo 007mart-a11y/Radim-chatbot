@@ -38,9 +38,7 @@ async function api(path, { method = "GET", body, headers = {} } = {}, apiKey) {
   let json = null;
   try {
     json = text ? JSON.parse(text) : null;
-  } catch {
-    // ignore
-  }
+  } catch {}
 
   if (!res.ok) {
     const msg = json?.error?.message || text || `HTTP ${res.status}`;
@@ -72,12 +70,7 @@ function extractLatestAssistantText(messagesListJson) {
 }
 
 /**
- * Minimum cleaning:
- * - odstraní file_search citace 【x:y†...】
- * - odstraní tečku/čárku na konci URL
- * - odstraní prázdné markdown odkazy [text]()
- *
- * NIC DALŠÍHO – žádné mazání vět/řádků.
+ * Minimum cleaning – NIC víc:
  */
 function cleanAnswer(text) {
   let t = String(text || "");
@@ -88,7 +81,7 @@ function cleanAnswer(text) {
   // odstranit tečku/čárku za URL
   t = t.replace(/(https?:\/\/[^\s)\]]+)[\.,]+/g, "$1");
 
-  // zrušit prázdné markdown odkazy: [text]()
+  // zrušit prázdné markdown odkazy
   t = t.replace(/\[([^\]]+)\]\(\s*\)/g, "$1");
 
   // whitespace
@@ -98,35 +91,30 @@ function cleanAnswer(text) {
 }
 
 /**
- * Minimal URL normalization:
- * - opraví https://https://..., http://https://..., www.https://...
- * - ořeže interpunkci na konci URL (.),],),, atd.
- * - opraví občas useknuté ".pd" -> ".pdf"
- * - zredukuje // v cestě (mimo https://)
- *
- * Neřeší domény a nic "nekanonikalizuje".
+ * Minimal URL normalization – OPRAVA SYNTAXE, NIC VÍC
  */
 function normalizeSingleUrl(raw) {
   let u = String(raw || "").trim();
   if (!u) return u;
 
-  // ořez koncových znaků, co se lepí v textu za URL
+  // ořez koncovek
   u = u.replace(/[)\]}>,.;:!?]+$/g, "");
 
-  // www.https://www... -> https://www...
+  // www.https://...
   u = u.replace(/^www\.(https?:\/\/)/i, "$1");
 
-  // http(s)://https://... -> https://...
+  // https://https://...
   u = u.replace(/^https?:\/\/https:\/\//i, "https://");
   u = u.replace(/^https?:\/\/http:\/\//i, "http://");
-
-  // vícenásobné schéma (https://https://...) -> jednou
   u = u.replace(/^(https?:\/\/)(https?:\/\/)+/i, "$1");
+
+  // ✅ JEDINÝ NOVÝ FIX – chybějící tečka v doméně
+  u = u.replace(/obec-radimcz/gi, "obec-radim.cz");
 
   // občas useknuté .pdf
   u = u.replace(/\.pd$/i, ".pdf");
 
-  // zredukuj dvojité // v cestě, ale nech https://
+  // dvojité //
   u = u.replace(/([^:]\/)\/+/g, "$1");
 
   return u;
@@ -136,7 +124,6 @@ function normalizeUrlsInText(text) {
   let t = String(text || "");
   if (!t) return t;
 
-  // klasické URL s protokolem
   const re = /\bhttps?:\/\/[^\s<>"'(){}\[\]]+/gi;
   t = t.replace(re, (m) => normalizeSingleUrl(m));
 
@@ -145,27 +132,15 @@ function normalizeUrlsInText(text) {
   return t;
 }
 
-/**
- * Krátký prompt, který funguje.
- * Pozn.: Tohle je INSTRUCTIONS pro run (přebije blbosti v UI, pokud tam něco je).
- */
 function buildRunInstructions() {
   return (
     `Jsi oficiální AI asistent obce Radim.\n\n` +
     `Odpovídáš výhradně na základě dokumentu: 99_FULL_obec_radim.txt.\n\n` +
-    `Zásady:\n` +
-    `- Neimprovizuj a nevymýšlej informace, které nejsou ve zdroji.\n` +
-    `- Můžeš logicky shrnout informace, které jsou ve zdroji obsaženy (např. "vede"/"vedení" = předseda/předsedkyně + výbor, pokud je ve zdroji uveden).\n` +
-    `- Pokud je osoba ve více rolích, použij nejnovější platnou informaci.\n` +
-    `- Pokud je u osoby kontakt uveden alespoň na jednom místě ve zdroji, považuj jej za dostupný.\n\n` +
-    `Odkazy:\n` +
-    `- Pokud je ve zdroji přímý odkaz na relevantní stránku nebo soubor, uveď jej.\n` +
-    `- URL kopíruj přesně ze zdroje, URL nikdy neukončuj tečkou.\n\n` +
-    `Styl:\n` +
-    `- Úřední, věcný, stručný.\n` +
-    `- Bez upozornění, bez řečí o AI.\n\n` +
-    `Pokud informace ve zdroji skutečně není, odpověz přesně:\n` +
-    `"Tuto informaci bohužel nemám k dispozici v oficiálních podkladech obce Radim."\n`
+    `Neimprovizuj, nevymýšlej.\n` +
+    `URL kopíruj přesně ze zdroje a nikdy je neukončuj tečkou.\n\n` +
+    `Styl: úřední, stručný.\n\n` +
+    `Pokud informace není ve zdroji:\n` +
+    `"Tuto informaci bohužel nemám k dispozici v oficiálních podkladech obce Radim."`
   );
 }
 
@@ -188,25 +163,22 @@ export default async function handler(req) {
       return jsonResponse(400, { ok: false, error: "Missing message" });
     }
 
-    // Thread: pokud přijde thread_id, pokračujeme; jinak založíme nový
     let threadId = body?.thread_id;
-    if (!threadId || typeof threadId !== "string" || !threadId.startsWith("thread_")) {
+    if (!threadId || !threadId.startsWith("thread_")) {
       const created = await api("/threads", { method: "POST" }, apiKey);
       threadId = created.id;
     }
 
-    // 1) user msg
     await api(
       `/threads/${threadId}/messages`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role: "user", content: String(message).trim() }),
+        body: JSON.stringify({ role: "user", content: message.trim() }),
       },
       apiKey
     );
 
-    // 2) run
     const run = await api(
       `/threads/${threadId}/runs`,
       {
@@ -216,53 +188,34 @@ export default async function handler(req) {
           assistant_id: assistantId,
           instructions: buildRunInstructions(),
           temperature: 0.1,
-          top_p: 1,
         }),
       },
       apiKey
     );
 
-    // 3) poll
     const started = Date.now();
-    const timeoutMs = 45_000;
-
     while (true) {
-      if (Date.now() - started > timeoutMs) {
-        return jsonResponse(504, { ok: false, error: "Timeout waiting for response" });
+      if (Date.now() - started > 45_000) {
+        return jsonResponse(504, { ok: false, error: "Timeout" });
       }
 
       await sleep(650);
-
       const check = await api(`/threads/${threadId}/runs/${run.id}`, {}, apiKey);
-      const status = check.status;
-
-      if (status === "queued" || status === "in_progress") continue;
-
-      if (status === "requires_action") {
-        return jsonResponse(501, {
-          ok: false,
-          error: "Run requires action (tool call not handled in function).",
-          status,
-        });
+      if (check.status === "completed") break;
+      if (check.status !== "queued" && check.status !== "in_progress") {
+        return jsonResponse(500, { ok: false, error: "Run failed", status: check.status });
       }
-
-      if (status !== "completed") {
-        return jsonResponse(500, { ok: false, error: "Run failed", status });
-      }
-
-      break;
     }
 
-    // 4) read messages
     const messages = await api(`/threads/${threadId}/messages?limit=50`, {}, apiKey);
     let answer = extractLatestAssistantText(messages);
 
-    // nejdřív minimum clean, pak URL fix na konci (nekanonikalizuje)
     answer = cleanAnswer(answer);
     answer = normalizeUrlsInText(answer);
 
     if (!answer) {
-      answer = "Tuto informaci bohužel nemám k dispozici v oficiálních podkladech obce Radim.";
+      answer =
+        "Tuto informaci bohužel nemám k dispozici v oficiálních podkladech obce Radim.";
     }
 
     return jsonResponse(200, { ok: true, answer, thread_id: threadId });
