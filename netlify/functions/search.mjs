@@ -1,6 +1,8 @@
 // netlify/functions/search.mjs
 // Netlify Functions (Node 18+), OpenAI Assistants v2 přes fetch
 // ENV: OPENAI_API_KEY, ASSISTANT_ID
+// Request JSON: { message: string, thread_id?: string }
+// Response JSON: { ok: true, answer: string, thread_id: string } | { ok:false, error, details? }
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -9,8 +11,6 @@ const corsHeaders = {
 };
 
 const OPENAI_BASE_URL = "https://api.openai.com/v1";
-const REQUIRED_FALLBACK =
-  "Tuto informaci bohužel nemám k dispozici v oficiálních podkladech obce Radim.";
 
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
@@ -44,127 +44,306 @@ async function api(path, { method = "GET", body, headers = {} } = {}, apiKey) {
     const msg = json?.error?.message || text || `HTTP ${res.status}`;
     const err = new Error(`${method} ${path} failed: ${msg}`);
     err.status = res.status;
+    err.path = path;
+    err.method = method;
+    err.details = json || text;
     throw err;
   }
 
   return json ?? {};
 }
 
-/* ======================= helpers ======================= */
-
+/**
+ * Vezme poslední assistant zprávu podle created_at.
+ */
 function extractLatestAssistantText(messagesListJson) {
   const data = Array.isArray(messagesListJson?.data) ? messagesListJson.data : [];
   const assistantMsgs = data.filter(
     (m) => m?.role === "assistant" && Array.isArray(m?.content) && m.content.length
   );
+
   if (!assistantMsgs.length) return "";
+
   assistantMsgs.sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
-  return assistantMsgs[0].content
+  const msg = assistantMsgs[0];
+
+  const parts = msg.content
     .map((c) => (c?.type === "text" ? c.text?.value : ""))
-    .filter(Boolean)
-    .join("\n\n");
+    .filter(Boolean);
+
+  return parts.join("\n\n");
 }
 
+/**
+ * Vezme text z message.content (jen textové části).
+ */
+function extractMessageText(messageObj) {
+  if (!messageObj || !Array.isArray(messageObj.content) || !messageObj.content.length) return "";
+  const parts = messageObj.content
+    .map((c) => (c?.type === "text" ? c.text?.value : ""))
+    .filter(Boolean);
+  return parts.join("\n\n").trim();
+}
+
+/**
+ * Minimum cleaning:
+ */
 function cleanAnswer(text) {
   let t = String(text || "");
+
+  // file_search citace
   t = t.replace(/【\s*\d+\s*:\s*\d+\s*†[^】]*】/g, "");
+
+  // odstranit tečku/čárku za URL
+  t = t.replace(/(https?:\/\/[^\s)\]]+)[\.,]+/g, "$1");
+
+  // zrušit prázdné markdown odkazy
+  t = t.replace(/\[([^\]]+)\]\(\s*\)/g, "$1");
+
+  // whitespace
   t = t.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+
   return t;
 }
 
-/* ======================= URL normalization ======================= */
-
+/**
+ * Minimal URL normalization
+ */
 function normalizeSingleUrl(raw) {
   let u = String(raw || "").trim();
   if (!u) return u;
+
   u = u.replace(/[)\]}>,.;:!?]+$/g, "");
-  u = u.replace(/^https?:\/\/https?:\/\//i, "https://");
+  u = u.replace(/^www\.(https?:\/\/)/i, "$1");
+  u = u.replace(/^https?:\/\/https:\/\//i, "https://");
+  u = u.replace(/^https?:\/\/http:\/\//i, "http://");
+  u = u.replace(/^(https?:\/\/)(https?:\/\/)+/i, "$1");
+
+  // oprav chybějící tečku
   u = u.replace(/obec-radimcz/gi, "obec-radim.cz");
+
+  // občas useknuté .pdf
   u = u.replace(/\.pd$/i, ".pdf");
+
+  // dvojité //
   u = u.replace(/([^:]\/)\/+/g, "$1");
+
   return u;
 }
 
 function normalizeUrlsInText(text) {
-  return String(text || "").replace(
-    /\bhttps?:\/\/[^\s<>"'(){}\[\]]+/gi,
-    (m) => normalizeSingleUrl(m)
-  );
+  let t = String(text || "");
+  if (!t) return t;
+
+  const re = /\bhttps?:\/\/[^\s<>"'(){}\[\]]+/gi;
+  t = t.replace(re, (m) => normalizeSingleUrl(m));
+
+  t = t.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+  return t;
 }
 
-/* ======================= instructions ======================= */
-
+/**
+ * Run instructions (minimal, nic složitýho – prompt řeší většinu).
+ */
 function buildRunInstructions() {
   return (
-    `Jsi oficiální AI asistent obce Radim.\n\n` +
-    `Odpovídáš výhradně na základě dokumentu 99_FULL_obec_radim.txt.\n\n` +
-    `Pokud nelze jednoznačně určit aktuální osobu (např. kdo vede / spravuje),\n` +
-    `uveď tuto skutečnost a nabídni nejlepší dostupný kontakt ze zdroje,\n` +
-    `pokud existuje. Historické informace nikdy nevydávej jako aktuální.\n\n` +
+    `Jsi oficiální AI asistent obce Radim.\n` +
+    `Odpovídáš výhradně na základě dokumentu 99_FULL_obec_radim.txt.\n` +
     `Styl: úřední, věcný, stručný.\n`
   );
 }
 
-/* ======================= guards ======================= */
+/* =========================================================
+   ✅ HARD COREFERENCE: přepis zájmen -> explicitní osoba
+   ========================================================= */
 
-function wantsCurrentInfo(msg) {
-  return /\b(kdo\s+vede|kdo\s+je|spravuje|aktu(á|a)ln)\b/i.test(msg);
+const PERSON_REGEX =
+  /\b([A-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ][a-záčďéěíňóřšťúůýž]+)\s+([A-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ][a-záčďéěíňóřšťúůýž]+)\b/g;
+
+function pickLastPersonFromText(text) {
+  const t = String(text || "");
+  const matches = [...t.matchAll(PERSON_REGEX)].map((m) => `${m[1]} ${m[2]}`);
+
+  // Odfiltruj nejčastější ne-osoby
+  const filtered = matches.filter((name) => {
+    const n = name.toLowerCase();
+    if (n.startsWith("obec ")) return false;
+    if (n.startsWith("obecní ")) return false;
+    if (n.includes("obecní úřad")) return false;
+    return true;
+  });
+
+  return filtered.length ? filtered[filtered.length - 1] : "";
 }
 
-function containsHistoricalSignals(answer) {
-  return /\b(19\d{2}|20\d{2})\b|\b(v\s+roce|byl[a]?\s+zvolen)\b/i.test(answer);
+function messageAlreadyContainsPersonName(msg) {
+  return PERSON_REGEX.test(String(msg || ""));
 }
 
-function shouldForceFallback(userMsg, answer) {
-  if (wantsCurrentInfo(userMsg) && containsHistoricalSignals(answer)) return true;
-  return false;
+function isContactQuestion(msg) {
+  const s = String(msg || "").toLowerCase();
+  return /\b(email|e-mail|mail|telefon|kontakt|zavolat|volat)\b/.test(s);
 }
 
-/* ======================= SOFT fallback ======================= */
-
-function hasFactualContent(text) {
-  if (!text) return false;
-  if (/[A-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ][a-záčďéěíňóřšťúůýž]+\s+[A-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ]/.test(text)) return true;
-  if (/\b(předsed|správc|TJ\s+Sokol|kontakt|telefon|email)\b/i.test(text)) return true;
-  return false;
+function hasPronounReference(msg) {
+  const s = String(msg || "").toLowerCase();
+  return /\b(na\s+ni|na\s+něj|na\s+ně|na\s+něho|její|jeho|jí|mu|něj|ní|tomu|té|toho|ta|ten|to)\b/.test(
+    s
+  );
 }
 
-/* ======================= handler ======================= */
+function rewriteToExplicitPersonQuestion(original, personName) {
+  const q = String(original || "").trim();
+  const p = String(personName || "").trim();
+  if (!q || !p) return q;
 
-export default async function handler(req) {
-  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders });
+  const wantsEmail = /\b(email|e-mail|mail)\b/i.test(q);
+  const wantsPhone = /\b(telefon|kontakt|zavolat|volat)\b/i.test(q);
 
+  if (wantsEmail && wantsPhone) return `Jaký je e-mail a telefon na ${p}?`;
+  if (wantsEmail) return `Jaký je e-mail na ${p}?`;
+  if (wantsPhone) return `Jaký je telefon na ${p}?`;
+
+  return `Dotaz se týká osoby ${p}: ${q}`;
+}
+
+async function getLastReferencedPersonFromThread(threadId, apiKey, limit = 12) {
   try {
-    const apiKey = process.env.OPENAI_API_KEY;
-    const assistantId = process.env.ASSISTANT_ID;
+    const messages = await api(`/threads/${threadId}/messages?limit=${limit}`, {}, apiKey);
+    const data = Array.isArray(messages?.data) ? messages.data : [];
+    if (!data.length) return "";
 
-    const body = await req.json();
-    const message = String(body?.message || "").trim();
+    const orderedDesc = [...data].sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
 
-    // 🔁 RESET THREAD
-    if (message.toLowerCase() === "reset") {
-      const created = await api("/threads", { method: "POST" }, apiKey);
-      return jsonResponse(200, {
-        ok: true,
-        answer: "Resetováno.",
-        thread_id: created.id,
-      });
+    for (const m of orderedDesc) {
+      if (!m || (m.role !== "user" && m.role !== "assistant")) continue;
+      const txt = extractMessageText(m);
+      if (!txt) continue;
+      const p = pickLastPersonFromText(txt);
+      if (p) return p;
     }
 
-    // nový thread
-    const thread = await api("/threads", { method: "POST" }, apiKey);
-    const threadId = thread.id;
+    return "";
+  } catch {
+    return "";
+  }
+}
 
+/**
+ * ✅ Spolehlivé zajištění threadu:
+ * - když je incoming thread_id neplatný (404), vytvoří nový.
+ */
+async function ensureThreadId(incomingThreadId, apiKey) {
+  let threadId = incomingThreadId;
+
+  if (!threadId || typeof threadId !== "string" || !threadId.startsWith("thread_")) {
+    const created = await api("/threads", { method: "POST" }, apiKey);
+    return created.id;
+  }
+
+  try {
+    await api(`/threads/${threadId}`, {}, apiKey);
+    return threadId;
+  } catch (e) {
+    if (e?.status === 404) {
+      const created = await api("/threads", { method: "POST" }, apiKey);
+      return created.id;
+    }
+    throw e;
+  }
+}
+
+/**
+ * ✅ Spolehlivé přidání zprávy do threadu s jednorázovým fallbackem při 404.
+ */
+async function addUserMessageWithFallback(threadId, content, apiKey) {
+  try {
     await api(
       `/threads/${threadId}/messages`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role: "user", content: message }),
+        body: JSON.stringify({ role: "user", content }),
       },
       apiKey
     );
+    return threadId;
+  } catch (e) {
+    if (e?.status === 404) {
+      const created = await api("/threads", { method: "POST" }, apiKey);
+      const newThreadId = created.id;
 
+      await api(
+        `/threads/${newThreadId}/messages`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ role: "user", content }),
+        },
+        apiKey
+      );
+
+      return newThreadId;
+    }
+    throw e;
+  }
+}
+
+/* =========================================================
+   ✅ Fallback hláška (jak chceš)
+   ========================================================= */
+
+const REQUIRED_FALLBACK =
+  "Tuto informaci bohužel nemám k dispozici v oficiálních podkladech obce Radim.";
+
+export default async function handler(req) {
+  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders });
+
+  try {
+    if (req.method !== "POST") return jsonResponse(405, { ok: false, error: "Method not allowed" });
+
+    const apiKey = process.env.OPENAI_API_KEY;
+    const assistantId = process.env.ASSISTANT_ID;
+
+    if (!apiKey) return jsonResponse(500, { ok: false, error: "Missing OPENAI_API_KEY" });
+    if (!assistantId) return jsonResponse(500, { ok: false, error: "Missing ASSISTANT_ID" });
+
+    const body = await req.json().catch(() => ({}));
+    const message = body?.message;
+
+    if (!message || typeof message !== "string") {
+      return jsonResponse(400, { ok: false, error: "Missing message" });
+    }
+
+    // ✅ Reset threadu (opravdový reset)
+    const msgTrim = String(message).trim();
+    if (msgTrim.toLowerCase() === "reset") {
+      const created = await api("/threads", { method: "POST" }, apiKey);
+      return jsonResponse(200, { ok: true, answer: "Resetováno.", thread_id: created.id });
+    }
+
+    // ✅ pokračujeme ve stejném threadu, když přijde; jinak založíme nový.
+    let threadId = await ensureThreadId(body?.thread_id, apiKey);
+
+    // ✅ HARD COREFERENCE:
+    let outgoingMessage = msgTrim;
+
+    const needRewrite =
+      isContactQuestion(outgoingMessage) &&
+      hasPronounReference(outgoingMessage) &&
+      !messageAlreadyContainsPersonName(outgoingMessage);
+
+    if (needRewrite) {
+      const lastPerson = await getLastReferencedPersonFromThread(threadId, apiKey, 12);
+      if (lastPerson) {
+        outgoingMessage = rewriteToExplicitPersonQuestion(outgoingMessage, lastPerson);
+      }
+    }
+
+    // 1) user msg (s fallbackem, kdyby threadId přece jen neexistoval)
+    threadId = await addUserMessageWithFallback(threadId, outgoingMessage, apiKey);
+
+    // 2) run
     const run = await api(
       `/threads/${threadId}/runs`,
       {
@@ -174,32 +353,59 @@ export default async function handler(req) {
           assistant_id: assistantId,
           instructions: buildRunInstructions(),
           temperature: 0.1,
+          top_p: 1,
         }),
       },
       apiKey
     );
 
+    // 3) poll
+    const started = Date.now();
+    const timeoutMs = 45_000;
+
     while (true) {
-      await sleep(600);
-      const r = await api(`/threads/${threadId}/runs/${run.id}`, {}, apiKey);
-      if (r.status === "completed") break;
+      if (Date.now() - started > timeoutMs) {
+        return jsonResponse(504, { ok: false, error: "Timeout waiting for response" });
+      }
+
+      await sleep(650);
+
+      const check = await api(`/threads/${threadId}/runs/${run.id}`, {}, apiKey);
+      const status = check.status;
+
+      if (status === "queued" || status === "in_progress") continue;
+
+      if (status === "requires_action") {
+        return jsonResponse(501, {
+          ok: false,
+          error: "Run requires action (tool call not handled in function).",
+          status,
+        });
+      }
+
+      if (status !== "completed") {
+        return jsonResponse(500, { ok: false, error: "Run failed", status });
+      }
+
+      break;
     }
 
-    const messages = await api(`/threads/${threadId}/messages?limit=20`, {}, apiKey);
+    // 4) read messages
+    const messages = await api(`/threads/${threadId}/messages?limit=50`, {}, apiKey);
     let answer = extractLatestAssistantText(messages);
 
-    answer = normalizeUrlsInText(cleanAnswer(answer));
+    answer = cleanAnswer(answer);
+    answer = normalizeUrlsInText(answer);
 
-    if (shouldForceFallback(message, answer)) {
-      answer = REQUIRED_FALLBACK;
-    }
-
-    if (!answer || !hasFactualContent(answer)) {
-      answer = REQUIRED_FALLBACK;
-    }
+    // ✅ fallback jen když fakt není co vrátit
+    if (!answer) answer = REQUIRED_FALLBACK;
 
     return jsonResponse(200, { ok: true, answer, thread_id: threadId });
   } catch (err) {
-    return jsonResponse(500, { ok: false, error: err.message });
+    return jsonResponse(500, {
+      ok: false,
+      error: "Server error",
+      details: err?.message || String(err),
+    });
   }
 }
