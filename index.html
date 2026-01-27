@@ -529,7 +529,26 @@ function escapeHtml(s){
   return String(s).replace(/[&<>"']/g,m=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;" }[m]));
 }
 
-/* ---- ČIŠTĚNÍ ODPOVĚDI: citace + markdown ** + odstranění interních keců (bez náhradní věty) ---- */
+/* ✅ RESET: skutečně resetne thread + UI */
+function doHardReset(){
+  try { localStorage.removeItem(THREAD_KEY); } catch {}
+  // vyčisti chat UI
+  chatEl.innerHTML = "";
+  // reset feedback počítadel
+  userQuestionsCount = 0;
+  feedbackShown = false;
+  removeFeedback();
+
+  // úvodní zprávy znovu
+  addMessage(
+    "Radim",
+    "Upozornění:\nOdpovědi tohoto asistenta jsou generovány umělou inteligencí na základě dostupných informací.\nPrávně závazné a oficiální informace si vždy ověřte na oficiálním webu obce Radim nebo přímo na obecním úřadě.",
+    "bot"
+  );
+  addMessage("Radim","Konverzace byla resetována. Zeptejte se prosím znovu.","bot");
+}
+
+/* ---- ČIŠTĚNÍ ODPOVĚDI: JEN bezpečné věci (bez agresivního mazání řádků) ---- */
 function cleanAnswerText(input){
   if(!input) return "";
   let t = String(input);
@@ -540,16 +559,23 @@ function cleanAnswerText(input){
   // markdown tučné **text**
   t = t.replace(/\*\*(.*?)\*\*/g, "$1");
 
-  // odfiltrování interních informací (NEPŘIDÁVAT žádnou neutrální větu!)
-  const internalRe = /(file[_\s-]?search|vector\s*store|assistant[s]?|openai|scrap|crawl|nahran(é|y|a)\s+(soubor|dokument)|soubor(y|ů)|znalostn(í|i)\s+báze|knowledge\s*base|\bCORE\b|\bLIVE\b|priorit(a|y)\s+zdrojů|sekce\s+„?důležité„?)/i;
+  // velmi mírné odstranění “meta” vět (jen pokud jsou to evidentně technické věty)
+  // — nepoužívat agresivní regex, který může sežrat normální odpověď
+  const badLines = [
+    /použív(á|a)m vyhledávací nástroj/i,
+    /pracuji na principu vyhledávání/i,
+    /odpovídám výhradně na základě dokumentu/i,
+    /99[_ ]?FULL_obec_radim\.txt/i,
+    /vector\s*store/i,
+    /file[_\s-]?search/i,
+    /\bOpenAI\b/i
+  ];
+  t = t
+    .split("\n")
+    .filter(line => !badLines.some(re => re.test(line.trim())))
+    .join("\n");
 
-  // pryč celé řádky s interními slovy
-  t = t.split("\n").filter(line => !internalRe.test(line)).join("\n");
-
-  // když by to zůstalo v jedné větě, vyříznout souvětí
-  t = t.replace(/[^.\n]*?(file[_\s-]?search|vector\s*store|assistant[s]?|openai|scrap|crawl|nahran(é|y|a)\s+(soubor|dokument)|soubor(y|ů)|znalostn(í|i)\s+báze|knowledge\s*base|\bCORE\b|\bLIVE\b|priorit(a|y)\s+zdrojů|sekce\s+„?důležité„?)[^.\n]*[.\n]?/gi, "");
-
-  // zbytečné dvojité mezery / prázdné řádky
+  // zbytečné mezery / prázdné řádky
   t = t.replace(/[ \t]+\n/g, "\n");
   t = t.replace(/\n{3,}/g, "\n\n");
 
@@ -614,9 +640,22 @@ function showFeedbackOnce(){
   });
 }
 
+function isResetCommand(q){
+  const s = String(q || "").trim().toLowerCase();
+  return s === "reset" || s === "/reset" || s === "restart" || s === "/restart" || s === "nový chat" || s === "novy chat";
+}
+
 async function ask(qOverride){
   const q=(qOverride ?? input.value).trim();
   if(!q) return;
+
+  // ✅ local reset
+  if (isResetCommand(q)) {
+    addMessage("Vy", q, "me");
+    input.value="";
+    doHardReset();
+    return;
+  }
 
   addMessage("Vy",q,"me");
   input.value="";
