@@ -70,51 +70,45 @@ function extractLatestAssistantText(messagesListJson) {
 }
 
 /**
- * Minimum cleaning – NIC víc:
+ * ➕ NOVÉ: získá poslední odpověď asistenta pro kontext
+ */
+async function getLastAssistantAnswer(threadId, apiKey) {
+  try {
+    const messages = await api(`/threads/${threadId}/messages?limit=10`, {}, apiKey);
+    return extractLatestAssistantText(messages) || "";
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * Minimum cleaning – beze změn
  */
 function cleanAnswer(text) {
   let t = String(text || "");
 
-  // file_search citace
   t = t.replace(/【\s*\d+\s*:\s*\d+\s*†[^】]*】/g, "");
-
-  // odstranit tečku/čárku za URL
   t = t.replace(/(https?:\/\/[^\s)\]]+)[\.,]+/g, "$1");
-
-  // zrušit prázdné markdown odkazy
   t = t.replace(/\[([^\]]+)\]\(\s*\)/g, "$1");
-
-  // whitespace
   t = t.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
 
   return t;
 }
 
 /**
- * Minimal URL normalization – OPRAVA SYNTAXE, NIC VÍC
+ * Minimal URL normalization – beze změn
  */
 function normalizeSingleUrl(raw) {
   let u = String(raw || "").trim();
   if (!u) return u;
 
-  // ořez koncovek
   u = u.replace(/[)\]}>,.;:!?]+$/g, "");
-
-  // www.https://...
   u = u.replace(/^www\.(https?:\/\/)/i, "$1");
-
-  // https://https://...
   u = u.replace(/^https?:\/\/https:\/\//i, "https://");
   u = u.replace(/^https?:\/\/http:\/\//i, "http://");
   u = u.replace(/^(https?:\/\/)(https?:\/\/)+/i, "$1");
-
-  // ✅ JEDINÝ NOVÝ FIX – chybějící tečka v doméně
   u = u.replace(/obec-radimcz/gi, "obec-radim.cz");
-
-  // občas useknuté .pdf
   u = u.replace(/\.pd$/i, ".pdf");
-
-  // dvojité //
   u = u.replace(/([^:]\/)\/+/g, "$1");
 
   return u;
@@ -127,7 +121,6 @@ function normalizeUrlsInText(text) {
   const re = /\bhttps?:\/\/[^\s<>"'(){}\[\]]+/gi;
   t = t.replace(re, (m) => normalizeSingleUrl(m));
 
-  // whitespace
   t = t.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
   return t;
 }
@@ -136,19 +129,19 @@ function buildRunInstructions() {
   return (
     `Jsi oficiální AI asistent obce Radim.\n\n` +
     `Odpovídáš výhradně na základě dokumentu: 99_FULL_obec_radim.txt.\n\n` +
-    `Neimprovizuj, nevymýšlej.\n` +
-    `URL kopíruj přesně ze zdroje a nikdy je neukončuj tečkou.\n\n` +
-    `Styl: úřední, stručný.\n\n` +
-    `Pokud informace není ve zdroji:\n` +
-    `"Tuto informaci bohužel nemám k dispozici v oficiálních podkladech obce Radim."`
+    `Styl: úřední, věcný, stručný.\n`
   );
 }
 
 export default async function handler(req) {
-  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders });
+  if (req.method === "OPTIONS") {
+    return new Response(null, { status: 204, headers: corsHeaders });
+  }
 
   try {
-    if (req.method !== "POST") return jsonResponse(405, { ok: false, error: "Method not allowed" });
+    if (req.method !== "POST") {
+      return jsonResponse(405, { ok: false, error: "Method not allowed" });
+    }
 
     const apiKey = process.env.OPENAI_API_KEY;
     const assistantId = process.env.ASSISTANT_ID;
@@ -163,22 +156,35 @@ export default async function handler(req) {
       return jsonResponse(400, { ok: false, error: "Missing message" });
     }
 
+    // THREAD
     let threadId = body?.thread_id;
     if (!threadId || !threadId.startsWith("thread_")) {
       const created = await api("/threads", { method: "POST" }, apiKey);
       threadId = created.id;
     }
 
+    // ➕ KONTEXT: poslední odpověď asistenta
+    const lastAnswer = await getLastAssistantAnswer(threadId, apiKey);
+
+    const contextualMessage = lastAnswer
+      ? `KONTEXT (předchozí odpověď asistenta):\n${lastAnswer}\n\nDOTAZ UŽIVATELE:\n${message.trim()}`
+      : message.trim();
+
+    // USER MESSAGE
     await api(
       `/threads/${threadId}/messages`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role: "user", content: message.trim() }),
+        body: JSON.stringify({
+          role: "user",
+          content: contextualMessage,
+        }),
       },
       apiKey
     );
 
+    // RUN
     const run = await api(
       `/threads/${threadId}/runs`,
       {
@@ -193,6 +199,7 @@ export default async function handler(req) {
       apiKey
     );
 
+    // POLL
     const started = Date.now();
     while (true) {
       if (Date.now() - started > 45_000) {
@@ -201,12 +208,14 @@ export default async function handler(req) {
 
       await sleep(650);
       const check = await api(`/threads/${threadId}/runs/${run.id}`, {}, apiKey);
+
       if (check.status === "completed") break;
       if (check.status !== "queued" && check.status !== "in_progress") {
         return jsonResponse(500, { ok: false, error: "Run failed", status: check.status });
       }
     }
 
+    // READ
     const messages = await api(`/threads/${threadId}/messages?limit=50`, {}, apiKey);
     let answer = extractLatestAssistantText(messages);
 
