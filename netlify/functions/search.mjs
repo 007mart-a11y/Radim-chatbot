@@ -70,21 +70,39 @@ function extractLatestAssistantText(messagesListJson) {
 }
 
 /**
- * Minimum cleaning
+ * Vezme text z message.content (jen textové části).
+ */
+function extractMessageText(messageObj) {
+  if (!messageObj || !Array.isArray(messageObj.content) || !messageObj.content.length) return "";
+  const parts = messageObj.content
+    .map((c) => (c?.type === "text" ? c.text?.value : ""))
+    .filter(Boolean);
+  return parts.join("\n\n").trim();
+}
+
+/**
+ * Minimum cleaning:
  */
 function cleanAnswer(text) {
   let t = String(text || "");
 
+  // file_search citace
   t = t.replace(/【\s*\d+\s*:\s*\d+\s*†[^】]*】/g, "");
+
+  // odstranit tečku/čárku za URL
   t = t.replace(/(https?:\/\/[^\s)\]]+)[\.,]+/g, "$1");
+
+  // zrušit prázdné markdown odkazy
   t = t.replace(/\[([^\]]+)\]\(\s*\)/g, "$1");
+
+  // whitespace
   t = t.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
 
   return t;
 }
 
 /**
- * Minimal URL normalization (už máš)
+ * Minimal URL normalization
  */
 function normalizeSingleUrl(raw) {
   let u = String(raw || "").trim();
@@ -95,8 +113,14 @@ function normalizeSingleUrl(raw) {
   u = u.replace(/^https?:\/\/https:\/\//i, "https://");
   u = u.replace(/^https?:\/\/http:\/\//i, "http://");
   u = u.replace(/^(https?:\/\/)(https?:\/\/)+/i, "$1");
+
+  // oprav chybějící tečku
   u = u.replace(/obec-radimcz/gi, "obec-radim.cz");
+
+  // občas useknuté .pdf
   u = u.replace(/\.pd$/i, ".pdf");
+
+  // dvojité //
   u = u.replace(/([^:]\/)\/+/g, "$1");
 
   return u;
@@ -114,82 +138,44 @@ function normalizeUrlsInText(text) {
 }
 
 /**
- * Instructions – nechávám jednoduché, ale doplním jednu jedinou větu pro kontakty.
- * (Neřešíme tady "AI kecy" apod., jen to, aby nepletlo osobu s obcí.)
+ * Run instructions (nepřepisuju promptovou filozofii, jen minimální).
  */
 function buildRunInstructions() {
   return (
     `Jsi oficiální AI asistent obce Radim.\n\n` +
     `Odpovídáš výhradně na základě dokumentu: 99_FULL_obec_radim.txt.\n\n` +
-    `DŮLEŽITÉ: Pokud se uživatel ptá na kontakt KONKRÉTNÍ OSOBY, odpovídej pouze kontaktem této osoby, ne kontaktem obce/úřadu.\n` +
     `Styl: úřední, věcný, stručný.\n`
   );
 }
 
 /* =========================================================
-   ✅ "Tvrdé" držení subjektu: thread metadata + přepis zájmen
+   ✅ HARD COREFERENCE: přepis zájmen -> explicitní osoba
+   - bere kontext z posledních zpráv USER+ASSISTANT
    ========================================================= */
 
-/**
- * Thread metadata (persistuje mezi dotazy)
- */
-async function getThreadMetadata(threadId, apiKey) {
-  try {
-    const th = await api(`/threads/${threadId}`, {}, apiKey);
-    return th?.metadata || {};
-  } catch {
-    return {};
-  }
-}
-
-async function updateThreadMetadata(threadId, apiKey, patch) {
-  try {
-    await api(
-      `/threads/${threadId}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ metadata: patch }),
-      },
-      apiKey
-    );
-  } catch {
-    // ignore
-  }
-}
-
-/**
- * Najdi jména osob v textu (konzervativně: dvě slova s velkým písmenem, CZ diakritika)
- */
 const PERSON_REGEX =
   /\b([A-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ][a-záčďéěíňóřšťúůýž]+)\s+([A-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ][a-záčďéěíňóřšťúůýž]+)\b/g;
 
-const PERSON_BLACKLIST = new Set([
-  "Obec Radim",
-  "Obecní úřad",
-  "Obecní Úřad",
-  "Obecní úřad Radim",
-  "Obec Radim 8",
-]);
-
-function extractPersonCandidates(text) {
+function pickLastPersonFromText(text) {
   const t = String(text || "");
   const matches = [...t.matchAll(PERSON_REGEX)].map((m) => `${m[1]} ${m[2]}`);
 
-  // odfiltruj běžné “ne-osoby”
-  const filtered = matches.filter((name) => !PERSON_BLACKLIST.has(name));
-  return filtered;
+  // Odfiltruj nejčastější ne-osoby
+  const filtered = matches.filter((name) => {
+    const n = name.toLowerCase();
+    if (n.startsWith("obec ")) return false;
+    if (n.startsWith("obecní ")) return false;
+    if (n.includes("obecní úřad")) return false;
+    return true;
+  });
+
+  return filtered.length ? filtered[filtered.length - 1] : "";
 }
 
-function pickLastPerson(text) {
-  const people = extractPersonCandidates(text);
-  if (!people.length) return "";
-  return people[people.length - 1];
+function messageAlreadyContainsPersonName(msg) {
+  return PERSON_REGEX.test(String(msg || ""));
 }
 
-/**
- * Rozpoznání kontakt otázky a zájmen
- */
 function isContactQuestion(msg) {
   const s = String(msg || "").toLowerCase();
   return /\b(email|e-mail|mail|telefon|kontakt|zavolat|volat)\b/.test(s);
@@ -202,44 +188,53 @@ function hasPronounReference(msg) {
   );
 }
 
-/**
- * Přepiš dotaz "na ni/na něj" na explicitní dotaz s osobou.
- * To je ten "tvrdý" fix, aby uživatelé nebyli zmatení.
- */
-function rewritePronounContactQuestion(original, personName) {
+function rewriteToExplicitPersonQuestion(original, personName) {
   const q = String(original || "").trim();
   const p = String(personName || "").trim();
   if (!q || !p) return q;
 
-  // pokud už uživatel jméno obsahuje, nepřepisuj
-  if (q.toLowerCase().includes(p.toLowerCase())) return q;
-
   const wantsEmail = /\b(email|e-mail|mail)\b/i.test(q);
   const wantsPhone = /\b(telefon|kontakt|zavolat|volat)\b/i.test(q);
 
-  if (wantsEmail && wantsPhone) {
-    return `Jaký je e-mail a telefon na ${p}?`;
-  }
-  if (wantsEmail) {
-    return `Jaký je e-mail na ${p}?`;
-  }
-  if (wantsPhone) {
-    return `Jaký je telefon na ${p}?`;
-  }
+  if (wantsEmail && wantsPhone) return `Jaký je e-mail a telefon na ${p}?`;
+  if (wantsEmail) return `Jaký je e-mail na ${p}?`;
+  if (wantsPhone) return `Jaký je telefon na ${p}?`;
 
-  // obecný fallback
   return `Dotaz se týká osoby ${p}: ${q}`;
 }
 
-export default async function handler(req) {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { status: 204, headers: corsHeaders });
+/**
+ * Najde "nejnovější osobu" z posledních N zpráv (user+assistant).
+ * Důležité: procházíme OD NEJNOVĚJŠÍCH k nejstarším.
+ */
+async function getLastReferencedPersonFromThread(threadId, apiKey, limit = 12) {
+  try {
+    const messages = await api(`/threads/${threadId}/messages?limit=${limit}`, {}, apiKey);
+    const data = Array.isArray(messages?.data) ? messages.data : [];
+    if (!data.length) return "";
+
+    // data je typicky nejnovější první – pro jistotu seřadíme dle created_at desc
+    const orderedDesc = [...data].sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
+
+    for (const m of orderedDesc) {
+      if (!m || (m.role !== "user" && m.role !== "assistant")) continue;
+      const txt = extractMessageText(m);
+      if (!txt) continue;
+      const p = pickLastPersonFromText(txt);
+      if (p) return p;
+    }
+
+    return "";
+  } catch {
+    return "";
   }
+}
+
+export default async function handler(req) {
+  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders });
 
   try {
-    if (req.method !== "POST") {
-      return jsonResponse(405, { ok: false, error: "Method not allowed" });
-    }
+    if (req.method !== "POST") return jsonResponse(405, { ok: false, error: "Method not allowed" });
 
     const apiKey = process.env.OPENAI_API_KEY;
     const assistantId = process.env.ASSISTANT_ID;
@@ -254,25 +249,32 @@ export default async function handler(req) {
       return jsonResponse(400, { ok: false, error: "Missing message" });
     }
 
-    // THREAD
+    // Thread: pokud přijde thread_id, pokračujeme; jinak založíme nový
     let threadId = body?.thread_id;
-    if (!threadId || !threadId.startsWith("thread_")) {
+    if (!threadId || typeof threadId !== "string" || !threadId.startsWith("thread_")) {
       const created = await api("/threads", { method: "POST" }, apiKey);
       threadId = created.id;
     }
 
-    // ✅ 1) vytáhni last_person z metadata
-    const md = await getThreadMetadata(threadId, apiKey);
-    const lastPerson = typeof md?.last_person === "string" ? md.last_person : "";
-
-    // ✅ 2) tvrdý přepis zájmen u kontaktových dotazů
+    // ✅ HARD COREFERENCE:
+    // Pokud dotaz obsahuje zájmeno + kontakt a neobsahuje explicitní jméno,
+    // tak ho přepíšeme na explicitní osobu z posledních zpráv (user+assistant).
     let outgoingMessage = String(message).trim();
 
-    if (isContactQuestion(outgoingMessage) && hasPronounReference(outgoingMessage) && lastPerson) {
-      outgoingMessage = rewritePronounContactQuestion(outgoingMessage, lastPerson);
+    const needRewrite =
+      isContactQuestion(outgoingMessage) &&
+      hasPronounReference(outgoingMessage) &&
+      !messageAlreadyContainsPersonName(outgoingMessage);
+
+    if (needRewrite) {
+      const lastPerson = await getLastReferencedPersonFromThread(threadId, apiKey, 12);
+      if (lastPerson) {
+        outgoingMessage = rewriteToExplicitPersonQuestion(outgoingMessage, lastPerson);
+      }
+      // když lastPerson nenajdeme, necháme původní dotaz (model se pak může doptat)
     }
 
-    // USER MESSAGE
+    // 1) user msg
     await api(
       `/threads/${threadId}/messages`,
       {
@@ -283,7 +285,7 @@ export default async function handler(req) {
       apiKey
     );
 
-    // RUN
+    // 2) run
     const run = await api(
       `/threads/${threadId}/runs`,
       {
@@ -299,23 +301,38 @@ export default async function handler(req) {
       apiKey
     );
 
-    // POLL
+    // 3) poll
     const started = Date.now();
+    const timeoutMs = 45_000;
+
     while (true) {
-      if (Date.now() - started > 45_000) {
-        return jsonResponse(504, { ok: false, error: "Timeout" });
+      if (Date.now() - started > timeoutMs) {
+        return jsonResponse(504, { ok: false, error: "Timeout waiting for response" });
       }
 
       await sleep(650);
-      const check = await api(`/threads/${threadId}/runs/${run.id}`, {}, apiKey);
 
-      if (check.status === "completed") break;
-      if (check.status !== "queued" && check.status !== "in_progress") {
-        return jsonResponse(500, { ok: false, error: "Run failed", status: check.status });
+      const check = await api(`/threads/${threadId}/runs/${run.id}`, {}, apiKey);
+      const status = check.status;
+
+      if (status === "queued" || status === "in_progress") continue;
+
+      if (status === "requires_action") {
+        return jsonResponse(501, {
+          ok: false,
+          error: "Run requires action (tool call not handled in function).",
+          status,
+        });
       }
+
+      if (status !== "completed") {
+        return jsonResponse(500, { ok: false, error: "Run failed", status });
+      }
+
+      break;
     }
 
-    // READ
+    // 4) read messages
     const messages = await api(`/threads/${threadId}/messages?limit=50`, {}, apiKey);
     let answer = extractLatestAssistantText(messages);
 
@@ -323,15 +340,7 @@ export default async function handler(req) {
     answer = normalizeUrlsInText(answer);
 
     if (!answer) {
-      answer =
-        "Tuto informaci bohužel nemám k dispozici v oficiálních podkladech obce Radim.";
-    }
-
-    // ✅ 3) po odpovědi aktualizuj last_person (persistuje pro další dotaz)
-    // (tohle je "jednou provždy" – další dotaz už ví, kdo je "ona")
-    const detectedPerson = pickLastPerson(answer);
-    if (detectedPerson) {
-      await updateThreadMetadata(threadId, apiKey, { ...(md || {}), last_person: detectedPerson });
+      answer = "Tuto informaci bohužel nemám k dispozici v oficiálních podkladech obce Radim.";
     }
 
     return jsonResponse(200, { ok: true, answer, thread_id: threadId });
