@@ -70,7 +70,7 @@ function extractLatestAssistantText(messagesListJson) {
 }
 
 /**
- * Minimum cleaning – beze změn
+ * Minimum cleaning
  */
 function cleanAnswer(text) {
   let t = String(text || "");
@@ -84,7 +84,7 @@ function cleanAnswer(text) {
 }
 
 /**
- * Minimal URL normalization – beze změn
+ * Minimal URL normalization (už máš)
  */
 function normalizeSingleUrl(raw) {
   let u = String(raw || "").trim();
@@ -113,143 +113,122 @@ function normalizeUrlsInText(text) {
   return t;
 }
 
+/**
+ * Instructions – nechávám jednoduché, ale doplním jednu jedinou větu pro kontakty.
+ * (Neřešíme tady "AI kecy" apod., jen to, aby nepletlo osobu s obcí.)
+ */
 function buildRunInstructions() {
   return (
     `Jsi oficiální AI asistent obce Radim.\n\n` +
     `Odpovídáš výhradně na základě dokumentu: 99_FULL_obec_radim.txt.\n\n` +
+    `DŮLEŽITÉ: Pokud se uživatel ptá na kontakt KONKRÉTNÍ OSOBY, odpovídej pouze kontaktem této osoby, ne kontaktem obce/úřadu.\n` +
     `Styl: úřední, věcný, stručný.\n`
   );
 }
 
 /* =========================================================
-   ✅ “Once and for all” fix: subject anchoring (coreference)
+   ✅ "Tvrdé" držení subjektu: thread metadata + přepis zájmen
    ========================================================= */
 
 /**
- * Získá posledních N zpráv z threadu a vrátí je seřazené od nejstarší k nejnovější,
- * včetně role + textu (jen textové části).
+ * Thread metadata (persistuje mezi dotazy)
  */
-async function getRecentMessagesRaw(threadId, apiKey, limit = 12) {
-  const messages = await api(`/threads/${threadId}/messages?limit=${limit}`, {}, apiKey);
-  const data = Array.isArray(messages?.data) ? messages.data : [];
-  if (!data.length) return [];
-
-  const ordered = [...data].sort((a, b) => (a.created_at || 0) - (b.created_at || 0));
-
-  const turns = [];
-  for (const m of ordered) {
-    if (!m || (m.role !== "user" && m.role !== "assistant")) continue;
-    if (!Array.isArray(m.content) || !m.content.length) continue;
-
-    const parts = m.content
-      .map((c) => (c?.type === "text" ? c.text?.value : ""))
-      .filter(Boolean);
-
-    const text = parts.join("\n\n").trim();
-    if (!text) continue;
-
-    turns.push({ role: m.role, text });
+async function getThreadMetadata(threadId, apiKey) {
+  try {
+    const th = await api(`/threads/${threadId}`, {}, apiKey);
+    return th?.metadata || {};
+  } catch {
+    return {};
   }
-  return turns;
 }
 
-/**
- * Najde “poslední subjekt”, ke kterému se uživatel pravděpodobně odkazuje:
- * - preferuje poslední konkrétní OSOBU (jméno příjmení s velkými písmeny)
- * - jinak poslední ORGANIZACI (TJ/SDH/Spolek/Sokol apod.)
- *
- * Vrací string nebo "".
- */
-function extractLastSubjectFromTurns(turns) {
-  const combined = turns.map((t) => t.text).join("\n\n");
-
-  // 1) Organizace/role (silné kotvy)
-  const orgPatterns = [
-    /\bTJ\s+Sokol\s+Radim\b/gi,
-    /\bSokol\b/gi,
-    /\bSDH\s+Radim\b/gi,
-    /\bObec\s+Radim\b/gi,
-    /\bObecní\s+úřad\s+Radim\b/gi,
-    /\bKulturní\s+výbor\b/gi,
-    /\bSportovní\s+výbor\b/gi,
-    /\bFinanční\s+výbor\b/gi,
-    /\bKontrolní\s+výbor\b/gi,
-  ];
-
-  // 2) Osoba: dvě slova s velkým písmenem (CZ diakritika) – konzervativní
-  // Zachytí např. "Štěpánka Kořínková", "Zdeňka Stříbrná"
-  const personRegex =
-    /\b([A-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ][a-záčďéěíňóřšťúůýž]+)\s+([A-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ][a-záčďéěíňóřšťúůýž]+)\b/g;
-
-  // Projdeme od konce (nejnovější zmínky)
-  for (let i = turns.length - 1; i >= 0; i--) {
-    const txt = turns[i].text;
-
-    // osobní jméno
-    const people = [...txt.matchAll(personRegex)].map((m) => `${m[1]} ${m[2]}`);
-    if (people.length) {
-      // vrať poslední jméno z té zprávy
-      return people[people.length - 1];
-    }
-
-    // organizace
-    for (const re of orgPatterns) {
-      const m = txt.match(re);
-      if (m && m.length) {
-        // vrať “normalizovanou” podobu poslední shody
-        return m[m.length - 1].replace(/\s+/g, " ").trim();
-      }
-    }
-  }
-
-  // fallback: z celého kontextu (kdyby byly zprávy krátké)
-  const peopleAll = [...combined.matchAll(personRegex)].map((m) => `${m[1]} ${m[2]}`);
-  if (peopleAll.length) return peopleAll[peopleAll.length - 1];
-
-  for (const re of orgPatterns) {
-    const m = combined.match(re);
-    if (m && m.length) return m[m.length - 1].replace(/\s+/g, " ").trim();
-  }
-
-  return "";
-}
-
-/**
- * Rozpozná, že dotaz je “referenční” (zájmena / “na ni/něj/její/jeho/tomu/té”),
- * a zároveň neobsahuje explicitní jméno/organizaci → potřebuje kotvu.
- */
-function shouldAnchorSubject(userMessage) {
-  const s = String(userMessage || "").toLowerCase();
-
-  // reference triggers (CZ)
-  const hasPronoun =
-    /\b(na\s+ni|na\s+něj|na\s+ně|na\s+něho|na\s+něm|na\s+něm|na\s+to|její|jeho|jí|mu|něj|ní|tomu|těm|té|toho|tamto|ten|ta|to)\b/.test(
-      s
+async function updateThreadMetadata(threadId, apiKey, patch) {
+  try {
+    await api(
+      `/threads/${threadId}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ metadata: patch }),
+      },
+      apiKey
     );
-
-  // “kdo”, “kontakt”, “email”, “telefon” často padají na úřad bez kotvy
-  const isContactAsk = /\b(email|e-mail|mail|telefon|kontakt|zavolat|volat)\b/.test(s);
-
-  // pokud už zpráva obsahuje nějaké velké jméno (2 slova) nebo “TJ Sokol”, kotva netřeba
-  const alreadyHasName =
-    /\b[A-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ][a-záčďéěíňóřšťúůýž]+\s+[A-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ][a-záčďéěíňóřšťúůýž]+\b/.test(
-      userMessage
-    ) || /\bTJ\s+Sokol\s+Radim\b/i.test(userMessage);
-
-  return (hasPronoun || isContactAsk) && !alreadyHasName;
+  } catch {
+    // ignore
+  }
 }
 
 /**
- * Přidá explicitní kotvu “Dotaz se týká: SUBJECT.” před dotaz.
- * Tím se odstraní “útěk” modelu na obec/úřad.
+ * Najdi jména osob v textu (konzervativně: dvě slova s velkým písmenem, CZ diakritika)
  */
-function applySubjectAnchor(userMessage, subject) {
-  const msg = String(userMessage || "").trim();
-  const sub = String(subject || "").trim();
-  if (!msg) return msg;
-  if (!sub) return msg;
+const PERSON_REGEX =
+  /\b([A-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ][a-záčďéěíňóřšťúůýž]+)\s+([A-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ][a-záčďéěíňóřšťúůýž]+)\b/g;
 
-  return `Dotaz se týká: ${sub}.\n\n${msg}`;
+const PERSON_BLACKLIST = new Set([
+  "Obec Radim",
+  "Obecní úřad",
+  "Obecní Úřad",
+  "Obecní úřad Radim",
+  "Obec Radim 8",
+]);
+
+function extractPersonCandidates(text) {
+  const t = String(text || "");
+  const matches = [...t.matchAll(PERSON_REGEX)].map((m) => `${m[1]} ${m[2]}`);
+
+  // odfiltruj běžné “ne-osoby”
+  const filtered = matches.filter((name) => !PERSON_BLACKLIST.has(name));
+  return filtered;
+}
+
+function pickLastPerson(text) {
+  const people = extractPersonCandidates(text);
+  if (!people.length) return "";
+  return people[people.length - 1];
+}
+
+/**
+ * Rozpoznání kontakt otázky a zájmen
+ */
+function isContactQuestion(msg) {
+  const s = String(msg || "").toLowerCase();
+  return /\b(email|e-mail|mail|telefon|kontakt|zavolat|volat)\b/.test(s);
+}
+
+function hasPronounReference(msg) {
+  const s = String(msg || "").toLowerCase();
+  return /\b(na\s+ni|na\s+něj|na\s+ně|na\s+něho|její|jeho|jí|mu|něj|ní|tomu|té|toho|ta|ten|to)\b/.test(
+    s
+  );
+}
+
+/**
+ * Přepiš dotaz "na ni/na něj" na explicitní dotaz s osobou.
+ * To je ten "tvrdý" fix, aby uživatelé nebyli zmatení.
+ */
+function rewritePronounContactQuestion(original, personName) {
+  const q = String(original || "").trim();
+  const p = String(personName || "").trim();
+  if (!q || !p) return q;
+
+  // pokud už uživatel jméno obsahuje, nepřepisuj
+  if (q.toLowerCase().includes(p.toLowerCase())) return q;
+
+  const wantsEmail = /\b(email|e-mail|mail)\b/i.test(q);
+  const wantsPhone = /\b(telefon|kontakt|zavolat|volat)\b/i.test(q);
+
+  if (wantsEmail && wantsPhone) {
+    return `Jaký je e-mail a telefon na ${p}?`;
+  }
+  if (wantsEmail) {
+    return `Jaký je e-mail na ${p}?`;
+  }
+  if (wantsPhone) {
+    return `Jaký je telefon na ${p}?`;
+  }
+
+  // obecný fallback
+  return `Dotaz se týká osoby ${p}: ${q}`;
 }
 
 export default async function handler(req) {
@@ -282,15 +261,15 @@ export default async function handler(req) {
       threadId = created.id;
     }
 
-    // ✅ “Once and for all” subject anchoring:
-    // Získej poslední zprávy, vytáhni subjekt, a pokud dotaz používá zájmena,
-    // připiš kotvu "Dotaz se týká: …"
-    const turns = await getRecentMessagesRaw(threadId, apiKey, 12);
-    const lastSubject = extractLastSubjectFromTurns(turns);
+    // ✅ 1) vytáhni last_person z metadata
+    const md = await getThreadMetadata(threadId, apiKey);
+    const lastPerson = typeof md?.last_person === "string" ? md.last_person : "";
 
-    let outgoingMessage = message.trim();
-    if (shouldAnchorSubject(outgoingMessage) && lastSubject) {
-      outgoingMessage = applySubjectAnchor(outgoingMessage, lastSubject);
+    // ✅ 2) tvrdý přepis zájmen u kontaktových dotazů
+    let outgoingMessage = String(message).trim();
+
+    if (isContactQuestion(outgoingMessage) && hasPronounReference(outgoingMessage) && lastPerson) {
+      outgoingMessage = rewritePronounContactQuestion(outgoingMessage, lastPerson);
     }
 
     // USER MESSAGE
@@ -299,10 +278,7 @@ export default async function handler(req) {
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          role: "user",
-          content: outgoingMessage,
-        }),
+        body: JSON.stringify({ role: "user", content: outgoingMessage }),
       },
       apiKey
     );
@@ -317,6 +293,7 @@ export default async function handler(req) {
           assistant_id: assistantId,
           instructions: buildRunInstructions(),
           temperature: 0.1,
+          top_p: 1,
         }),
       },
       apiKey
@@ -348,6 +325,13 @@ export default async function handler(req) {
     if (!answer) {
       answer =
         "Tuto informaci bohužel nemám k dispozici v oficiálních podkladech obce Radim.";
+    }
+
+    // ✅ 3) po odpovědi aktualizuj last_person (persistuje pro další dotaz)
+    // (tohle je "jednou provždy" – další dotaz už ví, kdo je "ona")
+    const detectedPerson = pickLastPerson(answer);
+    if (detectedPerson) {
+      await updateThreadMetadata(threadId, apiKey, { ...(md || {}), last_person: detectedPerson });
     }
 
     return jsonResponse(200, { ok: true, answer, thread_id: threadId });
