@@ -42,7 +42,13 @@ async function api(path, { method = "GET", body, headers = {} } = {}, apiKey) {
 
   if (!res.ok) {
     const msg = json?.error?.message || text || `HTTP ${res.status}`;
-    throw new Error(`${method} ${path} failed: ${msg}`);
+    const err = new Error(`${method} ${path} failed: ${msg}`);
+    // ✅ důležité pro spolehlivý fallback
+    err.status = res.status;
+    err.path = path;
+    err.method = method;
+    err.details = json || text;
+    throw err;
   }
 
   return json ?? {};
@@ -230,6 +236,68 @@ async function getLastReferencedPersonFromThread(threadId, apiKey, limit = 12) {
   }
 }
 
+/**
+ * ✅ Spolehlivé zajištění threadu:
+ * - když je incoming thread_id neplatný (404), vytvoří nový.
+ */
+async function ensureThreadId(incomingThreadId, apiKey) {
+  let threadId = incomingThreadId;
+
+  if (!threadId || typeof threadId !== "string" || !threadId.startsWith("thread_")) {
+    const created = await api("/threads", { method: "POST" }, apiKey);
+    return created.id;
+  }
+
+  try {
+    // ověření existence threadu
+    await api(`/threads/${threadId}`, {}, apiKey);
+    return threadId;
+  } catch (e) {
+    if (e?.status === 404) {
+      const created = await api("/threads", { method: "POST" }, apiKey);
+      return created.id;
+    }
+    // jiné chyby necháme propadnout (ať víme, že je problém jinde)
+    throw e;
+  }
+}
+
+/**
+ * ✅ Spolehlivé přidání zprávy do threadu s jednorázovým fallbackem při 404.
+ */
+async function addUserMessageWithFallback(threadId, content, apiKey) {
+  try {
+    await api(
+      `/threads/${threadId}/messages`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role: "user", content }),
+      },
+      apiKey
+    );
+    return threadId;
+  } catch (e) {
+    if (e?.status === 404) {
+      const created = await api("/threads", { method: "POST" }, apiKey);
+      const newThreadId = created.id;
+
+      await api(
+        `/threads/${newThreadId}/messages`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ role: "user", content }),
+        },
+        apiKey
+      );
+
+      return newThreadId;
+    }
+    throw e;
+  }
+}
+
 export default async function handler(req) {
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders });
 
@@ -249,16 +317,10 @@ export default async function handler(req) {
       return jsonResponse(400, { ok: false, error: "Missing message" });
     }
 
-    // Thread: pokud přijde thread_id, pokračujeme; jinak založíme nový
-    let threadId = body?.thread_id;
-    if (!threadId || typeof threadId !== "string" || !threadId.startsWith("thread_")) {
-      const created = await api("/threads", { method: "POST" }, apiKey);
-      threadId = created.id;
-    }
+    // ✅ Variant A: pokračujeme ve stejném threadu, když přijde; jinak založíme nový.
+    let threadId = await ensureThreadId(body?.thread_id, apiKey);
 
-    // ✅ HARD COREFERENCE:
-    // Pokud dotaz obsahuje zájmeno + kontakt a neobsahuje explicitní jméno,
-    // tak ho přepíšeme na explicitní osobu z posledních zpráv (user+assistant).
+    // ✅ HARD COREFERENCE (ponecháno):
     let outgoingMessage = String(message).trim();
 
     const needRewrite =
@@ -271,19 +333,10 @@ export default async function handler(req) {
       if (lastPerson) {
         outgoingMessage = rewriteToExplicitPersonQuestion(outgoingMessage, lastPerson);
       }
-      // když lastPerson nenajdeme, necháme původní dotaz (model se pak může doptat)
     }
 
-    // 1) user msg
-    await api(
-      `/threads/${threadId}/messages`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role: "user", content: outgoingMessage }),
-      },
-      apiKey
-    );
+    // 1) user msg (s fallbackem, kdyby threadId přece jen neexistoval)
+    threadId = await addUserMessageWithFallback(threadId, outgoingMessage, apiKey);
 
     // 2) run
     const run = await api(

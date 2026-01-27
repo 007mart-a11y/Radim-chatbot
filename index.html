@@ -481,6 +481,9 @@ const coachClose = document.getElementById("coachClose");
 const BG_URL = "/skins/radim/bg.jpg";
 const ERB_URL = "/skins/radim/erb.png";
 
+// ✅ Thread persistence key (Variant A)
+const THREAD_KEY = "radim_thread_id_v1";
+
 // onboarding
 const COACH_KEY = "radim_coach_dismissed_v1";
 function showCoach(){
@@ -621,12 +624,21 @@ async function ask(qOverride){
   showLoading(true);
 
   try{
+    // ✅ Variant A: always send thread_id + persist returned thread_id
+    const thread_id = localStorage.getItem(THREAD_KEY) || null;
+
     const r=await fetch("/.netlify/functions/search",{
       method:"POST",
       headers:{ "content-type":"application/json" },
-      body:JSON.stringify({ message:q })
+      body:JSON.stringify({ message:q, thread_id })
     });
+
     const j=await r.json().catch(()=>({}));
+
+    if (j && j.thread_id) {
+      localStorage.setItem(THREAD_KEY, j.thread_id);
+    }
+
     addMessage("Radim", (j && j.answer) ? j.answer : "Bez odpovědi", "bot");
 
     userQuestionsCount++;
