@@ -70,12 +70,50 @@ function extractLatestAssistantText(messagesListJson) {
 }
 
 /**
- * ➕ NOVÉ: získá poslední odpověď asistenta pro kontext
+ * ➕ NOVÉ: vezme poslední N zpráv (user+assistant) a udělá krátký kontext.
+ * Pozn.: Messages API vrací nejnovější jako první → otočíme pro čitelnost.
  */
-async function getLastAssistantAnswer(threadId, apiKey) {
+async function getRecentConversationContext(threadId, apiKey, limit = 8, maxTurns = 4) {
   try {
-    const messages = await api(`/threads/${threadId}/messages?limit=10`, {}, apiKey);
-    return extractLatestAssistantText(messages) || "";
+    const messages = await api(`/threads/${threadId}/messages?limit=${limit}`, {}, apiKey);
+    const data = Array.isArray(messages?.data) ? messages.data : [];
+    if (!data.length) return "";
+
+    // nejdřív seřadit od nejstarší k nejnovější (kvůli kontextu)
+    const ordered = [...data].sort((a, b) => (a.created_at || 0) - (b.created_at || 0));
+
+    // vyber jen user/assistant a jen textové části
+    const turns = [];
+    for (const m of ordered) {
+      if (!m || (m.role !== "user" && m.role !== "assistant")) continue;
+      if (!Array.isArray(m.content) || !m.content.length) continue;
+
+      const parts = m.content
+        .map((c) => (c?.type === "text" ? c.text?.value : ""))
+        .filter(Boolean);
+
+      const text = parts.join("\n\n").trim();
+      if (!text) continue;
+
+      // zkrať každou zprávu, ať to neexpanduje do nekonečna
+      const clipped = text.length > 900 ? text.slice(0, 900) + "…" : text;
+
+      turns.push({ role: m.role, text: clipped });
+    }
+
+    if (!turns.length) return "";
+
+    // vezmi posledních maxTurns zpráv (user+assistant dohromady)
+    const tail = turns.slice(-maxTurns);
+
+    // formát:
+    // Uživatel: ...
+    // Radim: ...
+    const formatted = tail
+      .map((t) => `${t.role === "user" ? "Uživatel" : "Radim"}:\n${t.text}`)
+      .join("\n\n");
+
+    return formatted.trim();
   } catch {
     return "";
   }
@@ -163,11 +201,11 @@ export default async function handler(req) {
       threadId = created.id;
     }
 
-    // ➕ KONTEXT: poslední odpověď asistenta
-    const lastAnswer = await getLastAssistantAnswer(threadId, apiKey);
+    // ✅ KONTEXT: poslední zprávy user+assistant (krátký výpis)
+    const recentCtx = await getRecentConversationContext(threadId, apiKey, 10, 4);
 
-    const contextualMessage = lastAnswer
-      ? `KONTEXT (předchozí odpověď asistenta):\n${lastAnswer}\n\nDOTAZ UŽIVATELE:\n${message.trim()}`
+    const contextualMessage = recentCtx
+      ? `KONTEXT POSLEDNÍ KONVERZACE:\n${recentCtx}\n\nNOVÝ DOTAZ UŽIVATELE:\n${message.trim()}`
       : message.trim();
 
     // USER MESSAGE
