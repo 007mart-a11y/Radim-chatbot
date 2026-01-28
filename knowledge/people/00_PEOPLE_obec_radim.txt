@@ -1,0 +1,139 @@
+# 00_PEOPLE_obec_radim.txt
+# Přehled osob, funkcí a odpovědností v obci Radim
+# Ručně ověřená databáze – prioritní zdroj pro dotazy na vedení, správu a kontakty
+# Poslední aktualizace: 2026-01-28
+
+
+[ORG] TJ Sokol Radim, z.s.
+
+- [ROLE] předsedkyně
+  [ALIAS] vede, vedení, předseda, předsedkyně, šéf Sokola
+  [NAME] Štěpánka Kořínková
+  [RESP] vedení TJ Sokol Radim
+  [TEL] 604 238 206
+  [EMAIL] není uvedeno
+
+- [ROLE] místopředseda
+  [ALIAS] vedení, zástupce předsedy
+  [NAME] Lukáš Karban
+  [RESP] místopředseda TJ Sokol Radim
+  [TEL] 723 226 623
+  [EMAIL] není uvedeno
+
+- [ROLE] pokladník
+  [ALIAS] hospodář, finance
+  [NAME] Martina Říhová
+  [RESP] správa financí TJ Sokol Radim
+  [TEL] 728 860 482
+  [EMAIL] není uvedeno
+
+- [ROLE] jednatel, správce webu
+  [ALIAS] administrace, web
+  [NAME] Petra Macáková
+  [RESP] jednatelka TJ Sokol Radim, správa webu
+  [TEL] 777 255 193
+  [EMAIL] není uvedeno
+
+- [ROLE] členové výboru
+  [NAME] Petr Kořínek; Petra Macáková; Pavel Míka; Martina Říhová; Karel Stříbrný
+  [RESP] členové výboru TJ Sokol Radim
+
+
+- [ROLE] správce areálu
+  [ALIAS] spravuje areál, má na starosti areál, provoz
+  [NAME] Lukáš Karban
+  [RESP] správa sportovního areálu TJ Sokol Radim
+  [TEL] 723 226 623
+  [EMAIL] není uvedeno
+
+- [ROLE] správce areálu (spolupráce)
+  [NAME] Jiří Macák
+  [RESP] správa sportovního areálu TJ Sokol Radim
+  [TEL] není uvedeno
+  [EMAIL] není uvedeno
+
+
+────────────────────────────────
+
+[ORG] SDH Radim (Sbor dobrovolných hasičů)
+
+- [ROLE] starosta sboru
+  [ALIAS] vede hasiče, vedení SDH
+  [NAME] Karel Stříbrný ml.
+  [RESP] vedení SDH Radim
+  [TEL] 731 108 539
+  [EMAIL] není uvedeno
+
+- [ROLE] velitel
+  [ALIAS] velitel hasičů
+  [NAME] Jaroslav Sedláček ml.
+  [RESP] velitel SDH Radim
+  [TEL] 739 471 795
+  [EMAIL] není uvedeno
+
+- [ROLE] správce webu
+  [ALIAS] web SDH
+  [NAME] Tomáš Myšík
+  [RESP] správa webu SDH Radim
+  [TEL] 774 500 641
+  [EMAIL] tomasmysik@seznam.cz
+
+- [ROLE] vedoucí hasičského kroužku
+  [ALIAS] hasičský kroužek, mládež
+  [NAME] Petra Stříbrná
+  [RESP] vedení hasičského kroužku
+  [TEL] 603 979 507
+  [EMAIL] není uvedeno
+
+- [ROLE] obecný kontakt
+  [NAME] SDH Radim
+  [EMAIL] sdhradim@email.cz
+
+
+────────────────────────────────
+
+[ORG] Zahrádkáři Radim
+
+- [ROLE] předseda
+  [ALIAS] vede zahrádkáře, vedení
+  [NAME] Jaromír Šimek
+  [RESP] vedení spolku Zahrádkáři Radim
+  [TEL] není uvedeno
+  [EMAIL] není uvedeno
+
+- [ROLE] tajemník
+  [NAME] Václav Nidrle
+  [RESP] tajemník spolku Zahrádkáři Radim
+
+- [ROLE] hospodářka
+  [NAME] Renata Odvárková
+  [RESP] správa financí spolku Zahrádkáři Radim
+
+- [ROLE] výbor
+  [NAME] Jaroslav Štál; Jaroslav Odvárko; Hana Militká; Jiří Militký; Jaroslav Šulc
+  [RESP] členové výboru Zahrádkáři Radim
+
+
+────────────────────────────────
+
+[ORG] Obec Radim – obecní úřad
+
+- [ROLE] starostka obce
+  [ALIAS] vede obec, vedení obce
+  [NAME] Zdeňka Stříbrná
+  [RESP] starostka obce Radim
+  [TEL] 731 409 498
+  [EMAIL] není uvedeno
+
+- [ROLE] obecní úřad – hlavní kontakt
+  [ALIAS] úřad, kontakty úřadu
+  [NAME] Obecní úřad Radim
+  [ADDR] Radim 8, 507 12 Radim
+  [TEL] 731 409 498
+  [EMAIL] urad@obec-radim.cz
+  [ICO] 00272001
+  [DATA_BOX] szfj9sk
+  [BANK] 5503257329/0800
+
+- [ROLE] úřední hodiny
+  [INFO] Středa 16:00–19:00
