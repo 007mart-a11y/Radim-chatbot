@@ -38,7 +38,7 @@ const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const VECTOR_STORE_ID = process.env.VECTOR_STORE_ID;
 
 const CLEANUP_OLD = (process.env.CLEANUP_OLD ?? "1") !== "0";
-const KEEP_LATEST = parseInt(process.env.KEEP_LATEST ?? "2", 10);
+const KEEP_LATEST = parseInt(process.env.KEEP_LATEST ?? "1", 10);
 
 const PREFIX = process.env.FULL_PREFIX ?? "99_FULL_obec_radim";
 const OUT_DIR = process.env.FULL_OUT_DIR ?? "knowledge";
