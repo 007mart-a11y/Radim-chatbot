@@ -1,5 +1,6 @@
 // scripts/full_radim_build_and_upload.mjs
-// FULL crawl + clean output + DOCUMENTS index (direct download links) + upload to OpenAI Vector Store + cleanup
+// FULL crawl + clean output + DOCUMENTS index (direct download links)
+// + build LATEST file (00_LATEST_...) + upload both to OpenAI Vector Store + cleanup
 //
 // Requirements: Node 18+ (native fetch/FormData/Blob), dependency: jsdom
 //   npm i jsdom
@@ -8,11 +9,20 @@
 //   SITE_BASE_URL=https://www.obec-radim.cz
 //   OPENAI_API_KEY=...
 //   VECTOR_STORE_ID=...
+//
 //   CLEANUP_OLD=1 (default) | 0
-//   KEEP_LATEST=2 (default)
+//   KEEP_LATEST=2 (default)                // keep last N FULL files
 //   FULL_PREFIX=99_FULL_obec_radim (default)
 //   FULL_OUT_DIR=knowledge (default)
 //   FULL_OUT_FILE=99_FULL_obec_radim.txt (default)
+//
+//   // LATEST (new)
+//   LATEST_PREFIX=00_LATEST_obec_radim (default)
+//   LATEST_OUT_FILE=00_LATEST_obec_radim.txt (default)
+//   LATEST_MAX_ITEMS=40 (default)
+//   CLEANUP_OLD_LATEST=1 (default) | 0
+//   KEEP_LATEST_LATEST=6 (default)         // keep last N LATEST files
+//
 //   MAX_PAGES=450 (default)
 //   CONCURRENCY=3 (default)
 //   REQUEST_TIMEOUT_MS=25000 (default)
@@ -33,6 +43,14 @@ const KEEP_LATEST = parseInt(process.env.KEEP_LATEST ?? "2", 10);
 const PREFIX = process.env.FULL_PREFIX ?? "99_FULL_obec_radim";
 const OUT_DIR = process.env.FULL_OUT_DIR ?? "knowledge";
 const OUT_FILE = process.env.FULL_OUT_FILE ?? `${PREFIX}.txt`;
+
+// ---------- LATEST ENV ----------
+const LATEST_PREFIX = process.env.LATEST_PREFIX ?? "00_LATEST_obec_radim";
+const LATEST_OUT_FILE = process.env.LATEST_OUT_FILE ?? `${LATEST_PREFIX}.txt`;
+const LATEST_MAX_ITEMS = parseInt(process.env.LATEST_MAX_ITEMS ?? "40", 10);
+
+const CLEANUP_OLD_LATEST = (process.env.CLEANUP_OLD_LATEST ?? "1") !== "0";
+const KEEP_LATEST_LATEST = parseInt(process.env.KEEP_LATEST_LATEST ?? "6", 10);
 
 const MAX_PAGES = parseInt(process.env.MAX_PAGES ?? "450", 10);
 const CONCURRENCY = Math.max(1, parseInt(process.env.CONCURRENCY ?? "3", 10));
@@ -212,7 +230,8 @@ function classifyDocType(titleOrUrl) {
   if (s.includes("vyhláška") || s.includes("obecně závazná vyhláška") || s.includes("ozv")) return "VYHLÁŠKA";
   if (s.includes("nařízení")) return "NAŘÍZENÍ";
   if (s.includes("zpravodaj")) return "ZPRAVODAJ";
-  if (s.includes("úřední deska") || s.includes("uredni-deska") || s.includes("záměr") || s.includes("zamer")) return "ÚŘEDNÍ_DESKA";
+  if (s.includes("úřední deska") || s.includes("uredni-deska") || s.includes("záměr") || s.includes("zamer"))
+    return "ÚŘEDNÍ_DESKA";
   if (s.includes("rozpočet") || s.includes("rozpočt") || s.includes("rozpoct")) return "ROZPOČET";
   if (s.includes("formulář") || s.includes("formular")) return "FORMULÁŘ";
   if (s.includes("svoz") || s.includes("odpady") || s.includes("bioodpad")) return "ODPADY";
@@ -362,6 +381,119 @@ function isHtmlResponse(r) {
   return ct.includes("text/html") || ct.includes("application/xhtml+xml");
 }
 
+/* ============================================================
+   LATEST helpers
+   ============================================================ */
+
+function pickBestDateForPage(p) {
+  // 1) explicitně z published
+  const d1 = findDateInText(p?.published || "");
+  if (d1) return d1;
+
+  // 2) z URL
+  const d2 = findDateInText(p?.url || "");
+  if (d2) return d2;
+
+  // 3) z titulku
+  const d3 = findDateInText(p?.title || "");
+  if (d3) return d3;
+
+  // 4) z prvních ~1500 znaků obsahu
+  const sample = (p?.content || "").slice(0, 1500);
+  const d4 = findDateInText(sample);
+  if (d4) return d4;
+
+  return null;
+}
+
+function isLatestPageUrl(url) {
+  // držíme to jednoduché: aktuality / kalendář / úřední deska / zpravodaj
+  return /\/(aktualne\/aktuality|aktualne\/kalendar-akci|uredni-deska|zpravodaj)\b/i.test(url || "");
+}
+
+async function buildLatestFile(latestPath, pages, docs) {
+  await fs.mkdir(path.dirname(latestPath), { recursive: true });
+
+  const pageItems = pages
+    .filter((p) => isLatestPageUrl(p.url))
+    .map((p) => {
+      const date = pickBestDateForPage(p);
+      const snippet = (p.content || "").split("\n").slice(0, 12).join("\n").trim();
+      return {
+        kind: "PAGE",
+        date: date || "",
+        title: (p.title || "").trim(),
+        url: p.url,
+        snippet,
+      };
+    });
+
+  const docItems = (docs || [])
+    .map((d) => ({
+      kind: "DOC",
+      date: d.date || "",
+      type: d.type || "DOKUMENT",
+      title: (d.title || "").replace(/\s+/g, " ").trim(),
+      url: d.url,
+      foundOn: d.foundOn || "",
+    }))
+    .filter((d) => d.date || /ÚŘEDNÍ_DESKA|VYHLÁŠKA|NAŘÍZENÍ|ZPRAVODAJ|ROZPOČET/i.test(d.type));
+
+  function sortByDateDesc(a, b) {
+    const da = a.date || "";
+    const db = b.date || "";
+    if (da && db) return db.localeCompare(da);
+    if (da && !db) return -1;
+    if (!da && db) return 1;
+    return (a.title || "").localeCompare(b.title || "");
+  }
+
+  pageItems.sort(sortByDateDesc);
+  docItems.sort(sortByDateDesc);
+
+  const merged = [...pageItems, ...docItems];
+
+  const seen = new Set();
+  const final = [];
+  for (const it of merged) {
+    if (!it.url || seen.has(it.url)) continue;
+    seen.add(it.url);
+    final.push(it);
+    if (final.length >= LATEST_MAX_ITEMS) break;
+  }
+
+  const header = [
+    `${LATEST_PREFIX}`,
+    `Vygenerováno: ${new Date().toISOString()}`,
+    `Zdroj: ${SITE_BASE_URL}`,
+    ``,
+    `Tento soubor obsahuje nejnovější položky (aktuality, akce, úřední deska, dokumenty).`,
+    `Řazeno od nejnovějších dle nalezeného data (pokud je dostupné).`,
+    ``,
+    `==============================`,
+    `=== LATEST (${final.length})`,
+    `Formát: KIND | DATE | TITLE/TYPE | URL | EXTRA`,
+    ``,
+  ].join("\n");
+
+  let body = "";
+  for (const it of final) {
+    if (it.kind === "PAGE") {
+      const title = (it.title || "").replace(/\s+/g, " ").trim();
+      const snippet = (it.snippet || "").trim();
+      body += `PAGE | ${it.date || ""} | ${title} | ${it.url} |\n`;
+      if (snippet) body += `${snippet}\n`;
+      body += `\n`;
+    } else {
+      body += `DOC | ${it.date || ""} | ${it.type} | ${it.title} | ${it.url} | ${it.foundOn}\n`;
+    }
+  }
+
+  const text = header + body.trim() + "\n";
+  await fs.writeFile(latestPath, text, "utf-8");
+  console.log("LATEST written:", latestPath);
+}
+
 // ---------- FULL CRAWLER ----------
 async function buildFullKnowledgeFile(outPath) {
   console.log("Building FULL knowledge from:", SITE_BASE_URL);
@@ -474,14 +606,12 @@ async function buildFullKnowledgeFile(outPath) {
         pageHashSeen.add(contentKey);
 
         // local downloads for page (limit noise)
-        const localDownloads = downloads
-          .slice(0, 60)
-          .map((d) => ({
-            url: d.url,
-            title: d.title,
-            date: d.date,
-            type: d.type,
-          }));
+        const localDownloads = downloads.slice(0, 60).map((d) => ({
+          url: d.url,
+          title: d.title,
+          date: d.date,
+          type: d.type,
+        }));
 
         pages.push({
           url,
@@ -571,6 +701,8 @@ async function buildFullKnowledgeFile(outPath) {
 
   console.log("FULL written:", outPath);
   console.log("Pages:", pages.length, "Docs:", docs.length, "Seen:", seen.size, "Queue left:", queue.length);
+
+  return { pages, docs };
 }
 
 // ---------- OpenAI helpers (fetch, bez SDK) ----------
@@ -631,6 +763,9 @@ async function getFileMeta(fileId) {
 function isFullName(name) {
   return name?.startsWith(PREFIX);
 }
+function isLatestName(name) {
+  return name?.startsWith(LATEST_PREFIX);
+}
 
 // ---------- MAIN ----------
 export async function main() {
@@ -638,28 +773,48 @@ export async function main() {
   if (!VECTOR_STORE_ID) throw new Error("Missing VECTOR_STORE_ID");
 
   const outPath = path.join(OUT_DIR, OUT_FILE);
+  const latestPath = path.join(OUT_DIR, LATEST_OUT_FILE);
 
-  console.log("== FULL RADIM ==");
+  console.log("== RADIM FULL + LATEST ==");
   console.log("SITE:", SITE_BASE_URL);
-  console.log("OUT:", outPath);
-  console.log("PREFIX:", PREFIX);
+  console.log("FULL OUT:", outPath);
+  console.log("LATEST OUT:", latestPath);
+  console.log("FULL PREFIX:", PREFIX);
+  console.log("LATEST PREFIX:", LATEST_PREFIX);
 
-  // A) build FULL (single file)
-  await buildFullKnowledgeFile(outPath);
+  // A) build FULL
+  const { pages, docs } = await buildFullKnowledgeFile(outPath);
 
   const stat = await fs.stat(outPath);
   if (stat.size < 50_000) {
     throw new Error(`FULL file too small (${stat.size} bytes) – refusing upload`);
   }
 
-  // B) upload + attach
-  console.log("Uploading file to OpenAI...");
-  const fileId = await uploadFileToOpenAI(outPath);
-  console.log("Uploaded file_id:", fileId);
+  // A2) build LATEST
+  await buildLatestFile(latestPath, pages, docs);
 
-  console.log("Attaching to vector store...");
+  const latestStat = await fs.stat(latestPath);
+  if (latestStat.size < 5_000) {
+    throw new Error(`LATEST file too small (${latestStat.size} bytes) – refusing upload`);
+  }
+
+  // B) upload + attach FULL
+  console.log("Uploading FULL file to OpenAI...");
+  const fileId = await uploadFileToOpenAI(outPath);
+  console.log("Uploaded FULL file_id:", fileId);
+
+  console.log("Attaching FULL to vector store...");
   const vsAttach = await attachToVectorStore(fileId);
-  console.log("Attached:", vsAttach?.id || "ok");
+  console.log("Attached FULL:", vsAttach?.id || "ok");
+
+  // B2) upload + attach LATEST
+  console.log("Uploading LATEST file to OpenAI...");
+  const latestFileId = await uploadFileToOpenAI(latestPath);
+  console.log("Uploaded LATEST file_id:", latestFileId);
+
+  console.log("Attaching LATEST to vector store...");
+  const vsAttachLatest = await attachToVectorStore(latestFileId);
+  console.log("Attached LATEST:", vsAttachLatest?.id || "ok");
 
   // C) cleanup old FULLs (keep KEEP_LATEST)
   if (CLEANUP_OLD) {
@@ -689,7 +844,44 @@ export async function main() {
       `FULL items in store: ${fullItems.length}, keeping: ${Math.min(KEEP_LATEST, fullItems.length)}, deleting: ${toDelete.length}`
     );
     for (const d of toDelete) {
-      console.log("Deleting:", d.filename, d.vsId);
+      console.log("Deleting FULL:", d.filename, d.vsId);
+      await deleteVectorStoreFile(d.vsId);
+    }
+  }
+
+  // D) cleanup old LATEST (keep KEEP_LATEST_LATEST)
+  if (CLEANUP_OLD_LATEST) {
+    console.log("Cleanup old LATEST files in vector store...");
+    const list = await listVectorStoreFiles();
+    const items = list?.data || [];
+
+    const latestItems = [];
+    for (const it of items) {
+      const fid = it?.file_id || it?.file?.id;
+      if (!fid) continue;
+      const meta = await getFileMeta(fid);
+      if (isLatestName(meta?.filename)) {
+        latestItems.push({
+          vsId: it.id,
+          fileId: fid,
+          filename: meta.filename,
+          created_at: meta.created_at || 0,
+        });
+      }
+    }
+
+    latestItems.sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
+    const toDeleteLatest = latestItems.slice(KEEP_LATEST_LATEST);
+
+    console.log(
+      `LATEST items in store: ${latestItems.length}, keeping: ${Math.min(
+        KEEP_LATEST_LATEST,
+        latestItems.length
+      )}, deleting: ${toDeleteLatest.length}`
+    );
+
+    for (const d of toDeleteLatest) {
+      console.log("Deleting LATEST:", d.filename, d.vsId);
       await deleteVectorStoreFile(d.vsId);
     }
   }
