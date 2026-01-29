@@ -180,21 +180,37 @@ function normalizeUrlsInText(text) {
 }
 
 /**
- * ✅ Run instructions: doplněné o dnešní datum + navigační chování.
+ * ✅ Run instructions – MIN změna, ale zásadní pro relevanci:
+ * - žádné "nejbližší stránku když nevíš"
+ * - ceny/poplatky jen pokud je ve zdroji částka + platnost
+ * - pronájmy sportovišť: preferuj ceník/sportovní areál, ne vedení
+ * - URL nikdy nekonstruuj
  */
 function buildRunInstructions() {
-  // stabilní "dnes" z backendu
   const today = new Date().toLocaleDateString("cs-CZ"); // např. 28. 1. 2026
 
   return (
     `Jsi oficiální AI asistent obce Radim.\n` +
     `Dnes je ${today}.\n` +
-    `Odpovídáš výhradně na základě dokumentů ve znalostní bázi (včetně 99_FULL_obec_radim.txt a PEOPLE, pokud jsou přiloženy).\n` +
+    `Odpovídáš pouze podle oficiálních podkladů ve znalostní bázi.\n` +
     `Styl: úřední, věcný, stručný.\n\n` +
-    `Navigace (povinné):\n` +
-    `- Pokud máš k odpovědi konkrétní URL, vždy ji uveď.\n` +
-    `- Pokud nemáš přímý odkaz, uveď nejbližší relevantní stránku/sekci, kde se to řeší (a pokud je ve zdroji URL na tu stránku, uveď ji).\n` +
-    `- Nepiš obecné rady typu "navštivte web" bez uvedení konkrétního odkazu.\n`
+
+    `KRITICKÉ:\n` +
+    `- Neimprovizuj. Pokud to není jednoznačně uvedeno v podkladech, použij přesně tuto větu:\n` +
+    `  "Tuto informaci bohužel nemám k dispozici v oficiálních podkladech obce Radim."\n` +
+    `- URL uváděj jen tehdy, když je v podkladech doslova. Nikdy URL nevymýšlej ani neodvozuj.\n\n` +
+
+    `RELEVANCE (aby ses nechytal první shody):\n` +
+    `- Odpověz až po ověření, že nalezená pasáž řeší přesně dotaz.\n` +
+    `- Pokud existuje více podobných údajů, uveď jen ten, který je výslovně označen jako platný/aktuální.\n\n` +
+
+    `CENY A POPLATKY:\n` +
+    `- U částek (poplatky, ceníky, pronájmy) uveď částku pouze tehdy, když je v podkladech uvedena přímo spolu s kontextem/platností.\n` +
+    `- Pokud v podkladech není přímá částka, nepředpokládej ji a použij fallback větu.\n\n` +
+
+    `PRONÁJEM HALY / SPORTOVIŠŤ:\n` +
+    `- Pokud se dotaz týká pronájmu/ceny sportovišť, hledej primárně ceník/pronájem (sportovní areál), ne kontakt na vedení.\n` +
+    `- Telefon dávej jen na osobu, která je uvedena jako správce/rezervace/pronájem, ne automaticky na předsedu.\n`
   );
 }
 
@@ -209,7 +225,6 @@ function pickLastPersonFromText(text) {
   const t = String(text || "");
   const matches = [...t.matchAll(PERSON_REGEX)].map((m) => `${m[1]} ${m[2]}`);
 
-  // Odfiltruj nejčastější ne-osoby
   const filtered = matches.filter((name) => {
     const n = name.toLowerCase();
     if (n.startsWith("obec ")) return false;
@@ -274,10 +289,6 @@ async function getLastReferencedPersonFromThread(threadId, apiKey, limit = 12) {
   }
 }
 
-/**
- * ✅ Spolehlivé zajištění threadu:
- * - když je incoming thread_id neplatný (404), vytvoří nový.
- */
 async function ensureThreadId(incomingThreadId, apiKey) {
   let threadId = incomingThreadId;
 
@@ -298,9 +309,6 @@ async function ensureThreadId(incomingThreadId, apiKey) {
   }
 }
 
-/**
- * ✅ Spolehlivé přidání zprávy do threadu s jednorázovým fallbackem při 404.
- */
 async function addUserMessageWithFallback(threadId, content, apiKey) {
   try {
     await api(
@@ -334,10 +342,6 @@ async function addUserMessageWithFallback(threadId, content, apiKey) {
   }
 }
 
-/* =========================================================
-   ✅ Fallback hláška
-   ========================================================= */
-
 const REQUIRED_FALLBACK =
   "Tuto informaci bohužel nemám k dispozici v oficiálních podkladech obce Radim.";
 
@@ -360,17 +364,14 @@ export default async function handler(req) {
       return jsonResponse(400, { ok: false, error: "Missing message" });
     }
 
-    // ✅ Reset threadu (opravdový reset)
     const msgTrim = String(message).trim();
     if (msgTrim.toLowerCase() === "reset") {
       const created = await api("/threads", { method: "POST" }, apiKey);
       return jsonResponse(200, { ok: true, answer: "Resetováno.", thread_id: created.id });
     }
 
-    // ✅ pokračujeme ve stejném threadu, když přijde; jinak založíme nový.
     let threadId = await ensureThreadId(body?.thread_id, apiKey);
 
-    // ✅ HARD COREFERENCE:
     let outgoingMessage = msgTrim;
 
     const needRewrite =
@@ -385,10 +386,8 @@ export default async function handler(req) {
       }
     }
 
-    // 1) user msg (s fallbackem, kdyby threadId přece jen neexistoval)
     threadId = await addUserMessageWithFallback(threadId, outgoingMessage, apiKey);
 
-    // 2) run
     const run = await api(
       `/threads/${threadId}/runs`,
       {
@@ -397,14 +396,13 @@ export default async function handler(req) {
         body: JSON.stringify({
           assistant_id: assistantId,
           instructions: buildRunInstructions(),
-          temperature: 0.1,
+          temperature: 0.0, // ✅ změna: méně domýšlení, víc jistoty
           top_p: 1,
         }),
       },
       apiKey
     );
 
-    // 3) poll
     const started = Date.now();
     const timeoutMs = 45_000;
 
@@ -435,14 +433,12 @@ export default async function handler(req) {
       break;
     }
 
-    // 4) read messages
     const messages = await api(`/threads/${threadId}/messages?limit=50`, {}, apiKey);
     let answer = extractLatestAssistantText(messages);
 
     answer = cleanAnswer(answer);
     answer = normalizeUrlsInText(answer);
 
-    // ✅ fallback jen když fakt není co vrátit
     if (!answer) answer = REQUIRED_FALLBACK;
 
     return jsonResponse(200, { ok: true, answer, thread_id: threadId });
