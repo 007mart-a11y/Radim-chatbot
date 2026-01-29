@@ -345,6 +345,25 @@ async function addUserMessageWithFallback(threadId, content, apiKey) {
 const REQUIRED_FALLBACK =
   "Tuto informaci bohužel nemám k dispozici v oficiálních podkladech obce Radim.";
 
+/* =========================================================
+   ✅ DOPLNĚNO: HARD FILTER pro "osoby / vedení / kontakty"
+   ========================================================= */
+
+function isPeopleLeadershipQuestion(msg) {
+  const s = String(msg || "").toLowerCase();
+  return /\b(kdo\s+je|kdo\s+vede|vedení|předsed|predsed|místopředsed|mistopředsed|starosta|starostka|velitel|jednatel|pokladn|správce|spravuje|má\s+na\s+starosti|kontakt|telefon|e-?mail)\b/.test(
+    s
+  );
+}
+
+function answerHasContact(text) {
+  const t = String(text || "");
+  const hasEmail = /[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/i.test(t);
+  const hasPhone = /\b(?:\+420\s*)?(?:\d{3}\s*\d{3}\s*\d{3})\b/.test(t);
+  const hasTelWord = /\btel\.?\b/i.test(t);
+  return hasEmail || hasPhone || hasTelWord;
+}
+
 export default async function handler(req) {
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders });
 
@@ -434,9 +453,14 @@ export default async function handler(req) {
     }
 
     const messages = await api(`/threads/${threadId}/messages?limit=50`, {}, apiKey);
-    let answer = extractLatestAssistantText(messages);
+    let answerRaw = extractLatestAssistantText(messages);
 
-    answer = cleanAnswer(answer);
+    // ✅ HARD FILTER: pokud je dotaz na osoby/vedení/kontakty a odpověď nemá kontakt → fallback
+    if (isPeopleLeadershipQuestion(outgoingMessage) && !answerHasContact(answerRaw)) {
+      return jsonResponse(200, { ok: true, answer: REQUIRED_FALLBACK, thread_id: threadId });
+    }
+
+    let answer = cleanAnswer(answerRaw);
     answer = normalizeUrlsInText(answer);
 
     if (!answer) answer = REQUIRED_FALLBACK;
