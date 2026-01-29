@@ -11,7 +11,7 @@ const corsHeaders = {
 };
 
 const OPENAI_BASE_URL = "https://api.openai.com/v1";
-const OBEC_NAME = "Radim";
+const OBEC_NAZEV = "Radim"; // ✅ natvrdo pro tento projekt
 
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
@@ -115,8 +115,12 @@ function isAllowedDomain(url) {
     const u = new URL(url);
     const host = u.hostname.toLowerCase();
 
-    // POVOLENÉ domény (jen ty, které opravdu používáte)
-    const allowed = new Set(["obec-radim.cz", "www.obec-radim.cz", "zsradim.cz", "www.zsradim.cz"]);
+    const allowed = new Set([
+      "obec-radim.cz",
+      "www.obec-radim.cz",
+      "zsradim.cz",
+      "www.zsradim.cz",
+    ]);
 
     return allowed.has(host);
   } catch {
@@ -125,41 +129,26 @@ function isAllowedDomain(url) {
 }
 
 /**
- * Minimal URL normalization (OPRAVENO: obec-radimcz -> obec-radim.cz, i s www)
+ * Minimal URL normalization
  */
 function normalizeSingleUrl(raw) {
   let u = String(raw || "").trim();
   if (!u) return u;
 
-  // ořez koncové interpunkce (klikatelnost)
   u = u.replace(/[)\]}>,.;:!?]+$/g, "");
-
-  // oprava zdvojených protokolů
+  u = u.replace(/^www\.(https?:\/\/)/i, "$1");
   u = u.replace(/^https?:\/\/https:\/\//i, "https://");
   u = u.replace(/^https?:\/\/http:\/\//i, "http://");
   u = u.replace(/^(https?:\/\/)(https?:\/\/)+/i, "$1");
 
-  // dvojité //
-  u = u.replace(/([^:]\/)\/+/g, "$1");
+  // oprav chybějící tečku
+  u = u.replace(/obec-radimcz/gi, "obec-radim.cz");
 
   // občas useknuté .pdf
   u = u.replace(/\.pd$/i, ".pdf");
 
-  // ✅ oprava domény "obec-radimcz" -> "obec-radim.cz" (i s www)
-  try {
-    const parsed = new URL(u);
-    const host = parsed.hostname.toLowerCase();
-
-    if (host === "obec-radimcz") parsed.hostname = "obec-radim.cz";
-    if (host === "www.obec-radimcz") parsed.hostname = "www.obec-radim.cz";
-
-    u = parsed.toString();
-  } catch {
-    // fallback na čisté replace, kdyby to nebyla validní URL
-    u = u.replace(/\/\/www\.obec-radimcz\b/gi, "//www.obec-radim.cz");
-    u = u.replace(/\/\/obec-radimcz\b/gi, "//obec-radim.cz");
-    u = u.replace(/\bobec-radimcz\b/gi, "obec-radim.cz");
-  }
+  // dvojité //
+  u = u.replace(/([^:]\/)\/+/g, "$1");
 
   return u;
 }
@@ -176,10 +165,10 @@ function normalizeUrlsInText(text) {
   t = t.replace(re, (m) => {
     const fixed = normalizeSingleUrl(m);
 
-    // zahodit všechno mimo whitelist
+    // 1) zahodit všechno mimo whitelist
     if (!isAllowedDomain(fixed)) return "";
 
-    // pojistka: ořez interpunkce (kdyby se přilepila i po normalizaci)
+    // 2) pojistka: ořez interpunkce
     return fixed.replace(/[)\]}>,.;:!?]+$/g, "");
   });
 
@@ -191,22 +180,49 @@ function normalizeUrlsInText(text) {
 }
 
 /**
- * ✅ Run instructions: přidán "tvrdý zákaz domýšlení jmen"
+ * ✅ SYSTEM text (posílá se ke každému runu natvrdo)
  */
 function buildRunInstructions() {
   const today = new Date().toLocaleDateString("cs-CZ");
 
   return (
-    `Jsi oficiální AI asistent obce ${OBEC_NAME}.\n` +
+    `Jsi oficiální AI asistent obce ${OBEC_NAZEV}.\n` +
     `Dnes je ${today}.\n` +
-    `Odpovídáš pouze z přiložených dokumentů (File Search).\n\n` +
-    `KRITICKÉ PRAVIDLO: U jmen osob a funkcí nikdy nehádáš.\n` +
-    `Jméno uveď pouze tehdy, pokud je výslovně uvedeno v nalezeném textu.\n` +
-    `Pokud v poskytnutých podkladech jméno není nebo je nejasné, řekni přesně:\n` +
-    `"V poskytnutých podkladech to nemám uvedené."\n\n` +
-    `KONTEXT: Tento chat je výhradně pro obec ${OBEC_NAME}. Nepoužívej informace z jiných obcí.\n` +
-    `Styl: věcný, stručný.\n` +
-    `Odkazy uváděj pouze tehdy, pokud jsou v podkladech doslova. URL nikdy nekonstruuj.\n`
+    `Odpovídáš výhradně na základě přiložených dokumentů (File Search / vector store) pro obec ${OBEC_NAZEV}.\n\n` +
+
+    `KRITICKÁ PRAVIDLA (musí být splněna):\n` +
+    `1) NIKDY NEHÁDEJ: Jména osob, funkce, telefony, e-maily, úřední hodiny, termíny, částky a fakta uváděj pouze tehdy, pokud jsou výslovně uvedeny v nalezeném textu z podkladů.\n` +
+    `   Pokud nejsou, napiš přesně: "V poskytnutých podkladech to nemám uvedené."\n` +
+    `2) VŽDY PŘILOŽ ODKAZ: Ke každé odpovědi přilož minimálně 1 relevantní odkaz (URL) na stránku nebo dokument obce, odkud informace pochází.\n` +
+    `   Pokud v nalezených podkladech žádný odkaz není nebo ho nelze jednoznačně určit, napiš: "Relevantní odkaz v podkladech nemám."\n` +
+    `3) NEJAKTUÁLNĚJŠÍ INFORMACE: Pokud se k tématu v podkladech vyskytuje více verzí (starší/novější), vyber nejnovější podle data aktualizace/publikace/účinnosti.\n` +
+    `   Pokud datum chybí, nepředstírej ho.\n` +
+    `4) JSI NAVIGACE: Vždy přidej sekci "Odkazy" s 1–3 nejrelevantnějšími odkazy. Odkazy piš jako odrážky ve formátu "Název – URL".\n` +
+    `5) Když je dotaz nejasný, polož 1 doplňující otázku. Pokud je jasný, nevyptávej se.\n\n` +
+
+    `Formát odpovědi dodrž přesně:\n` +
+    `Odpověď: (1–4 věty)\n\n` +
+    `Odkazy:\n` +
+    `- (Název) – (URL)\n` +
+    `- (Název) – (URL)\n`
+  );
+}
+
+/**
+ * ✅ USER wrapper (přidá se ke KAŽDÉ otázce)
+ */
+function wrapUserQuestion(userText) {
+  const t = String(userText || "").trim();
+
+  return (
+    `KONTEXT: Tento chat je pouze pro obec ${OBEC_NAZEV}. Neodpovídej pro jiné obce.\n` +
+    `DOTAZ UŽIVATELE: ${t}\n` +
+    `POVINNOST: Odpověz stručně a přidej sekci "Odkazy" (1–3 odkazy). Pokud odkaz v podkladech není, napiš "Relevantní odkaz v podkladech nemám."\n` +
+    `\n` +
+    `Formát odpovědi dodrž přesně:\n` +
+    `Odpověď: (1–4 věty)\n\n` +
+    `Odkazy:\n` +
+    `- (Název) – (URL)\n`
   );
 }
 
@@ -285,6 +301,10 @@ async function getLastReferencedPersonFromThread(threadId, apiKey, limit = 12) {
   }
 }
 
+/**
+ * ✅ Spolehlivé zajištění threadu:
+ * - když je incoming thread_id neplatný (404), vytvoří nový.
+ */
 async function ensureThreadId(incomingThreadId, apiKey) {
   let threadId = incomingThreadId;
 
@@ -305,6 +325,9 @@ async function ensureThreadId(incomingThreadId, apiKey) {
   }
 }
 
+/**
+ * ✅ Spolehlivé přidání zprávy do threadu s jednorázovým fallbackem při 404.
+ */
 async function addUserMessageWithFallback(threadId, content, apiKey) {
   try {
     await api(
@@ -338,19 +361,12 @@ async function addUserMessageWithFallback(threadId, content, apiKey) {
   }
 }
 
+/* =========================================================
+   ✅ Fallback hláška
+   ========================================================= */
+
 const REQUIRED_FALLBACK =
   "Tuto informaci bohužel nemám k dispozici v oficiálních podkladech obce Radim.";
-
-/**
- * ✅ Wrapper per user message (posílá se pokaždé)
- */
-function wrapUserQuestion(userText) {
-  const q = String(userText || "").trim();
-  return (
-    `KONTEXT: Tento chat je výhradně pro obec ${OBEC_NAME}. Nepoužívej informace z jiných obcí.\n` +
-    `DOTAZ UŽIVATELE: ${q}`
-  );
-}
 
 export default async function handler(req) {
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders });
@@ -371,15 +387,17 @@ export default async function handler(req) {
       return jsonResponse(400, { ok: false, error: "Missing message" });
     }
 
+    // ✅ Reset threadu (opravdový reset)
     const msgTrim = String(message).trim();
     if (msgTrim.toLowerCase() === "reset") {
       const created = await api("/threads", { method: "POST" }, apiKey);
       return jsonResponse(200, { ok: true, answer: "Resetováno.", thread_id: created.id });
     }
 
+    // ✅ pokračujeme ve stejném threadu, když přijde; jinak založíme nový.
     let threadId = await ensureThreadId(body?.thread_id, apiKey);
 
-    // ✅ HARD COREFERENCE (ponecháno)
+    // ✅ HARD COREFERENCE:
     let outgoingMessage = msgTrim;
 
     const needRewrite =
@@ -394,11 +412,13 @@ export default async function handler(req) {
       }
     }
 
-    // ✅ WRAP každé user otázky podle tvého pravidla
+    // ✅ USER wrapper pro KAŽDÝ dotaz
     outgoingMessage = wrapUserQuestion(outgoingMessage);
 
+    // 1) user msg (s fallbackem, kdyby threadId přece jen neexistoval)
     threadId = await addUserMessageWithFallback(threadId, outgoingMessage, apiKey);
 
+    // 2) run
     const run = await api(
       `/threads/${threadId}/runs`,
       {
@@ -407,13 +427,14 @@ export default async function handler(req) {
         body: JSON.stringify({
           assistant_id: assistantId,
           instructions: buildRunInstructions(),
-          temperature: 0.1, // ponecháno jako dřív
+          temperature: 0.1,
           top_p: 1,
         }),
       },
       apiKey
     );
 
+    // 3) poll
     const started = Date.now();
     const timeoutMs = 45_000;
 
@@ -444,12 +465,14 @@ export default async function handler(req) {
       break;
     }
 
+    // 4) read messages
     const messages = await api(`/threads/${threadId}/messages?limit=50`, {}, apiKey);
     let answer = extractLatestAssistantText(messages);
 
     answer = cleanAnswer(answer);
     answer = normalizeUrlsInText(answer);
 
+    // ✅ fallback jen když fakt není co vrátit
     if (!answer) answer = REQUIRED_FALLBACK;
 
     return jsonResponse(200, { ok: true, answer, thread_id: threadId });
