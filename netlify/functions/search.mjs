@@ -94,11 +94,14 @@ function cleanAnswer(text) {
   // file_search citace
   t = t.replace(/【\s*\d+\s*:\s*\d+\s*†[^】]*】/g, "");
 
-  // odstranit tečku/čárku/středník atd. za URL (klikatelnost)
+  // odstranění trailing interpunkce za URL (klikatelnost)
   t = t.replace(/(https?:\/\/[^\s)\]]+)[\.,;:!?]+/g, "$1");
 
   // zrušit prázdné markdown odkazy
   t = t.replace(/\[([^\]]+)\]\(\s*\)/g, "$1");
+
+  // dočistit "Odkaz:" bez URL
+  t = t.replace(/\bOdkaz:\s*$/gim, "").trim();
 
   // whitespace
   t = t.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
@@ -107,14 +110,14 @@ function cleanAnswer(text) {
 }
 
 /**
- * ✅ Whitelist domén – nepustíme ven vymyšlené URL
+ * ✅ Whitelist domén – nepustíme ven vymyšlené URL mimo naše povolené domény
+ * (jen bezpečnostní pojistka; asistent stejně nesmí URL vymýšlet)
  */
 function isAllowedDomain(url) {
   try {
     const u = new URL(url);
     const host = u.hostname.toLowerCase();
 
-    // POVOLENÉ domény (přidej další jen pokud je máš ve FULL)
     const allowed = new Set([
       "obec-radim.cz",
       "www.obec-radim.cz",
@@ -128,9 +131,6 @@ function isAllowedDomain(url) {
   }
 }
 
-/**
- * Minimal URL normalization
- */
 function normalizeSingleUrl(raw) {
   let u = String(raw || "").trim();
   if (!u) return u;
@@ -141,7 +141,7 @@ function normalizeSingleUrl(raw) {
   u = u.replace(/^https?:\/\/http:\/\//i, "http://");
   u = u.replace(/^(https?:\/\/)(https?:\/\/)+/i, "$1");
 
-  // oprav chybějící tečku
+  // oprav typický překlep bez tečky
   u = u.replace(/obec-radimcz/gi, "obec-radim.cz");
 
   // občas useknuté .pdf
@@ -164,15 +164,10 @@ function normalizeUrlsInText(text) {
 
   t = t.replace(re, (m) => {
     const fixed = normalizeSingleUrl(m);
-
-    // 1) zahodit všechno mimo whitelist
-    if (!isAllowedDomain(fixed)) return "";
-
-    // 2) pojistka: ořez interpunkce
+    if (!isAllowedDomain(fixed)) return ""; // zahodit mimo whitelist
     return fixed.replace(/[)\]}>,.;:!?]+$/g, "");
   });
 
-  // dočistit mezery po vyhozených URL
   t = t.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n");
   t = t.replace(/[ \t]{2,}/g, " ").trim();
 
@@ -180,37 +175,59 @@ function normalizeUrlsInText(text) {
 }
 
 /**
- * ✅ Run instructions – MIN změna, ale zásadní pro relevanci:
- * - žádné "nejbližší stránku když nevíš"
- * - ceny/poplatky jen pokud je ve zdroji částka + platnost
- * - pronájmy sportovišť: preferuj ceník/sportovní areál, ne vedení
- * - URL nikdy nekonstruuj
+ * ✅ “Louny-style” instructions:
+ * - stručně, lidsky, ale bez halucinací
+ * - dovolí 1 doptání, když chybí klíčový detail
+ * - navádění pouze konkrétně (Odkaz/Cesta), bez “běžte na web”
+ * - pronájmy: preferuj správce/rezervace/ceník, ne vedení
+ * - starosta/starostka: neopírej se o “obecné znalosti”, jen podklady
  */
-function buildRunInstructions() {
-  const today = new Date().toLocaleDateString("cs-CZ"); // např. 28. 1. 2026
+function buildRunInstructions(userMsg) {
+  const today = new Date().toLocaleDateString("cs-CZ");
+
+  // malé “chytré” vynucení doptání jen tam, kde to dává smysl
+  const m = String(userMsg || "").toLowerCase();
+  const looksLikeAmbiguous =
+    /\b(odkaz|kde to najdu|kde je|jak se přihlásit|jak zaplatit|jak podat)\b/.test(m) &&
+    !/\b(poplatek|vyhlášk|formulář|územní plán|zápis|usnesen|zpravodaj|hala|areál|bioodpad)\b/.test(m);
+
+  const extraClarifyRule = looksLikeAmbiguous
+    ? `\n- Pokud dotaz není jasný (např. "pošli mi odkaz" bez čeho), polož jednu doplňující otázku, aby bylo zřejmé co přesně hledat.\n`
+    : `\n`;
 
   return (
-    `Jsi oficiální AI asistent obce Radim.\n` +
-    `Dnes je ${today}.\n` +
-    `Odpovídáš pouze podle oficiálních podkladů ve znalostní bázi.\n` +
-    `Styl: úřední, věcný, stručný.\n\n` +
+    `Jsi oficiální asistent obce Radim.\n` +
+    `Dnes je ${today}.\n\n` +
 
-    `KRITICKÉ:\n` +
-    `- Neimprovizuj. Pokud to není jednoznačně uvedeno v podkladech, použij přesně tuto větu:\n` +
-    `  "Tuto informaci bohužel nemám k dispozici v oficiálních podkladech obce Radim."\n` +
-    `- URL uváděj jen tehdy, když je v podkladech doslova. Nikdy URL nevymýšlej ani neodvozuj.\n\n` +
+    `ZÁSADY (neporušitelné):\n` +
+    `- Odpovídej jen podle oficiálních podkladů ve znalostní bázi. Nevyužívej obecné znalosti.\n` +
+    `- Neimprovizuj: nevymýšlej jména, částky, termíny ani odkazy.\n` +
+    `- URL uváděj jen tehdy, když je v podkladech doslova. URL nikdy nekonstruuj.\n` +
+    `- Pokud chybí přímá URL, ale je známá struktura, uveď "Cesta: Sekce → Podsekce → Název".\n` +
+    `- Nepiš obecné fráze typu "navštivte web" bez konkrétního Odkazu nebo Cesty.\n` +
+    `${extraClarifyRule}` +
 
-    `RELEVANCE (aby ses nechytal první shody):\n` +
-    `- Odpověz až po ověření, že nalezená pasáž řeší přesně dotaz.\n` +
-    `- Pokud existuje více podobných údajů, uveď jen ten, který je výslovně označen jako platný/aktuální.\n\n` +
+    `LIDSKÝ, ALE STRUČNÝ STYL (jako úřad):\n` +
+    `- 1–3 krátké věty k věci.\n` +
+    `- Pak případně řádek "Kontakt:" (jen pokud je kontakt u dané věci/osoby výslovně uveden).\n` +
+    `- Pak případně "Odkaz:" nebo "Cesta:".\n` +
+    `- Když něco chybí, zeptej se jednou doplňující otázkou místo domýšlení.\n\n` +
 
-    `CENY A POPLATKY:\n` +
-    `- U částek (poplatky, ceníky, pronájmy) uveď částku pouze tehdy, když je v podkladech uvedena přímo spolu s kontextem/platností.\n` +
-    `- Pokud v podkladech není přímá částka, nepředpokládej ji a použij fallback větu.\n\n` +
+    `KONTAKTY (kritické):\n` +
+    `- Telefon/e-mail uváděj u konkrétní osoby jen pokud je uveden přímo u ní.\n` +
+    `- Nikdy nepřiřazuj telefon úřadu konkrétní osobě.\n\n` +
 
-    `PRONÁJEM HALY / SPORTOVIŠŤ:\n` +
-    `- Pokud se dotaz týká pronájmu/ceny sportovišť, hledej primárně ceník/pronájem (sportovní areál), ne kontakt na vedení.\n` +
-    `- Telefon dávej jen na osobu, která je uvedena jako správce/rezervace/pronájem, ne automaticky na předsedu.\n`
+    `STAROSTA/STAROSTKA:\n` +
+    `- Odpověz pouze, pokud je jméno výslovně uvedeno v podkladech.\n` +
+    `- Pokud je uveden starosta (muž) a uživatel píše "starostka", vysvětli stručně, že starostou je uvedená osoba.\n\n` +
+
+    `PRONÁJEM HALY/SPORTOVIŠŤ:\n` +
+    `- U pronájmu/ceníku hledej primárně ceník/pronájem/sportovní areál a osobu označenou jako správce/rezervace.\n` +
+    `- Neodkazuj automaticky na vedení (předsedu), pokud podklady uvádějí správce/rezervace.\n\n` +
+
+    `KDYŽ INFORMACE NENÍ:\n` +
+    `- Pokud ani po 1 doplňující otázce nelze odpovědět z podkladů, použij přesnou větu:\n` +
+    `"Tuto informaci bohužel nemám k dispozici v oficiálních podkladech obce Radim."\n`
   );
 }
 
@@ -289,6 +306,10 @@ async function getLastReferencedPersonFromThread(threadId, apiKey, limit = 12) {
   }
 }
 
+/**
+ * ✅ Spolehlivé zajištění threadu:
+ * - když je incoming thread_id neplatný (404), vytvoří nový.
+ */
 async function ensureThreadId(incomingThreadId, apiKey) {
   let threadId = incomingThreadId;
 
@@ -309,6 +330,9 @@ async function ensureThreadId(incomingThreadId, apiKey) {
   }
 }
 
+/**
+ * ✅ Spolehlivé přidání zprávy do threadu s jednorázovým fallbackem při 404.
+ */
 async function addUserMessageWithFallback(threadId, content, apiKey) {
   try {
     await api(
@@ -345,25 +369,6 @@ async function addUserMessageWithFallback(threadId, content, apiKey) {
 const REQUIRED_FALLBACK =
   "Tuto informaci bohužel nemám k dispozici v oficiálních podkladech obce Radim.";
 
-/* =========================================================
-   ✅ DOPLNĚNO: HARD FILTER pro "osoby / vedení / kontakty"
-   ========================================================= */
-
-function isPeopleLeadershipQuestion(msg) {
-  const s = String(msg || "").toLowerCase();
-  return /\b(kdo\s+je|kdo\s+vede|vedení|předsed|predsed|místopředsed|mistopředsed|starosta|starostka|velitel|jednatel|pokladn|správce|spravuje|má\s+na\s+starosti|kontakt|telefon|e-?mail)\b/.test(
-    s
-  );
-}
-
-function answerHasContact(text) {
-  const t = String(text || "");
-  const hasEmail = /[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/i.test(t);
-  const hasPhone = /\b(?:\+420\s*)?(?:\d{3}\s*\d{3}\s*\d{3})\b/.test(t);
-  const hasTelWord = /\btel\.?\b/i.test(t);
-  return hasEmail || hasPhone || hasTelWord;
-}
-
 export default async function handler(req) {
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders });
 
@@ -384,13 +389,17 @@ export default async function handler(req) {
     }
 
     const msgTrim = String(message).trim();
+
+    // ✅ Reset threadu
     if (msgTrim.toLowerCase() === "reset") {
       const created = await api("/threads", { method: "POST" }, apiKey);
       return jsonResponse(200, { ok: true, answer: "Resetováno.", thread_id: created.id });
     }
 
+    // ✅ thread
     let threadId = await ensureThreadId(body?.thread_id, apiKey);
 
+    // ✅ HARD COREFERENCE (jen pro dotazy na kontakt se zájmeny)
     let outgoingMessage = msgTrim;
 
     const needRewrite =
@@ -405,8 +414,10 @@ export default async function handler(req) {
       }
     }
 
+    // 1) user msg
     threadId = await addUserMessageWithFallback(threadId, outgoingMessage, apiKey);
 
+    // 2) run
     const run = await api(
       `/threads/${threadId}/runs`,
       {
@@ -414,14 +425,15 @@ export default async function handler(req) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           assistant_id: assistantId,
-          instructions: buildRunInstructions(),
-          temperature: 0.0, // ✅ změna: méně domýšlení, víc jistoty
+          instructions: buildRunInstructions(outgoingMessage),
+          temperature: 0.0, // stabilita + minimum halucinací
           top_p: 1,
         }),
       },
       apiKey
     );
 
+    // 3) poll
     const started = Date.now();
     const timeoutMs = 45_000;
 
@@ -452,17 +464,14 @@ export default async function handler(req) {
       break;
     }
 
+    // 4) read messages
     const messages = await api(`/threads/${threadId}/messages?limit=50`, {}, apiKey);
-    let answerRaw = extractLatestAssistantText(messages);
+    let answer = extractLatestAssistantText(messages);
 
-    // ✅ HARD FILTER: pokud je dotaz na osoby/vedení/kontakty a odpověď nemá kontakt → fallback
-    if (isPeopleLeadershipQuestion(outgoingMessage) && !answerHasContact(answerRaw)) {
-      return jsonResponse(200, { ok: true, answer: REQUIRED_FALLBACK, thread_id: threadId });
-    }
-
-    let answer = cleanAnswer(answerRaw);
+    answer = cleanAnswer(answer);
     answer = normalizeUrlsInText(answer);
 
+    // ✅ měkký fallback: jen když je to fakt prázdné
     if (!answer) answer = REQUIRED_FALLBACK;
 
     return jsonResponse(200, { ok: true, answer, thread_id: threadId });
