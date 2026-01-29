@@ -94,8 +94,8 @@ function cleanAnswer(text) {
   // file_search citace
   t = t.replace(/【\s*\d+\s*:\s*\d+\s*†[^】]*】/g, "");
 
-  // odstranit tečku/čárku za URL
-  t = t.replace(/(https?:\/\/[^\s)\]]+)[\.,]+/g, "$1");
+  // odstranit tečku/čárku/středník atd. za URL (klikatelnost)
+  t = t.replace(/(https?:\/\/[^\s)\]]+)[\.,;:!?]+/g, "$1");
 
   // zrušit prázdné markdown odkazy
   t = t.replace(/\[([^\]]+)\]\(\s*\)/g, "$1");
@@ -104,6 +104,28 @@ function cleanAnswer(text) {
   t = t.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
 
   return t;
+}
+
+/**
+ * ✅ Whitelist domén – nepustíme ven vymyšlené URL
+ */
+function isAllowedDomain(url) {
+  try {
+    const u = new URL(url);
+    const host = u.hostname.toLowerCase();
+
+    // POVOLENÉ domény (přidej další jen pokud je máš ve FULL)
+    const allowed = new Set([
+      "obec-radim.cz",
+      "www.obec-radim.cz",
+      "zsradim.cz",
+      "www.zsradim.cz",
+    ]);
+
+    return allowed.has(host);
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -131,14 +153,29 @@ function normalizeSingleUrl(raw) {
   return u;
 }
 
+/**
+ * ✅ Normalize URLs + vyhoď všechny nepovolené domény
+ */
 function normalizeUrlsInText(text) {
   let t = String(text || "");
   if (!t) return t;
 
   const re = /\bhttps?:\/\/[^\s<>"'(){}\[\]]+/gi;
-  t = t.replace(re, (m) => normalizeSingleUrl(m));
 
-  t = t.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+  t = t.replace(re, (m) => {
+    const fixed = normalizeSingleUrl(m);
+
+    // 1) zahodit všechno mimo whitelist
+    if (!isAllowedDomain(fixed)) return "";
+
+    // 2) pojistka: ořez interpunkce
+    return fixed.replace(/[)\]}>,.;:!?]+$/g, "");
+  });
+
+  // dočistit mezery po vyhozených URL
+  t = t.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n");
+  t = t.replace(/[ \t]{2,}/g, " ").trim();
+
   return t;
 }
 
@@ -298,7 +335,7 @@ async function addUserMessageWithFallback(threadId, content, apiKey) {
 }
 
 /* =========================================================
-   ✅ Fallback hláška (jak chceš)
+   ✅ Fallback hláška
    ========================================================= */
 
 const REQUIRED_FALLBACK =
