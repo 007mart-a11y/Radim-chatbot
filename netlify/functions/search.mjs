@@ -87,13 +87,20 @@ function extractMessageText(messageObj) {
 }
 
 /**
- * Minimum cleaning:
+ * Minimum cleaning + odstranění interních zdrojů.
  */
 function cleanAnswer(text) {
   let t = String(text || "");
 
   // file_search citace
   t = t.replace(/【\s*\d+\s*:\s*\d+\s*†[^】]*】/g, "");
+
+  // odstranit interní řádky typu Zdroj: ...
+  t = t.replace(/^\s*(Zdroj|Source)\s*:\s*.*$/gim, "");
+
+  // odstranit výskyty interních názvů souborů (00_..., 99_FULL..., .txt/.json)
+  t = t.replace(/\b\d{2,3}_[A-Z0-9_]+\.(txt|json)\b/gi, "");
+  t = t.replace(/\b(file_search|vector store|vector_store|knowledge base|knowledge_base|báze|baze)\b/gi, "");
 
   // odstranit tečku/čárku/středník atd. za URL (klikatelnost)
   t = t.replace(/(https?:\/\/[^\s)\]]+)[\.,;:!?]+/g, "$1");
@@ -141,7 +148,7 @@ function normalizeSingleUrl(raw) {
   u = u.replace(/^https?:\/\/http:\/\//i, "http://");
   u = u.replace(/^(https?:\/\/)(https?:\/\/)+/i, "$1");
 
-  // ✅ oprav chybějící tečku v doméně
+  // oprav chybějící tečku v doméně
   u = u.replace(/obec-radimcz/gi, "obec-radim.cz");
 
   // občas useknuté .pdf
@@ -164,11 +171,7 @@ function normalizeUrlsInText(text) {
 
   t = t.replace(re, (m) => {
     const fixed = normalizeSingleUrl(m);
-
-    // 1) zahodit všechno mimo whitelist
     if (!isAllowedDomain(fixed)) return "";
-
-    // 2) pojistka: ořez interpunkce
     return fixed.replace(/[)\]}>,.;:!?]+$/g, "");
   });
 
@@ -194,7 +197,6 @@ function removePriceSectionIfNotRelevant(answerText, userText) {
   let t = String(answerText || "");
   if (!t) return t;
 
-  // když uživatel cenu vůbec neřeší, sekci "Cena / podmínky" pryč (ať už je vyplněná nebo "Není uvedeno")
   if (!isPriceRelevantQuestion(userText)) {
     t = t.replace(
       /(^|\n)Cena\s*\/\s*podmínky:\s*\n([\s\S]*?)(?=\n(?:Odkazy:|$)|\n{2,})/i,
@@ -204,7 +206,6 @@ function removePriceSectionIfNotRelevant(answerText, userText) {
     return t;
   }
 
-  // když cena relevantní je, ale je tam jen "Není uvedeno", odstraň
   t = t.replace(
     /(^|\n)Cena\s*\/\s*podmínky:\s*\n\s*Není uvedeno\s*(?=\n(?:Odkazy:|$)|\n{2,})/i,
     "\n"
@@ -216,24 +217,30 @@ function removePriceSectionIfNotRelevant(answerText, userText) {
 
 /* =========================================================
    ✅ NAVIGACE PO WEBU (blbuvzdorné odkazy z backendu)
-   - přidá odkazy i když je model neuvede
-   - když model spadne na fallback u zjevně navigačního dotazu, backend vrátí navigační odpověď
    ========================================================= */
 
 const NAV_LINKS = [
+  // Starosta / starostka => kontakty úřadu (kde to typicky bývá)
   {
-    // Úřední deska – ověřená veřejná stránka (u Radimi běží i "verze pro seniory")
-    patterns: [/\b(úřední deska|uredni deska)\b/i],
-    links: [["Úřední deska obce Radim", "https://www.obec-radim.cz/seniori/urad/uredni-deska/"]],
+    patterns: [/\b(starosta|starostka|místostarosta|mistostarosta)\b/i],
+    links: [["Kontakty a úřední hodiny (vedení obce)", "https://www.obec-radim.cz/urad/kontakty/"]],
   },
+  // Úřední hodiny / kontakty
   {
     patterns: [/\b(kontakt|kontakty|úřední hodiny|uredni hodiny|telefon|e-?mail|datová schránka|datova schranka)\b/i],
     links: [["Kontakty a úřední hodiny", "https://www.obec-radim.cz/urad/kontakty/"]],
   },
+  // Úřední deska
+  {
+    patterns: [/\b(úřední deska|uredni deska)\b/i],
+    links: [["Úřední deska obce Radim", "https://www.obec-radim.cz/seniori/urad/uredni-deska/"]],
+  },
+  // Bioodpad
   {
     patterns: [/\b(bioodpad|skládka bioodpadu|skladka bioodpadu|kompost)\b/i],
     links: [["Skládka bioodpadu", "https://www.obec-radim.cz/urad/skladka-bioodpadu/"]],
   },
+  // Sokol
   {
     patterns: [/\b(sokol|tj\s*sokol)\b/i],
     links: [
@@ -241,10 +248,12 @@ const NAV_LINKS = [
       ["TJ Sokol Radim – kontakty", "https://www.obec-radim.cz/organizace-a-spolky/sokolove/o-nas/kontakty/"],
     ],
   },
+  // Hasiči
   {
     patterns: [/\b(hasič|hasici|sdh|mladí hasiči|mladi hasici|hasičský kroužek|hasicsky krouzek)\b/i],
-    links: [["Hasiči – aktuálně o sboru (kontakty)", "https://www.obec-radim.cz/organizace-a-spolky/hasici/aktualne-o-sboru/"]],
+    links: [["Hasiči – aktuálně o sboru", "https://www.obec-radim.cz/organizace-a-spolky/hasici/aktualne-o-sboru/"]],
   },
+  // Czech POINT (ověření podpisu atd.)
   {
     patterns: [/\b(czech\s*point|ověřit podpis|overit podpis|legalizace|vidimace)\b/i],
     links: [["Czech POINT", "https://www.obec-radim.cz/urad/czech-point/"]],
@@ -282,7 +291,7 @@ function appendNavLinksIfMissing(answerText, userText) {
   const links = getNavLinksForQuestion(userText);
   if (!links.length) return t;
 
-  // pokud už odpověď nějaký povolený URL má, nic nenutíme
+  // pokud už odpověď má nějaký povolený URL, nenuť další
   if (answerHasAllowedUrl(t)) return t;
 
   t += "\n\nOdkazy:\n";
@@ -294,7 +303,7 @@ function appendNavLinksIfMissing(answerText, userText) {
 
 function isClearlyNavigationQuestion(userText) {
   const s = String(userText || "").toLowerCase();
-  return /\b(odkaz|link|kde najdu|kde je|úřední deska|uredni deska|kontakty|úřední hodiny|uredni hodiny|bioodpad|skládka|sokol|hasič|hasici|czech point|ověřit podpis|overit podpis)\b/.test(
+  return /\b(odkaz|link|kde najdu|kde je|úřední deska|uredni deska|kontakty|úřední hodiny|uredni hodiny|bioodpad|skládka|sokol|hasič|hasici|czech point|ověřit podpis|overit podpis|starosta|starostka)\b/.test(
     s
   );
 }
@@ -307,41 +316,16 @@ function buildNavigationOnlyAnswer(userText) {
     t += `- ${label} – ${url}\n`;
   }
   t += `\nOdpovědná osoba / úřad:\nObecní úřad ${OBEC_NAZEV}\n`;
-  t += `\nKontakt:\nViz stránka „Kontakty a úřední hodiny“.`;
+  t += `\nKontakt:\n- Kontakty a úřední hodiny – https://www.obec-radim.cz/urad/kontakty/`;
   return t.trim();
-}
-
-/* =========================================================
-   ✅ Anti-halucinace: pokud padne jméno, musí existovat veřejný odkaz
-   ========================================================= */
-
-const PERSON_REGEX =
-  /\b([A-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ][a-záčďéěíňóřšťúůýž]+)\s+([A-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ][a-záčďéěíňóřšťúůýž]+)\b/g;
-
-function answerContainsPersonName(answerText) {
-  const t = String(answerText || "");
-  const matches = [...t.matchAll(PERSON_REGEX)].map((m) => `${m[1]} ${m[2]}`);
-  // pokud není žádné "Jméno Příjmení", false
-  return matches.length > 0;
-}
-
-function enforceNameMustHaveLink(answerText, userText, fallbackText) {
-  const a = String(answerText || "").trim();
-  if (!a) return a;
-
-  // jméno v odpovědi + žádný povolený URL => buď doplň navigační linky, nebo fallback
-  if (answerContainsPersonName(a) && !answerHasAllowedUrl(a)) {
-    const withNav = appendNavLinksIfMissing(a, userText);
-    // pokud ani po nav doplnění není žádný povolený url (nemáme mapu), radši fallback
-    if (!answerHasAllowedUrl(withNav)) return fallbackText;
-    return withNav;
-  }
-  return a;
 }
 
 /* =========================================================
    ✅ HARD COREFERENCE: přepis zájmen -> explicitní osoba
    ========================================================= */
+
+const PERSON_REGEX =
+  /\b([A-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ][a-záčďéěíňóřšťúůýž]+)\s+([A-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ][a-záčďéěíňóřšťúůýž]+)\b/g;
 
 function pickLastPersonFromText(text) {
   const t = String(text || "");
@@ -412,8 +396,7 @@ async function getLastReferencedPersonFromThread(threadId, apiKey, limit = 12) {
 }
 
 /**
- * ✅ Spolehlivé zajištění threadu:
- * - když je incoming thread_id neplatný (404), vytvoří nový.
+ * Thread helpers
  */
 async function ensureThreadId(incomingThreadId, apiKey) {
   let threadId = incomingThreadId;
@@ -435,9 +418,6 @@ async function ensureThreadId(incomingThreadId, apiKey) {
   }
 }
 
-/**
- * ✅ Spolehlivé přidání zprávy do threadu s jednorázovým fallbackem při 404.
- */
 async function addUserMessageWithFallback(threadId, content, apiKey) {
   try {
     await api(
@@ -474,49 +454,95 @@ async function addUserMessageWithFallback(threadId, content, apiKey) {
 const REQUIRED_FALLBACK = "Tato informace není v dostupných podkladech obce uvedena.";
 
 /**
- * ✅ FINÁLNÍ INSTRUKCE PRO ASISTENTA (BACKEND)
+ * ✅ Instructions (zákaz interních zdrojů + důraz na odkazy)
  */
-function buildRunInstructions() {
-  return (
+function buildRunInstructions({ retryMode = false } = {}) {
+  const base =
     `Jsi oficiální AI asistent obce ${OBEC_NAZEV}.\n` +
-    `Tvým úkolem je pomáhat občanům jako digitální úředník a navigátor po obci ${OBEC_NAZEV}.\n\n` +
+    `Pomáháš občanům jako digitální úředník a navigátor po webu obce.\n\n` +
+    `Odpovídáš výhradně z oficiálních veřejných podkladů obce ${OBEC_NAZEV} (web obce a dokumenty).\n` +
+    `Nepoužívej informace z jiných obcí.\n\n` +
+    `🚫 Kriticky důležité:\n` +
+    `- Nevymýšlej jména, funkce, kontakty, termíny, ceny ani postupy.\n` +
+    `- Pokud si nejsi jistý, použij přesně větu: „${REQUIRED_FALLBACK}“\n\n` +
+    `🔒 Zákaz interních informací:\n` +
+    `- NIKDY neuváděj názvy souborů, zdroje typu 00_*.txt, 99_FULL*.txt, file_search, vector store ani "Zdroj: ...".\n` +
+    `- Uváděj pouze veřejné odkazy na stránky obce.\n\n` +
+    `🔗 Odkazy:\n` +
+    `- Kdykoliv je to možné, připoj relevantní veřejný odkaz (https://...) na stránku obce, kde je informace uvedena.\n\n` +
+    `Formát odpovědi:\n` +
+    `Odpověď:\n...\n\n` +
+    `Odpovědná osoba / úřad:\n...\n\n` +
+    `Kontakt:\n...\n\n` +
+    `Odkazy:\n- Název stránky – https://...\n`;
 
-    `Odpovídáš výhradně na základě oficiálních veřejných informací obce ${OBEC_NAZEV} (web obce, dokumenty, zveřejněné kontakty).\n` +
-    `Nikdy nepoužívej informace z jiných obcí.\n\n` +
+  if (!retryMode) return base;
 
-    `🚫 ZÁKAZ HÁDÁNÍ A HALUCINACÍ (kritické)\n` +
-    `NIKDY nevymýšlej jména osob, funkce, kontakty, ceny, termíny ani postupy.\n` +
-    `Jména osob, kontakty, úřední hodiny, ceny a postupy uváděj POUZE tehdy, pokud jsou jasně uvedeny v podkladech.\n\n` +
-
-    `Pokud informace chybí nebo nejsou jednoznačné, napiš přesně:\n` +
-    `„Tato informace není v dostupných podkladech obce uvedena.“\n\n` +
-
-    `🧭 ROLE: NAVIGÁTOR + ÚŘEDNÍK\n` +
-    `Když odpovídáš, mysli jako obecní úředník: rozpoznej, zda jde o fakt, nebo o postup.\n` +
-    `U postupových dotazů (rezervace, ověření podpisu, poplatky, žádosti) uveď kroky a kontakt, pokud jsou v podkladech.\n\n` +
-
-    `🔗 ODKAZY (důležité)\n` +
-    `Kdykoliv je to možné, připoj relevantní veřejný odkaz na stránku obce, kde je informace uvedena.\n` +
-    `Odkazy dávej pouze úplné (https://…) a z oficiálního webu obce.\n` +
-    `Nikdy neposílej odkazy na interní bázi / files / knowledge base.\n\n` +
-
-    `🕒 AKTUÁLNOST\n` +
-    `Pokud existuje více verzí informace, upřednostni nejnovější podle data publikace/účinnosti. Pokud datum není, nedoplňuj ho.\n\n` +
-
-    `🧾 FORMÁT\n` +
-    `Odpověď:\n(stručně, nebo delší u postupů)\n\n` +
-    `Odpovědná osoba / úřad:\n(jméno + funkce, pokud existuje)\n\n` +
-    `Kontakt:\n(telefon / e-mail, pokud existuje)\n\n` +
-    `Odkazy:\n- Název stránky – https://…\n`
+  // retry mód = přinutit cílené dohledání u krátkých dotazů
+  return (
+    base +
+    `\nRETRY MODE (povinné):\n` +
+    `Znovu projdi podklady a aktivně vyhledej relevantní část (např. "Kontakty", "Úřední hodiny", "Starostka/Starosta", "Poplatky", "Odpady").\n` +
+    `Pokud odpovídáš jménem osoby nebo úředními hodinami, vždy připoj veřejný odkaz na příslušnou stránku obce.\n`
   );
 }
 
 /**
- * ✅ POVINNÝ KONTEXT WRAPPER (USER MESSAGE – VŽDY)
+ * ✅ Context wrapper
  */
 function wrapUserQuestion(userText) {
   const t = String(userText || "").trim();
-  return `KONTEXT: Tento chat slouží výhradně pro obec ${OBEC_NAZEV}. Odpovídej jen z podkladů obce ${OBEC_NAZEV}.\nDOTAZ UŽIVATELE: ${t}`;
+  return `KONTEXT: Tento chat je výhradně pro obec ${OBEC_NAZEV}. Odpovídej jen z podkladů obce ${OBEC_NAZEV}.\nDOTAZ UŽIVATELE: ${t}`;
+}
+
+async function runAssistant(threadId, assistantId, apiKey, { retryMode = false } = {}) {
+  const run = await api(
+    `/threads/${threadId}/runs`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        assistant_id: assistantId,
+        instructions: buildRunInstructions({ retryMode }),
+        temperature: 0.1,
+        top_p: 1,
+      }),
+    },
+    apiKey
+  );
+
+  const started = Date.now();
+  const timeoutMs = 45_000;
+
+  while (true) {
+    if (Date.now() - started > timeoutMs) {
+      throw new Error("Timeout waiting for response");
+    }
+
+    await sleep(650);
+
+    const check = await api(`/threads/${threadId}/runs/${run.id}`, {}, apiKey);
+    const status = check.status;
+
+    if (status === "queued" || status === "in_progress") continue;
+
+    if (status === "requires_action") {
+      const e = new Error("Run requires action (tool call not handled).");
+      e.status = 501;
+      throw e;
+    }
+
+    if (status !== "completed") {
+      const e = new Error(`Run failed: ${status}`);
+      e.status = 500;
+      throw e;
+    }
+
+    break;
+  }
+
+  const messages = await api(`/threads/${threadId}/messages?limit=50`, {}, apiKey);
+  return extractLatestAssistantText(messages);
 }
 
 export default async function handler(req) {
@@ -566,85 +592,54 @@ export default async function handler(req) {
     // wrapper
     outgoingMessage = wrapUserQuestion(outgoingMessage);
 
-    // 1) user message
+    // user message
     threadId = await addUserMessageWithFallback(threadId, outgoingMessage, apiKey);
 
-    // 2) run
-    const run = await api(
-      `/threads/${threadId}/runs`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          assistant_id: assistantId,
-          instructions: buildRunInstructions(),
-          temperature: 0.1,
-          top_p: 1,
-        }),
-      },
-      apiKey
-    );
-
-    // 3) poll
-    const started = Date.now();
-    const timeoutMs = 45_000;
-
-    while (true) {
-      if (Date.now() - started > timeoutMs) {
-        return jsonResponse(504, { ok: false, error: "Timeout waiting for response" });
-      }
-
-      await sleep(650);
-
-      const check = await api(`/threads/${threadId}/runs/${run.id}`, {}, apiKey);
-      const status = check.status;
-
-      if (status === "queued" || status === "in_progress") continue;
-
-      if (status === "requires_action") {
-        return jsonResponse(501, {
-          ok: false,
-          error: "Run requires action (tool call not handled in function).",
-          status,
-        });
-      }
-
-      if (status !== "completed") {
-        return jsonResponse(500, { ok: false, error: "Run failed", status });
-      }
-
-      break;
-    }
-
-    // 4) read messages
-    const messages = await api(`/threads/${threadId}/messages?limit=50`, {}, apiKey);
-    let answer = extractLatestAssistantText(messages);
+    // 1) první run
+    let answer = await runAssistant(threadId, assistantId, apiKey, { retryMode: false });
 
     // clean + url normalize
     answer = cleanAnswer(answer);
     answer = normalizeUrlsInText(answer);
 
-    // cena jen u relevantních dotazů
+    // cena sekce jen u relevantních dotazů
     answer = removePriceSectionIfNotRelevant(answer, msgTrim);
 
-    // fallback jen když fakt nic
+    // pokud nic
     if (!answer) answer = REQUIRED_FALLBACK;
 
-    // když model spadl na fallback, ale dotaz je jasně navigační, vrať navigační odpověď s odkazem
-    if (answer.trim() === REQUIRED_FALLBACK && isClearlyNavigationQuestion(msgTrim)) {
+    const looksLikeFallback =
+      answer.trim() === REQUIRED_FALLBACK ||
+      /Tato informace není v dostupných podkladech obce uvedena\./i.test(answer);
+
+    // 2) retry: pokud fallback, zkus 1× cíleně dohledat
+    if (looksLikeFallback) {
+      const retryRaw = await runAssistant(threadId, assistantId, apiKey, { retryMode: true });
+      let retryAnswer = cleanAnswer(retryRaw);
+      retryAnswer = normalizeUrlsInText(retryAnswer);
+      retryAnswer = removePriceSectionIfNotRelevant(retryAnswer, msgTrim);
+
+      if (retryAnswer && retryAnswer.trim() !== REQUIRED_FALLBACK) {
+        answer = retryAnswer;
+      }
+    }
+
+    // navigace: když je to navigační dotaz a pořád fallback -> vrať aspoň link
+    if ((answer.trim() === REQUIRED_FALLBACK) && isClearlyNavigationQuestion(msgTrim)) {
       const navOnly = buildNavigationOnlyAnswer(msgTrim);
       if (navOnly) answer = navOnly;
     }
 
-    // přidej navigační odkazy, pokud odpověď nemá žádný povolený URL a máme mapu pro dotaz
+    // doplň navigační odkazy, pokud odpověď žádný povolený url nemá, ale pro dotaz mapu máme
     answer = appendNavLinksIfMissing(answer, msgTrim);
 
-    // anti-halucinace: jméno musí mít veřejný odkaz, jinak fallback
-    answer = enforceNameMustHaveLink(answer, msgTrim, REQUIRED_FALLBACK);
+    // finální pojistka: znovu odeber interní zmínky (kdyby to model zkusil obejít)
+    answer = cleanAnswer(answer);
 
     return jsonResponse(200, { ok: true, answer, thread_id: threadId });
   } catch (err) {
-    return jsonResponse(500, {
+    const status = err?.status || 500;
+    return jsonResponse(status, {
       ok: false,
       error: "Server error",
       details: err?.message || String(err),
