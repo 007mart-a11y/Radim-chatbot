@@ -27,6 +27,10 @@ const KEY_LINKS = {
 
 const REQUIRED_FALLBACK = "Tato informace není v dostupných podkladech obce uvedena.";
 
+/* =========================================================
+   Utils
+   ========================================================= */
+
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
@@ -115,23 +119,21 @@ function cleanAnswer(text) {
   // file_search citace
   t = t.replace(/【\s*\d+\s*:\s*\d+\s*†[^】]*】/g, "");
 
-  // odstranit koncovou interpunkci za URL
-  t = t.replace(/(https?:\/\/[^\s)\]]+)[\.,;:!?]+/g, "$1");
-
-  // zrušit prázdné markdown odkazy
-  t = t.replace(/\[([^\]]+)\]\(\s*\)/g, "$1");
-
   // whitespace
   t = t.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
 
   // interní úniky
   t = stripInternalLeaks(t);
 
-  // pojistka: obec-radimcz
+  // domena bez tecky
   t = t.replace(/obec-radimcz/gi, "obec-radim.cz");
 
   return t;
 }
+
+/* =========================================================
+   ✅ URL normalization (100% fix https://https)
+   ========================================================= */
 
 function isAllowedDomain(url) {
   try {
@@ -148,31 +150,41 @@ function normalizeSingleUrl(raw) {
   let u = String(raw || "").trim();
   if (!u) return u;
 
-  // ořež koncovou interpunkci
+  // ořez koncové interpunkce
   u = u.replace(/[)\]}>,.;:!?]+$/g, "");
 
-  // "www.https://"
-  u = u.replace(/^www\.(https?:\/\/)/i, "$1");
+  // ✅ tvrdě: oprav všechny formy zdvojeného schématu (kdekoliv na začátku)
+  u = u.replace(/^https?:\/\/https?:\/\//i, "https://");
+  u = u.replace(/^http:\/\/https:\/\//i, "https://");
+  u = u.replace(/^https:\/\/http:\/\//i, "https://");
 
-  // ✅ FIX: více schémat (https://https://..., http://https://...)
-  // opakovaně odstraň, dokud nezačne jedním schématem
+  // opakovaně, kdyby to bylo víckrát
   while (/^(https?:\/\/)(https?:\/\/)+/i.test(u)) {
     u = u.replace(/^(https?:\/\/)(https?:\/\/)+/i, "$1");
   }
+
+  // "www.https://"
+  u = u.replace(/^www\.(https?:\/\/)/i, "$1");
 
   // fix domény bez tečky
   u = u.replace(/\/\/www\.obec-radimcz/gi, "//www.obec-radim.cz");
   u = u.replace(/\/\/obec-radimcz/gi, "//obec-radim.cz");
   u = u.replace(/obec-radimcz/gi, "obec-radim.cz");
 
-  // chybějící ".html" (…-1html → …-1.html)
+  // fix chybějící ".html" (…-1html → …-1.html)
   u = u.replace(/(\d+)html(\b|\/|\?|#)/gi, "$1.html$2");
 
-  // useknuté .pdf
+  // fix useknutých koncovek u e_download (např. obsah479_1docx -> obsah479_1.docx)
+  u = u.replace(/(obsah\d+_\d+)(docx|pdf)(\b|&|$)/gi, "$1.$2$3");
+
+  // občas useknuté .pdf
   u = u.replace(/\.pd(\b|$)/i, ".pdf$1");
 
   // dvojité //
   u = u.replace(/([^:]\/)\/+/g, "$1");
+
+  // finální ořez
+  u = u.replace(/[)\]}>,.;:!?]+$/g, "");
 
   return u;
 }
@@ -186,66 +198,151 @@ function normalizeUrlsInText(text) {
   t = t.replace(re, (m) => {
     const fixed = normalizeSingleUrl(m);
     if (!isAllowedDomain(fixed)) return "";
-    return fixed.replace(/[)\]}>,.;:!?]+$/g, "");
+    return fixed;
   });
 
+  // dočisti mezery po vyhozených url
   t = t.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n");
   t = t.replace(/[ \t]{2,}/g, " ").trim();
-  t = t.replace(/obec-radimcz/gi, "obec-radim.cz");
-
-  return t;
-}
-
-function normalizeBareDomains(text) {
-  let t = String(text || "");
-  if (!t) return t;
-
-  t = t.replace(/www\.obec-radimcz/gi, "www.obec-radim.cz");
-  t = t.replace(/\bobec-radimcz\b/gi, "obec-radim.cz");
-
-  t = t.replace(/\b(www\.obec-radim\.cz\/[^\s<>"'(){}\[\]]+)/gi, (m) => {
-    const url = `https://${m}`;
-    return isAllowedDomain(url) ? url : m;
-  });
 
   return t;
 }
 
 /* =========================================================
-   Cena/podmínky: relevance + backend stripper
+   ✅ Deterministické hledání v FULL (DOCUMENTS INDEX)
    ========================================================= */
 
-function isPriceRelevantQuestion(userText) {
-  const s = String(userText || "").toLowerCase();
-  return /\b(cena|kolik stojí|kolik stoji|poplatek|poplatky|ceník|cenik|pronájem|pronajem|pronajmout|rezerv|hala|sál|sal|hřiště|hriste|kurty|areál|areal)\b/.test(
-    s
-  );
+let _fullCache = null;
+let _docsCache = null;
+
+function readFullText() {
+  if (_fullCache) return _fullCache;
+  try {
+    const p = path.join(process.cwd(), "knowledge", "99_FULL_obec_radim.txt");
+    if (!fs.existsSync(p)) return "";
+    _fullCache = fs.readFileSync(p, "utf-8");
+    return _fullCache;
+  } catch {
+    return "";
+  }
 }
 
-function removePriceSectionIfNotRelevant(answerText, userText) {
-  let t = String(answerText || "");
-  if (!t) return t;
+function parseDocumentsIndex(fullText) {
+  if (_docsCache) return _docsCache;
 
-  if (!isPriceRelevantQuestion(userText)) {
-    t = t.replace(
-      /(^|\n)Cena\s*\/\s*podmínky:\s*\n([\s\S]*?)(?=\n(?:Odkazy:|$)|\n{2,}|$)/i,
-      "\n"
-    );
-    t = t.replace(/\n{3,}/g, "\n\n").trim();
-    return t;
+  const t = String(fullText || "");
+  const docs = [];
+  const start = t.indexOf("=== DOCUMENTS INDEX");
+  if (start === -1) {
+    _docsCache = docs;
+    return docs;
   }
 
-  t = t.replace(
-    /(^|\n)Cena\s*\/\s*podmínky:\s*\n\s*Není uvedeno\s*(?=\n(?:Odkazy:|$)|\n{2,}|$)/i,
-    "\n"
-  );
-  t = t.replace(/\n{3,}/g, "\n\n").trim();
+  const slice = t.slice(start);
+  const lines = slice.split("\n");
 
-  return t;
+  for (const line of lines) {
+    // konec indexu typicky začíná "==============================" nebo "=== PAGES"
+    if (line.includes("=== PAGES")) break;
+    if (!line.includes("|")) continue;
+    if (/Formát položek/i.test(line)) continue;
+
+    // TYPE | DATE | TITLE | URL | FOUND_ON
+    const parts = line.split("|").map((x) => x.trim());
+    if (parts.length < 5) continue;
+
+    const [type, date, title, url, foundOn] = parts;
+    if (!url || !url.startsWith("http")) continue;
+
+    docs.push({
+      type: type || "",
+      date: date || "",
+      title: title || "",
+      url: normalizeSingleUrl(url),
+      foundOn: normalizeSingleUrl(foundOn),
+    });
+  }
+
+  _docsCache = docs;
+  return docs;
+}
+
+function tokenize(q) {
+  return String(q || "")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]+/gu, " ")
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 18);
+}
+
+function scoreDoc(doc, tokens) {
+  const hay = `${doc.type} ${doc.title} ${doc.foundOn}`.toLowerCase();
+  let s = 0;
+  for (const tok of tokens) {
+    if (tok.length <= 2) continue;
+    if (hay.includes(tok)) s += 3;
+  }
+
+  // bonusy pro časté intent
+  if (tokens.includes("přihláška") || tokens.includes("prihlaska")) {
+    if (hay.includes("přihlášk") || hay.includes("prihlask")) s += 6;
+  }
+  if (tokens.includes("odpad") || tokens.includes("odpadu") || tokens.includes("bioodpad")) {
+    if (hay.includes("odpad")) s += 4;
+  }
+  if (tokens.includes("poplatek") || tokens.includes("poplatky")) {
+    if (hay.includes("poplatek") || hay.includes("poplat")) s += 4;
+  }
+  if (tokens.includes("vyhláška") || tokens.includes("vyhlaska") || tokens.includes("nařízení") || tokens.includes("narizeni")) {
+    if (hay.includes("vyhl") || hay.includes("nař") || hay.includes("nariz")) s += 3;
+  }
+
+  return s;
+}
+
+function findBestDocs(query, limit = 5) {
+  const full = readFullText();
+  if (!full) return [];
+  const docs = parseDocumentsIndex(full);
+  if (!docs.length) return [];
+
+  const tokens = tokenize(query);
+  const scored = docs
+    .map((d) => ({ d, s: scoreDoc(d, tokens) }))
+    .filter((x) => x.s > 0)
+    .sort((a, b) => b.s - a.s)
+    .slice(0, limit)
+    .map((x) => x.d);
+
+  return scored;
+}
+
+function buildDocHintsBlock(query) {
+  const best = findBestDocs(query, 6);
+  if (!best.length) return "";
+
+  // jen povolené domény a opravené url
+  const lines = best
+    .map((d) => {
+      const u = normalizeSingleUrl(d.url);
+      if (!isAllowedDomain(u)) return null;
+      const label = d.title || d.type || "Dokument";
+      return `- ${label} — ${u}`;
+    })
+    .filter(Boolean);
+
+  if (!lines.length) return "";
+
+  return (
+    `KANDIDÁTNÍ ODKAZY (použij PŘESNĚ tyto, nevymýšlej jiné):\n` +
+    lines.join("\n") +
+    `\n`
+  );
 }
 
 /* =========================================================
-   Dotazové heuristiky
+   Dotazy
    ========================================================= */
 
 function isPersonRoleQuestion(userText) {
@@ -255,122 +352,64 @@ function isPersonRoleQuestion(userText) {
   );
 }
 
-function isNavigationQuestion(userText) {
+function isDocLikeQuestion(userText) {
   const s = String(userText || "").toLowerCase();
-  return /\b(odkaz|link|kde\s+najdu|kde\s+je|úřední\s+deska|uredni\s+deska|kontakty|úřední\s+hodiny|uredni\s+hodiny|vyhlášk|vyhlask|nařízení|narizeni|dokument|ke\s+stažení|ke\s+stazeni)\b/.test(
+  return /\b(vyhlášk|vyhlask|nařízení|narizeni|dokument|ke\s+stažení|ke\s+stazeni|přihlášk|prihlask|poplatek|poplatky|odpad|odpadu|svoz)\b/.test(
     s
   );
 }
 
-/* =========================================================
-   ✅ PEOPLE allowlist (anti-hallucination)
-   ========================================================= */
-
-function readPeopleAllowlist() {
-  // soubor dej do repa sem: knowledge/people/00_PEOPLE_obec_radim.txt
-  // (tohle NENÍ "public pro lidi", je to jen soubor v repu; veřejné je jen když ho dáš do /public)
-  try {
-    const cwd = process.cwd();
-    const p = path.join(cwd, "knowledge", "people", "00_PEOPLE_obec_radim.txt");
-    if (!fs.existsSync(p)) return new Set();
-
-    const txt = fs.readFileSync(p, "utf-8");
-    const names = new Set();
-
-    // vytáhneme kandidáty na jména: "Jméno Příjmení" (i s diakritikou)
-    const re = /\b([A-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ][A-Za-zÁČĎÉĚÍŇÓŘŠŤÚŮÝŽáčďéěíňóřšťúůýž\-]+)\s+([A-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ][A-Za-zÁČĎÉĚÍŇÓŘŠŤÚŮÝŽáčďéěíňóřšťúůýž\-]+)\b/g;
-
-    for (const m of txt.matchAll(re)) {
-      const full = `${m[1]} ${m[2]}`.trim();
-      // základní filtr na nesmysly
-      if (full.length >= 5 && full.length <= 40) names.add(full);
-    }
-
-    return names;
-  } catch {
-    return new Set();
-  }
+function looksLikeFallback(answer) {
+  const t = String(answer || "").toLowerCase();
+  return t.includes("tato informace není v dostupných podkladech obce uvedena");
 }
-
-function extractPersonNamesFromAnswer(answer) {
-  const t = String(answer || "");
-  const names = new Set();
-
-  const re = /\b([A-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ][A-Za-zÁČĎÉĚÍŇÓŘŠŤÚŮÝŽáčďéěíňóřšťúůýž\-]+)\s+([A-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ][A-Za-zÁČĎÉĚÍŇÓŘŠŤÚŮÝŽáčďéěíňóřšťúůýž\-]+)\b/g;
-
-  for (const m of t.matchAll(re)) {
-    const full = `${m[1]} ${m[2]}`.trim();
-    if (full.length >= 5 && full.length <= 40) names.add(full);
-  }
-
-  return [...names];
-}
-
-function answerContainsDisallowedPersonName(answer, allowlist) {
-  if (!allowlist || allowlist.size === 0) return false; // pokud allowlist nemáme, neblokujeme (aby to nespadlo úplně)
-  const found = extractPersonNamesFromAnswer(answer);
-
-  // povolíme obecné fráze typu "Obecní úřad Radim" (nejsou to jména osob)
-  const safePhrases = new Set(["Obecní úřad", "Obecní úřad Radim", "Obec Radim"]);
-
-  for (const n of found) {
-    if (safePhrases.has(n)) continue;
-    if (!allowlist.has(n)) return true;
-  }
-
-  return false;
-}
-
-/* =========================================================
-   Instructions
-   ========================================================= */
 
 function buildRunInstructions({ mode = "normal" } = {}) {
   const common =
     `Jsi oficiální AI asistent obce ${OBEC_NAZEV}.\n` +
     `Pracuješ výhradně s podklady v asistentovi (00_PEOPLE_obec_radim.txt a 99_FULL_obec_radim.txt).\n` +
-    `Tvoje role: ochotný pracovník obecního úřadu a navigátor po webu obce.\n\n` +
-    `Kritická pravidla:\n` +
-    `- NEIMPROVIZUJ. Nic nevymýšlej.\n` +
-    `- NIKDY nevypisuj názvy interních souborů ani "Zdroj: ...".\n` +
-    `- Jména osob a funkce uváděj jen pokud jsou v podkladech výslovně uvedené.\n` +
-    `- Kontakty k osobám uváděj jen pokud jsou u té osoby výslovně uvedené.\n` +
-    `- Odkazy uváděj jen takové, které jsou v podkladech.\n\n` +
+    `NEIMPROVIZUJ. Nic nevymýšlej.\n` +
+    `NIKDY nevypisuj názvy interních souborů ani "Zdroj: ...".\n` +
+    `Odkazy uváděj pouze z podkladů nebo z kandidátních odkazů, které ti poskytnu v dotazu.\n\n` +
     `Priorita zdrojů:\n` +
-    `- Dotazy na osoby/funkce/vedení: nejdřív 00_PEOPLE_obec_radim.txt, teprve pak 99_FULL.\n` +
-    `- Ostatní dotazy: 99_FULL.\n\n` +
+    `- osoby/funkce: nejdřív PEOPLE, pak FULL\n` +
+    `- ostatní: FULL\n\n` +
     `Pokud informace není v podkladech jednoznačně uvedená, napiš přesně:\n` +
     `„${REQUIRED_FALLBACK}“\n\n` +
     `Formát odpovědi:\n` +
     `Odpověď:\n(1–5 vět, věcně)\n\n` +
     `Odpovědná osoba / úřad:\n(jméno+funkce jen pokud existuje, jinak "Obecní úřad Radim")\n\n` +
     `Kontakt:\n(telefon/e-mail jen pokud existuje, jinak "Není uvedeno")\n\n` +
-    `Odkazy:\n- Název – https://...\n`;
+    `Odkazy:\n- Název — https://...\n`;
 
   if (mode === "hard") {
     return (
       common +
-      `\nDODATEČNĚ (HARD):\n` +
-      `Před odpovědí aktivně dohledávej konkrétní pasáž v podkladech.\n` +
-      `U dokumentů/vyhlášek hledej v "DOCUMENTS INDEX" a na stránkách úřední desky.\n`
+      `\nHARD:\n` +
+      `Aktivně dohledávej relevantní pasáž v podkladech.\n` +
+      `U dokumentů hledej v DOCUMENTS INDEX a preferuj přímé odkazy ke stažení.\n`
     );
   }
 
   if (mode === "people_strict") {
     return (
       common +
-      `\nDODATEČNĚ (PEOPLE-STRICT):\n` +
-      `U dotazů na osoby/funkce je povinné nejprve najít odpověď v PEOPLE.\n` +
-      `Pokud PEOPLE údaj neobsahuje, teprve pak hledej ve FULL.\n`
+      `\nPEOPLE-STRICT:\n` +
+      `U dotazů na osoby je povinné nejprve odpovědět z PEOPLE.\n` +
+      `Pokud údaj v PEOPLE není, teprve pak hledej ve FULL.\n`
     );
   }
 
   return common;
 }
 
-function wrapUserQuestion(userText) {
+function wrapUserQuestion(userText, hintsBlock = "") {
   const t = String(userText || "").trim();
-  return `KONTEXT: Tento chat je pouze pro obec ${OBEC_NAZEV}. Uživatel chce přesnou odpověď a pokud existuje, tak i relevantní veřejný odkaz na web obce.\nDOTAZ UŽIVATELE: ${t}`;
+  return (
+    `KONTEXT: Tento chat je pouze pro obec ${OBEC_NAZEV}. Uživatel chce přesnou odpověď a pokud existuje, tak i relevantní veřejný odkaz.\n` +
+    (hintsBlock ? `${hintsBlock}\n` : "") +
+    `DOTAZ UŽIVATELE: ${t}`
+  );
 }
 
 /* =========================================================
@@ -505,11 +544,6 @@ async function addUserMessageWithFallback(threadId, content, apiKey) {
   }
 }
 
-function looksLikeFallback(answer) {
-  const t = String(answer || "").toLowerCase();
-  return t.includes("tato informace není v dostupných podkladech obce uvedena");
-}
-
 async function runAssistant({ threadId, assistantId, apiKey, instructions, temperature = 0 }) {
   const run = await api(
     `/threads/${threadId}/runs`,
@@ -542,11 +576,7 @@ async function runAssistant({ threadId, assistantId, apiKey, instructions, tempe
     if (status === "queued" || status === "in_progress") continue;
 
     if (status === "requires_action") {
-      return {
-        ok: false,
-        error: "Run requires action (tool call not handled in function).",
-        status,
-      };
+      return { ok: false, error: "Run requires action.", status };
     }
 
     if (status !== "completed") {
@@ -561,40 +591,13 @@ async function runAssistant({ threadId, assistantId, apiKey, instructions, tempe
 
   answer = cleanAnswer(answer);
   answer = normalizeUrlsInText(answer);
-  answer = normalizeBareDomains(answer);
 
   return { ok: true, answer };
 }
 
-/**
- * Když je navigační dotaz a žádný odkaz, připoj relevantní rozcestník.
- */
-function maybeAppendCanonicalLink(answer, userText) {
-  let a = String(answer || "").trim();
-  const u = String(userText || "").toLowerCase();
-  if (!a) return a;
-
-  const hasAnyUrl = /\bhttps?:\/\/\S+/i.test(a);
-  if (hasAnyUrl) return a;
-
-  if (/\b(úřední\s*deska|uredni\s*deska)\b/.test(u)) {
-    return a + `\n\nOdkazy:\n- Úřední deska – ${KEY_LINKS.uredniDeska}`;
-  }
-  if (/\b(kontakty|kontakt)\b/.test(u)) {
-    return a + `\n\nOdkazy:\n- Kontakty – ${KEY_LINKS.kontakty}`;
-  }
-  if (/\b(úřední\s*hodiny|uredni\s*hodiny)\b/.test(u)) {
-    return a + `\n\nOdkazy:\n- Kontakty a úřední hodiny – ${KEY_LINKS.kontakty}`;
-  }
-  if (/\b(aktuality)\b/.test(u)) {
-    return a + `\n\nOdkazy:\n- Aktuality – ${KEY_LINKS.aktuality}`;
-  }
-  if (/\b(kalendář|kalendar|akce)\b/.test(u)) {
-    return a + `\n\nOdkazy:\n- Kalendář akcí – ${KEY_LINKS.kalendar}`;
-  }
-
-  return a;
-}
+/* =========================================================
+   Handler
+   ========================================================= */
 
 export default async function handler(req) {
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders });
@@ -622,12 +625,9 @@ export default async function handler(req) {
       return jsonResponse(200, { ok: true, answer: "Resetováno.", thread_id: created.id });
     }
 
-    // ✅ allowlist jmen z PEOPLE (anti-hallucination)
-    const peopleAllowlist = readPeopleAllowlist();
-
     let threadId = await ensureThreadId(body?.thread_id, apiKey);
 
-    // Coreference
+    // coreference
     let outgoingMessage = msgTrim;
     const needRewrite =
       isContactQuestion(outgoingMessage) &&
@@ -639,23 +639,24 @@ export default async function handler(req) {
       if (lastPerson) outgoingMessage = rewriteToExplicitPersonQuestion(outgoingMessage, lastPerson);
     }
 
-    outgoingMessage = wrapUserQuestion(outgoingMessage);
+    // ✅ Kandidátní odkazy pro dokumenty (deterministicky)
+    const hints = isDocLikeQuestion(msgTrim) ? buildDocHintsBlock(msgTrim) : "";
+    outgoingMessage = wrapUserQuestion(outgoingMessage, hints);
 
     threadId = await addUserMessageWithFallback(threadId, outgoingMessage, apiKey);
 
-    const personQ = isPersonRoleQuestion(msgTrim);
-    const navQ = isNavigationQuestion(msgTrim);
+    const mode = isPersonRoleQuestion(msgTrim) ? "people_strict" : "normal";
 
-    // 1) person dotazy: PEOPLE-STRICT, teplota 0
+    // 1) run
     let r = await runAssistant({
       threadId,
       assistantId,
       apiKey,
-      instructions: buildRunInstructions({ mode: personQ ? "people_strict" : "normal" }),
+      instructions: buildRunInstructions({ mode }),
       temperature: 0,
     });
 
-    // 2) když fallback → HARD
+    // 2) fallback -> hard
     if (r.ok && looksLikeFallback(r.answer)) {
       const r2 = await runAssistant({
         threadId,
@@ -671,21 +672,6 @@ export default async function handler(req) {
 
     answer = cleanAnswer(answer);
     answer = normalizeUrlsInText(answer);
-    answer = normalizeBareDomains(answer);
-    answer = removePriceSectionIfNotRelevant(answer, msgTrim);
-
-    // ✅ tvrdá pojistka: person dotaz nesmí obsahovat jméno mimo PEOPLE
-    if (personQ && answer && answerContainsDisallowedPersonName(answer, peopleAllowlist)) {
-      answer = REQUIRED_FALLBACK;
-    }
-
-    // navigace: když není odkaz, přidej rozcestník
-    if (navQ && answer && answer !== REQUIRED_FALLBACK) {
-      answer = maybeAppendCanonicalLink(answer, msgTrim);
-      answer = cleanAnswer(answer);
-      answer = normalizeUrlsInText(answer);
-      answer = normalizeBareDomains(answer);
-    }
 
     if (!answer) answer = REQUIRED_FALLBACK;
 
