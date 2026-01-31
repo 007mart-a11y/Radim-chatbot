@@ -4,6 +4,9 @@
 // Request JSON: { message: string, thread_id?: string }
 // Response JSON: { ok: true, answer: string, thread_id: string } | { ok:false, error, details? }
 
+import fs from "node:fs";
+import path from "node:path";
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "content-type",
@@ -13,7 +16,6 @@ const corsHeaders = {
 const OPENAI_BASE_URL = "https://api.openai.com/v1";
 const OBEC_NAZEV = "Radim";
 
-// Kanonické (bezpečné) rozcestníky – pomáhá navigaci po webu
 const KEY_LINKS = {
   homepage: "https://www.obec-radim.cz/",
   kontakty: "https://www.obec-radim.cz/urad/kontakty/",
@@ -23,7 +25,6 @@ const KEY_LINKS = {
   hledani: "https://www.obec-radim.cz/?hledej=&lang=cs",
 };
 
-// bezpečný fallback (dle zadání)
 const REQUIRED_FALLBACK = "Tato informace není v dostupných podkladech obce uvedena.";
 
 function sleep(ms) {
@@ -37,8 +38,8 @@ function jsonResponse(status, data) {
   });
 }
 
-async function api(path, { method = "GET", body, headers = {} } = {}, apiKey) {
-  const res = await fetch(`${OPENAI_BASE_URL}${path}`, {
+async function api(pathUrl, { method = "GET", body, headers = {} } = {}, apiKey) {
+  const res = await fetch(`${OPENAI_BASE_URL}${pathUrl}`, {
     method,
     headers: {
       Authorization: `Bearer ${apiKey}`,
@@ -56,9 +57,9 @@ async function api(path, { method = "GET", body, headers = {} } = {}, apiKey) {
 
   if (!res.ok) {
     const msg = json?.error?.message || text || `HTTP ${res.status}`;
-    const err = new Error(`${method} ${path} failed: ${msg}`);
+    const err = new Error(`${method} ${pathUrl} failed: ${msg}`);
     err.status = res.status;
-    err.path = path;
+    err.path = pathUrl;
     err.method = method;
     err.details = json || text;
     throw err;
@@ -67,9 +68,6 @@ async function api(path, { method = "GET", body, headers = {} } = {}, apiKey) {
   return json ?? {};
 }
 
-/**
- * Vezme poslední assistant zprávu podle created_at.
- */
 function extractLatestAssistantText(messagesListJson) {
   const data = Array.isArray(messagesListJson?.data) ? messagesListJson.data : [];
   const assistantMsgs = data.filter(
@@ -87,9 +85,6 @@ function extractLatestAssistantText(messagesListJson) {
   return parts.join("\n\n").trim();
 }
 
-/**
- * Vezme text z message.content (jen textové části).
- */
 function extractMessageText(messageObj) {
   if (!messageObj || !Array.isArray(messageObj.content) || !messageObj.content.length) return "";
   const parts = messageObj.content
@@ -98,32 +93,22 @@ function extractMessageText(messageObj) {
   return parts.join("\n\n").trim();
 }
 
-/**
- * Odstraní úniky interních zdrojů / názvů souborů a lehce dočistí text.
- */
 function stripInternalLeaks(text) {
   let t = String(text || "");
 
-  // Zdroj: ...
   t = t.replace(/^\s*Zdroj\s*:\s*.*$/gim, "");
   t = t.replace(/^\s*Zdroje?\s*:\s*.*$/gim, "");
 
-  // Názvy interních souborů / artefaktů
   t = t.replace(/\b\d{2}_[A-Z0-9_]+\.(txt|md)\b/gi, "");
   t = t.replace(/\b99_FULL_[A-Z0-9_]+\b/gi, "");
   t = t.replace(/\b00_PEOPLE_[A-Z0-9_]+\b/gi, "");
 
-  // “file_search”, “vector store” apod.
   t = t.replace(/\b(knowledge\s*base|vector\s*store|file_search|internal\s*source)\b/gi, "");
 
-  // Dočistit prázdné řádky
   t = t.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
   return t;
 }
 
-/**
- * Minimum cleaning:
- */
 function cleanAnswer(text) {
   let t = String(text || "");
 
@@ -142,38 +127,23 @@ function cleanAnswer(text) {
   // interní úniky
   t = stripInternalLeaks(t);
 
-  // poslední pojistka: doména bez tečky
+  // pojistka: obec-radimcz
   t = t.replace(/obec-radimcz/gi, "obec-radim.cz");
 
   return t;
 }
 
-/**
- * ✅ Whitelist domén – nepustíme ven vymyšlené URL
- */
 function isAllowedDomain(url) {
   try {
     const u = new URL(url);
     const host = u.hostname.toLowerCase();
-    const allowed = new Set([
-      "obec-radim.cz",
-      "www.obec-radim.cz",
-      "zsradim.cz",
-      "www.zsradim.cz",
-    ]);
+    const allowed = new Set(["obec-radim.cz", "www.obec-radim.cz", "zsradim.cz", "www.zsradim.cz"]);
     return allowed.has(host);
   } catch {
     return false;
   }
 }
 
-/**
- * Robustní opravy URL:
- * - obec-radimcz -> obec-radim.cz (i s www)
- * - -1html / -2html -> -1.html / -2.html
- * - useknuté .pd -> .pdf
- * - dvojité schéma, divné "www.https://"
- */
 function normalizeSingleUrl(raw) {
   let u = String(raw || "").trim();
   if (!u) return u;
@@ -181,23 +151,24 @@ function normalizeSingleUrl(raw) {
   // ořež koncovou interpunkci
   u = u.replace(/[)\]}>,.;:!?]+$/g, "");
 
-  // někdy se objeví "www.https://..."
+  // "www.https://"
   u = u.replace(/^www\.(https?:\/\/)/i, "$1");
 
-  // zdvojené schéma
-  u = u.replace(/^https?:\/\/https:\/\//i, "https://");
-  u = u.replace(/^https?:\/\/http:\/\//i, "http://");
-  u = u.replace(/^(https?:\/\/)(https?:\/\/)+/i, "$1");
+  // ✅ FIX: více schémat (https://https://..., http://https://...)
+  // opakovaně odstraň, dokud nezačne jedním schématem
+  while (/^(https?:\/\/)(https?:\/\/)+/i.test(u)) {
+    u = u.replace(/^(https?:\/\/)(https?:\/\/)+/i, "$1");
+  }
 
   // fix domény bez tečky
   u = u.replace(/\/\/www\.obec-radimcz/gi, "//www.obec-radim.cz");
   u = u.replace(/\/\/obec-radimcz/gi, "//obec-radim.cz");
   u = u.replace(/obec-radimcz/gi, "obec-radim.cz");
 
-  // fix chybějící ".html" (typicky "...-1html" nebo "...-2html")
+  // chybějící ".html" (…-1html → …-1.html)
   u = u.replace(/(\d+)html(\b|\/|\?|#)/gi, "$1.html$2");
 
-  // občas useknuté .pdf
+  // useknuté .pdf
   u = u.replace(/\.pd(\b|$)/i, ".pdf$1");
 
   // dvojité //
@@ -206,9 +177,6 @@ function normalizeSingleUrl(raw) {
   return u;
 }
 
-/**
- * Normalize URLs v textu (https://...)
- */
 function normalizeUrlsInText(text) {
   let t = String(text || "");
   if (!t) return t;
@@ -221,29 +189,20 @@ function normalizeUrlsInText(text) {
     return fixed.replace(/[)\]}>,.;:!?]+$/g, "");
   });
 
-  // dočistit mezery po vyhozených URL
   t = t.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n");
   t = t.replace(/[ \t]{2,}/g, " ").trim();
-
-  // poslední pojistka: doména bez tečky
   t = t.replace(/obec-radimcz/gi, "obec-radim.cz");
 
   return t;
 }
 
-/**
- * Opraví i „nahé“ domény bez schématu (např. www.obec-radimcz/...)
- * a doplní https:// jen pokud je to bezpečné a whitelistované.
- */
 function normalizeBareDomains(text) {
   let t = String(text || "");
   if (!t) return t;
 
-  // fix obec-radimcz -> obec-radim.cz i bez schématu
   t = t.replace(/www\.obec-radimcz/gi, "www.obec-radim.cz");
   t = t.replace(/\bobec-radimcz\b/gi, "obec-radim.cz");
 
-  // doplnění schématu pro whitelistované "www.obec-radim.cz/..."
   t = t.replace(/\b(www\.obec-radim\.cz\/[^\s<>"'(){}\[\]]+)/gi, (m) => {
     const url = `https://${m}`;
     return isAllowedDomain(url) ? url : m;
@@ -267,7 +226,6 @@ function removePriceSectionIfNotRelevant(answerText, userText) {
   let t = String(answerText || "");
   if (!t) return t;
 
-  // když uživatel cenu neřeší, sekci pryč
   if (!isPriceRelevantQuestion(userText)) {
     t = t.replace(
       /(^|\n)Cena\s*\/\s*podmínky:\s*\n([\s\S]*?)(?=\n(?:Odkazy:|$)|\n{2,}|$)/i,
@@ -277,7 +235,6 @@ function removePriceSectionIfNotRelevant(answerText, userText) {
     return t;
   }
 
-  // když je relevantní, ale jen "Není uvedeno", pryč
   t = t.replace(
     /(^|\n)Cena\s*\/\s*podmínky:\s*\n\s*Není uvedeno\s*(?=\n(?:Odkazy:|$)|\n{2,}|$)/i,
     "\n"
@@ -287,9 +244,10 @@ function removePriceSectionIfNotRelevant(answerText, userText) {
   return t;
 }
 
-/**
- * Pomocná heuristika: jaký typ dotazu je to?
- */
+/* =========================================================
+   Dotazové heuristiky
+   ========================================================= */
+
 function isPersonRoleQuestion(userText) {
   const s = String(userText || "").toLowerCase();
   return /\b(kdo\s+je|kdo\s+vede|kdo\s+má\s+na\s+starosti|starosta|starostka|předseda|predseda|kontakt\s+na)\b/.test(
@@ -304,38 +262,85 @@ function isNavigationQuestion(userText) {
   );
 }
 
-/**
- * FINÁLNÍ INSTRUKCE PRO RUN (backend)
- * - Záměrně jednoduché, ale důsledné:
- *   1) lidštější navigace
- *   2) zákaz interních zdrojů
- *   3) person-dotazy: PEOPLE první
- */
+/* =========================================================
+   ✅ PEOPLE allowlist (anti-hallucination)
+   ========================================================= */
+
+function readPeopleAllowlist() {
+  // soubor dej do repa sem: knowledge/people/00_PEOPLE_obec_radim.txt
+  // (tohle NENÍ "public pro lidi", je to jen soubor v repu; veřejné je jen když ho dáš do /public)
+  try {
+    const cwd = process.cwd();
+    const p = path.join(cwd, "knowledge", "people", "00_PEOPLE_obec_radim.txt");
+    if (!fs.existsSync(p)) return new Set();
+
+    const txt = fs.readFileSync(p, "utf-8");
+    const names = new Set();
+
+    // vytáhneme kandidáty na jména: "Jméno Příjmení" (i s diakritikou)
+    const re = /\b([A-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ][A-Za-zÁČĎÉĚÍŇÓŘŠŤÚŮÝŽáčďéěíňóřšťúůýž\-]+)\s+([A-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ][A-Za-zÁČĎÉĚÍŇÓŘŠŤÚŮÝŽáčďéěíňóřšťúůýž\-]+)\b/g;
+
+    for (const m of txt.matchAll(re)) {
+      const full = `${m[1]} ${m[2]}`.trim();
+      // základní filtr na nesmysly
+      if (full.length >= 5 && full.length <= 40) names.add(full);
+    }
+
+    return names;
+  } catch {
+    return new Set();
+  }
+}
+
+function extractPersonNamesFromAnswer(answer) {
+  const t = String(answer || "");
+  const names = new Set();
+
+  const re = /\b([A-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ][A-Za-zÁČĎÉĚÍŇÓŘŠŤÚŮÝŽáčďéěíňóřšťúůýž\-]+)\s+([A-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ][A-Za-zÁČĎÉĚÍŇÓŘŠŤÚŮÝŽáčďéěíňóřšťúůýž\-]+)\b/g;
+
+  for (const m of t.matchAll(re)) {
+    const full = `${m[1]} ${m[2]}`.trim();
+    if (full.length >= 5 && full.length <= 40) names.add(full);
+  }
+
+  return [...names];
+}
+
+function answerContainsDisallowedPersonName(answer, allowlist) {
+  if (!allowlist || allowlist.size === 0) return false; // pokud allowlist nemáme, neblokujeme (aby to nespadlo úplně)
+  const found = extractPersonNamesFromAnswer(answer);
+
+  // povolíme obecné fráze typu "Obecní úřad Radim" (nejsou to jména osob)
+  const safePhrases = new Set(["Obecní úřad", "Obecní úřad Radim", "Obec Radim"]);
+
+  for (const n of found) {
+    if (safePhrases.has(n)) continue;
+    if (!allowlist.has(n)) return true;
+  }
+
+  return false;
+}
+
+/* =========================================================
+   Instructions
+   ========================================================= */
+
 function buildRunInstructions({ mode = "normal" } = {}) {
   const common =
     `Jsi oficiální AI asistent obce ${OBEC_NAZEV}.\n` +
     `Pracuješ výhradně s podklady v asistentovi (00_PEOPLE_obec_radim.txt a 99_FULL_obec_radim.txt).\n` +
     `Tvoje role: ochotný pracovník obecního úřadu a navigátor po webu obce.\n\n` +
-
     `Kritická pravidla:\n` +
     `- NEIMPROVIZUJ. Nic nevymýšlej.\n` +
     `- NIKDY nevypisuj názvy interních souborů ani "Zdroj: ...".\n` +
-    `- Odkazy uváděj jen takové, které jsou v podkladech.\n` +
-    `- Kontakty k osobám uváděj jen pokud jsou u té osoby výslovně uvedené.\n\n` +
-
+    `- Jména osob a funkce uváděj jen pokud jsou v podkladech výslovně uvedené.\n` +
+    `- Kontakty k osobám uváděj jen pokud jsou u té osoby výslovně uvedené.\n` +
+    `- Odkazy uváděj jen takové, které jsou v podkladech.\n\n` +
     `Priorita zdrojů:\n` +
     `- Dotazy na osoby/funkce/vedení: nejdřív 00_PEOPLE_obec_radim.txt, teprve pak 99_FULL.\n` +
     `- Ostatní dotazy: 99_FULL.\n\n` +
-
-    `Kanonické rozcestníky (použij, jen když je to relevantní k dotazu):\n` +
-    `- Kontakty: ${KEY_LINKS.kontakty}\n` +
-    `- Úřední deska: ${KEY_LINKS.uredniDeska}\n` +
-    `- Aktuality: ${KEY_LINKS.aktuality}\n` +
-    `- Kalendář: ${KEY_LINKS.kalendar}\n\n` +
-
     `Pokud informace není v podkladech jednoznačně uvedená, napiš přesně:\n` +
     `„${REQUIRED_FALLBACK}“\n\n` +
-
     `Formát odpovědi:\n` +
     `Odpověď:\n(1–5 vět, věcně)\n\n` +
     `Odpovědná osoba / úřad:\n(jméno+funkce jen pokud existuje, jinak "Obecní úřad Radim")\n\n` +
@@ -347,7 +352,7 @@ function buildRunInstructions({ mode = "normal" } = {}) {
       common +
       `\nDODATEČNĚ (HARD):\n` +
       `Před odpovědí aktivně dohledávej konkrétní pasáž v podkladech.\n` +
-      `U dotazů na dokumenty/vyhlášky hledej v "DOCUMENTS INDEX" a na stránkách úřední desky.\n`
+      `U dokumentů/vyhlášek hledej v "DOCUMENTS INDEX" a na stránkách úřední desky.\n`
     );
   }
 
@@ -363,16 +368,13 @@ function buildRunInstructions({ mode = "normal" } = {}) {
   return common;
 }
 
-/**
- * POVINNÝ wrapper pro user dotaz (pomáhá držet kontext Radim)
- */
 function wrapUserQuestion(userText) {
   const t = String(userText || "").trim();
   return `KONTEXT: Tento chat je pouze pro obec ${OBEC_NAZEV}. Uživatel chce přesnou odpověď a pokud existuje, tak i relevantní veřejný odkaz na web obce.\nDOTAZ UŽIVATELE: ${t}`;
 }
 
 /* =========================================================
-   HARD COREFERENCE: přepis zájmen -> explicitní osoba
+   Coreference (zájmena -> poslední osoba)
    ========================================================= */
 
 const PERSON_REGEX =
@@ -446,9 +448,10 @@ async function getLastReferencedPersonFromThread(threadId, apiKey, limit = 12) {
   }
 }
 
-/**
- * Thread helper
- */
+/* =========================================================
+   Thread helpers
+   ========================================================= */
+
 async function ensureThreadId(incomingThreadId, apiKey) {
   let threadId = incomingThreadId;
 
@@ -507,7 +510,7 @@ function looksLikeFallback(answer) {
   return t.includes("tato informace není v dostupných podkladech obce uvedena");
 }
 
-async function runAssistant({ threadId, assistantId, apiKey, instructions, temperature = 0.1 }) {
+async function runAssistant({ threadId, assistantId, apiKey, instructions, temperature = 0 }) {
   const run = await api(
     `/threads/${threadId}/runs`,
     {
@@ -556,7 +559,6 @@ async function runAssistant({ threadId, assistantId, apiKey, instructions, tempe
   const messages = await api(`/threads/${threadId}/messages?limit=50`, {}, apiKey);
   let answer = extractLatestAssistantText(messages);
 
-  // finální post-clean (2x je OK – pomáhá to i když asistent po retry něco přidá)
   answer = cleanAnswer(answer);
   answer = normalizeUrlsInText(answer);
   answer = normalizeBareDomains(answer);
@@ -565,8 +567,7 @@ async function runAssistant({ threadId, assistantId, apiKey, instructions, tempe
 }
 
 /**
- * Když je dotaz čistě navigační a asistent žádný odkaz nedá,
- * připojíme bezpečný rozcestník (jen relevantní).
+ * Když je navigační dotaz a žádný odkaz, připoj relevantní rozcestník.
  */
 function maybeAppendCanonicalLink(answer, userText) {
   let a = String(answer || "").trim();
@@ -574,11 +575,8 @@ function maybeAppendCanonicalLink(answer, userText) {
   if (!a) return a;
 
   const hasAnyUrl = /\bhttps?:\/\/\S+/i.test(a);
-
-  // pokud už odkaz má, nic nepřidávat
   if (hasAnyUrl) return a;
 
-  // navigační dotazy -> přidej relevantní rozcestník
   if (/\b(úřední\s*deska|uredni\s*deska)\b/.test(u)) {
     return a + `\n\nOdkazy:\n- Úřední deska – ${KEY_LINKS.uredniDeska}`;
   }
@@ -617,14 +615,16 @@ export default async function handler(req) {
       return jsonResponse(400, { ok: false, error: "Missing message" });
     }
 
-    // Reset threadu
     const msgTrim = String(message).trim();
+
     if (msgTrim.toLowerCase() === "reset") {
       const created = await api("/threads", { method: "POST" }, apiKey);
       return jsonResponse(200, { ok: true, answer: "Resetováno.", thread_id: created.id });
     }
 
-    // Thread
+    // ✅ allowlist jmen z PEOPLE (anti-hallucination)
+    const peopleAllowlist = readPeopleAllowlist();
+
     let threadId = await ensureThreadId(body?.thread_id, apiKey);
 
     // Coreference
@@ -639,62 +639,48 @@ export default async function handler(req) {
       if (lastPerson) outgoingMessage = rewriteToExplicitPersonQuestion(outgoingMessage, lastPerson);
     }
 
-    // Wrapper
     outgoingMessage = wrapUserQuestion(outgoingMessage);
 
-    // 1) add msg
     threadId = await addUserMessageWithFallback(threadId, outgoingMessage, apiKey);
 
-    // 2) Run strategie:
-    //    a) u person-role dotazů nejdřív PEOPLE-STRICT
-    //    b) když fallback → HARD dohledávání
-    //    c) když pořád fallback → ještě jednou HARD s mírně vyšší teplotou (jen pro retrieval variabilitu)
-    const isPerson = isPersonRoleQuestion(msgTrim);
-    const isNav = isNavigationQuestion(msgTrim);
+    const personQ = isPersonRoleQuestion(msgTrim);
+    const navQ = isNavigationQuestion(msgTrim);
 
+    // 1) person dotazy: PEOPLE-STRICT, teplota 0
     let r = await runAssistant({
       threadId,
       assistantId,
       apiKey,
-      instructions: buildRunInstructions({ mode: isPerson ? "people_strict" : "normal" }),
-      temperature: 0.1,
+      instructions: buildRunInstructions({ mode: personQ ? "people_strict" : "normal" }),
+      temperature: 0,
     });
 
+    // 2) když fallback → HARD
     if (r.ok && looksLikeFallback(r.answer)) {
       const r2 = await runAssistant({
         threadId,
         assistantId,
         apiKey,
         instructions: buildRunInstructions({ mode: "hard" }),
-        temperature: 0.1,
+        temperature: 0,
       });
       if (r2.ok && r2.answer) r = r2;
     }
 
-    // poslední pokus: někdy pomůže změna sampling (retrieval u asistentů není deterministický)
-    if (r.ok && looksLikeFallback(r.answer)) {
-      const r3 = await runAssistant({
-        threadId,
-        assistantId,
-        apiKey,
-        instructions: buildRunInstructions({ mode: "hard" }),
-        temperature: 0.2,
-      });
-      if (r3.ok && r3.answer) r = r3;
-    }
-
     let answer = r.ok ? r.answer : "";
 
-    // finální úklid + URL normalizace
     answer = cleanAnswer(answer);
     answer = normalizeUrlsInText(answer);
     answer = normalizeBareDomains(answer);
-
-    // Cena sekce: jen když relevantní
     answer = removePriceSectionIfNotRelevant(answer, msgTrim);
 
-    // Když navigace a žádný odkaz -> doplň kanonický rozcestník
-    if (isNav) {
+    // ✅ tvrdá pojistka: person dotaz nesmí obsahovat jméno mimo PEOPLE
+    if (personQ && answer && answerContainsDisallowedPersonName(answer, peopleAllowlist)) {
+      answer = REQUIRED_FALLBACK;
+    }
+
+    // navigace: když není odkaz, přidej rozcestník
+    if (navQ && answer && answer !== REQUIRED_FALLBACK) {
       answer = maybeAppendCanonicalLink(answer, msgTrim);
       answer = cleanAnswer(answer);
       answer = normalizeUrlsInText(answer);
