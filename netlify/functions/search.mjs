@@ -16,7 +16,7 @@ const corsHeaders = {
 const OPENAI_BASE_URL = "https://api.openai.com/v1";
 const OBEC_NAZEV = "Radim";
 
-// Kanonické (bezpečné) rozcestníky – pomáhá navigaci i když uživatel neví kam kliknout
+// Kanonické (bezpečné) rozcestníky
 const KEY_LINKS = {
   homepage: "https://www.obec-radim.cz/",
   kontakty: "https://www.obec-radim.cz/urad/kontakty/",
@@ -27,7 +27,7 @@ const KEY_LINKS = {
 };
 
 // ============================================
-// ✅ Local knowledge (optional, but makes it "blbuvzdorné")
+// ✅ Local knowledge (deterministická vrstva)
 // ============================================
 
 const FULL_FILE_CANDIDATES = [
@@ -38,8 +38,8 @@ const FULL_FILE_CANDIDATES = [
 
 let _cache = {
   fullText: null,
-  docs: null,
   loadedAt: 0,
+  pages: null,
 };
 
 function safeReadText(rel) {
@@ -53,72 +53,55 @@ function safeReadText(rel) {
 }
 
 function loadFullText() {
-  // cache 10 min
   const now = Date.now();
   if (_cache.fullText && now - _cache.loadedAt < 10 * 60 * 1000) return _cache.fullText;
 
   for (const rel of FULL_FILE_CANDIDATES) {
     const t = safeReadText(rel);
-    if (t && t.length > 1000) {
+    if (t && t.length > 50_000) {
       _cache.fullText = t;
       _cache.loadedAt = now;
-      // reset derived caches
-      _cache.docs = null;
+      _cache.pages = null;
       return t;
     }
   }
 
   _cache.fullText = null;
-  _cache.docs = null;
+  _cache.pages = null;
   _cache.loadedAt = now;
   return null;
 }
 
-function parseDocumentsIndexFromFull(fullText) {
-  if (!fullText) return [];
+function buildPagesIndex(fullText) {
+  if (!fullText) return null;
 
-  // Najdeme blok DOCUMENTS INDEX (…)
-  const start = fullText.indexOf("=== DOCUMENTS INDEX");
-  if (start === -1) return [];
-
-  // Uřízni rozumný kus (index je na začátku)
-  const slice = fullText.slice(start, start + 400_000);
-  const lines = slice.split("\n");
-
-  const docs = [];
-  for (const line of lines) {
-    // Končíme na PAGES
-    if (line.includes("=== PAGES")) break;
-
-    // Formát: TYPE | DATE | TITLE | URL | FOUND_ON
-    if (!line.includes("|")) continue;
-    const parts = line.split("|").map((p) => p.trim());
-    if (parts.length < 5) continue;
-
-    const [type, date, title, url, foundOn] = parts;
-
-    // vyfiltruj hlavičky a balast
-    if (!type || type.startsWith("Formát položek")) continue;
-    if (!url || !url.startsWith("http")) continue;
-
-    docs.push({
-      type: type || "",
-      date: date || "",
-      title: title || "",
-      url: url || "",
-      foundOn: foundOn || "",
-    });
+  // Velmi jednoduchý parser: vytáhne bloky:
+  // URL: ...
+  // TITLE: ...
+  // CONTENT: ...
+  const pages = new Map();
+  const re = /=== PAGE[\s\S]*?URL:\s*(.+?)\nTITLE:\s*([\s\S]*?)\nCONTENT:\n([\s\S]*?)(?=\n={10,}|\n=== PAGE|\s*$)/g;
+  let m;
+  while ((m = re.exec(fullText))) {
+    const url = String(m[1] || "").trim();
+    const content = String(m[3] || "").trim();
+    if (url && content) pages.set(url, content);
   }
-
-  return docs;
+  return pages;
 }
 
-function getDocsIndex() {
-  if (_cache.docs) return _cache.docs;
+function getPages() {
+  if (_cache.pages) return _cache.pages;
   const full = loadFullText();
-  const docs = parseDocumentsIndexFromFull(full);
-  _cache.docs = docs;
-  return docs;
+  if (!full) return null;
+  _cache.pages = buildPagesIndex(full);
+  return _cache.pages;
+}
+
+function getPageContentByUrl(url) {
+  const pages = getPages();
+  if (!pages) return null;
+  return pages.get(url) || null;
 }
 
 function normalizeCzech(s) {
@@ -128,197 +111,145 @@ function normalizeCzech(s) {
     .replace(/[\u0300-\u036f]/g, "");
 }
 
-function isDocLikeQuestion(q) {
+// ============================================
+// ✅ Deterministické odpovědi (bez LLM)
+// ============================================
+
+function isKontaktyQuestion(q) {
   const s = normalizeCzech(q);
-  return /\b(vyhlaska|vyhlasky|narizeni|dokument|pdf|docx|ke stazeni|stahnout|formular|prihlaska|přihlaska|prihláš|povinne informace|uredni deska|usneseni|zapis|zpravodaj|rozpocet|poplatek|odpady|odpad)\b/.test(
-    s
-  );
+  return /\b(kontakt|kontakty|telefon|email|e-mail|mail|datova schranka|datova schrank)\b/.test(s);
 }
 
-function scoreDoc(doc, query) {
-  const q = normalizeCzech(query);
-  const title = normalizeCzech(doc.title);
-  const type = normalizeCzech(doc.type);
-  const foundOn = normalizeCzech(doc.foundOn);
-
-  let score = 0;
-
-  // typové boosty
-  if (q.includes("vyhlask") && type.includes("vyhl")) score += 30;
-  if (q.includes("narizen") && type.includes("nariz")) score += 30;
-  if (q.includes("uredni deska") && (type.includes("uredni") || foundOn.includes("uredni-deska")))
-    score += 15;
-
-  // odpady
-  if (/\b(odpad|odpady|bioodpad|poplatek)\b/.test(q)) {
-    if (title.includes("odpad") || foundOn.includes("odpad")) score += 25;
-    if (title.includes("mistni poplatek") || title.includes("poplatek")) score += 20;
-  }
-
-  // sokol / přihláška
-  if (/\b(sokol|tj sokol|prihlask)\b/.test(q)) {
-    if (title.includes("sokol") || foundOn.includes("sokol")) score += 25;
-    if (title.includes("prihlaska") || title.includes("přihl")) score += 35;
-  }
-
-  // hasiči / kroužek
-  if (/\b(hasic|hasici|sdh|mladi hasici|krouzek)\b/.test(q)) {
-    if (title.includes("hasic") || foundOn.includes("hasici")) score += 18;
-  }
-
-  // obecně: shoda slov
-  const words = q.split(/[^a-z0-9]+/).filter(Boolean);
-  for (const w of words) {
-    if (w.length < 4) continue;
-    if (title.includes(w)) score += 3;
-    if (foundOn.includes(w)) score += 2;
-  }
-
-  // datum: novější lehce preferovat (pokud existuje)
-  const m = String(doc.date || "").match(/(\d{4})-(\d{2})-(\d{2})/);
-  if (m) {
-    const key = Number(m[1]) * 10000 + Number(m[2]) * 100 + Number(m[3]);
-    score += Math.min(20, Math.max(0, (key - 20100101) / 100000)); // malý boost
-  }
-
-  return score;
+function isUredniHodinyQuestion(q) {
+  const s = normalizeCzech(q);
+  return /\b(uredni hodiny|kdy ma urad otevreno|oteviraci doba|kdy je otevreno)\b/.test(s);
 }
 
-function findBestDocs(query, limit = 6) {
-  const docs = getDocsIndex();
-  if (!docs.length) return [];
-
-  const ranked = docs
-    .map((d) => ({ d, s: scoreDoc(d, query) }))
-    .filter((x) => x.s > 0)
-    .sort((a, b) => b.s - a.s)
-    .slice(0, limit)
-    .map((x) => x.d);
-
-  return ranked;
+function isBioodpadQuestion(q) {
+  const s = normalizeCzech(q);
+  return /\b(bioodpad|skladka bioodpadu|kam s bioodpadem|bio odpad|kompost|zeleny odpad)\b/.test(s);
 }
 
-function buildDocHintsBlock(query, { force = false } = {}) {
-  const best = findBestDocs(query, 6);
-  if (!best.length) return "";
-
-  const lines = best
-    .map((d) => {
-      const u = normalizeSingleUrl(d.url);
-      if (!isAllowedDomain(u)) return null;
-      const label = d.title || d.type || "Dokument";
-      return { label, url: u };
-    })
+function extractContactsFromKontaktyPage(content) {
+  // očekáváme v textu aspoň tel + email + úřední hodiny
+  const phones = [...content.matchAll(/\+420\s?\d{3}\s?\d{3}\s?\d{3}|\b\d{3}\s?\d{3}\s?\d{3}\b/g)]
+    .map((m) => m[0].replace(/\s+/g, " ").trim())
     .filter(Boolean);
 
-  if (!lines.length) return "";
+  const emails = [...content.matchAll(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi)]
+    .map((m) => m[0].trim())
+    .filter(Boolean);
 
-  const header = force
-    ? "POVINNÉ ODKAZY (musíš použít alespoň jeden, nevymýšlej jiné):"
-    : "KANDIDÁTNÍ ODKAZY (použij přesně tyto, nevymýšlej jiné):";
-
-  return `${header}\n` + lines.map((x) => `- ${x.label} — ${x.url}`).join("\n") + "\n";
-}
-
-// ============================================
-// ✅ "Nejnovější" resolvery z FULL (deterministicky)
-// ============================================
-
-function parseDDMMYYYY(s) {
-  const m = String(s || "").match(/(\d{2})\.(\d{2})\.(\d{4})/);
-  if (!m) return null;
-  const dd = Number(m[1]),
-    mm = Number(m[2]),
-    yyyy = Number(m[3]);
-  const key = yyyy * 10000 + mm * 100 + dd;
-  return { dd, mm, yyyy, key, str: `${m[1]}.${m[2]}.${m[3]}` };
-}
-
-function findLatestAktualitaFromFull() {
-  const full = loadFullText();
-  if (!full) return null;
-
-  // Vezmi block homepage PAGE (kde bývá "Aktuality")
-  const idxHome = full.indexOf("URL: https://www.obec-radim.cz/");
-  if (idxHome === -1) return null;
-  const homeSlice = full.slice(idxHome, idxHome + 80_000);
-
-  const lines = homeSlice.split("\n").map((l) => l.trim()).filter(Boolean);
-
-  // Sbírej položky ve formátu: 04.06.2025 / 23.04.2025 atd. + titulek o 1-3 řádky níž
-  const items = [];
-  for (let i = 0; i < lines.length; i++) {
-    const d = parseDDMMYYYY(lines[i]);
-    if (!d) continue;
-
-    // titul bývá o 1 řádek dál; někdy je mezi tím "Detail" apod.
-    const t1 = lines[i + 1] || "";
-    const t2 = lines[i + 2] || "";
-    const t3 = lines[i + 3] || "";
-
-    const title = [t1, t2, t3].find((x) => x && !/^detail$/i.test(x) && !/^\-?\s*\d{2}\.\d{2}\.\d{4}/.test(x)) || "";
-    if (!title) continue;
-
-    items.push({ key: d.key, date: d.str, title });
-  }
-
-  if (!items.length) return null;
-  items.sort((a, b) => b.key - a.key);
+  // úřední hodiny – často "Středa: 16:00 - 19:00"
+  const hoursLine =
+    content
+      .split("\n")
+      .map((l) => l.trim())
+      .find((l) => normalizeCzech(l).startsWith("streda")) || "";
 
   return {
-    title: items[0].title,
-    date: items[0].date,
-    url: KEY_LINKS.aktuality, // bezpečně dáme rozcestník, detail URL se dá doplnit později
+    phones: [...new Set(phones)],
+    emails: [...new Set(emails)],
+    hoursLine,
   };
 }
 
-function findLatestUredniDeskaFromFull() {
-  const full = loadFullText();
-  if (!full) return null;
+function makeKontaktyAnswer() {
+  const kontaktyUrl = KEY_LINKS.kontakty;
+  const page = getPageContentByUrl(kontaktyUrl);
 
-  const idxHome = full.indexOf("URL: https://www.obec-radim.cz/");
-  if (idxHome === -1) return null;
-  const homeSlice = full.slice(idxHome, idxHome + 120_000);
+  // fallback: vezmeme aspoň údaje z FULLTEXTOVÉHO HLEDÁNÍ (v tvém FULL to bývá)
+  const searchPage = getPageContentByUrl("https://www.obec-radim.cz/?hledej=&lang=cs");
 
-  // V homepage bývá sekce "Úřední deska" se seznamem
-  const lines = homeSlice.split("\n").map((l) => l.trim()).filter(Boolean);
+  const src = page || searchPage;
+  if (!src) return null;
 
-  const items = [];
-  for (let i = 0; i < lines.length; i++) {
-    // např. "26.01.2026" pak "- 31.03.2026" pak "Návrh rozpočtu..."
-    const d = parseDDMMYYYY(lines[i]);
-    if (!d) continue;
+  const { phones, emails, hoursLine } = extractContactsFromKontaktyPage(src);
 
-    // titul bývá o 1-4 řádky dál
-    const cand = [lines[i + 1], lines[i + 2], lines[i + 3], lines[i + 4]].filter(Boolean);
-    const title = cand.find((x) => !x.startsWith("-") && !/^detail$/i.test(x)) || "";
-    if (!title) continue;
+  const phone = phones?.[0] || "";
+  const email = emails?.[0] || "";
 
-    // heuristika: na úřední desce je často rozsah datumů (řádek "- dd.mm.yyyy") hned po startu
-    items.push({ key: d.key, date: d.str, title });
+  const contactLines = [];
+  if (phone) contactLines.push(`Telefon: ${phone}`);
+  if (email) contactLines.push(`E-mail: ${email}`);
+
+  const answer =
+    `Odpověď:\n` +
+    `Kontakty na Obecní úřad Radim jsou uvedeny níže.\n\n` +
+    `Odpovědná osoba / úřad:\nObecní úřad Radim\n\n` +
+    `Kontakt:\n${contactLines.length ? contactLines.join(", ") : "Není uvedeno"}\n\n` +
+    `Odkazy:\n- Kontakty a úřední hodiny — ${kontaktyUrl}\n`;
+
+  return answer;
+}
+
+function makeUredniHodinyAnswer() {
+  const kontaktyUrl = KEY_LINKS.kontakty;
+  const page = getPageContentByUrl(kontaktyUrl) || getPageContentByUrl("https://www.obec-radim.cz/?hledej=&lang=cs");
+  if (!page) return null;
+
+  const { phones, emails, hoursLine } = extractContactsFromKontaktyPage(page);
+
+  let hours = "";
+  if (hoursLine) {
+    // z "Středa: 16:00 - 19:00" uděláme hezké
+    const m = hoursLine.match(/středa\s*:\s*([0-9]{1,2}:[0-9]{2})\s*-\s*([0-9]{1,2}:[0-9]{2})/i);
+    if (m) hours = `Úřední hodiny Obecního úřadu Radim jsou ve středu od ${m[1]} do ${m[2]}.`;
+    else hours = `Úřední hodiny jsou uvedeny na stránce Kontaktů.`;
+  } else {
+    hours = `Úřední hodiny jsou uvedeny na stránce Kontaktů.`;
   }
 
-  if (!items.length) return null;
-  items.sort((a, b) => b.key - a.key);
+  const phone = phones?.[0] || "";
+  const email = emails?.[0] || "";
 
-  return {
-    title: items[0].title,
-    date: items[0].date,
-    url: KEY_LINKS.uredniDeska,
-  };
+  const contactLines = [];
+  if (phone) contactLines.push(`Telefon: ${phone}`);
+  if (email) contactLines.push(`E-mail: ${email}`);
+
+  const answer =
+    `Odpověď:\n${hours}\n\n` +
+    `Odpovědná osoba / úřad:\nObecní úřad Radim\n\n` +
+    `Kontakt:\n${contactLines.length ? contactLines.join(", ") : "Není uvedeno"}\n\n` +
+    `Odkazy:\n- Kontakty a úřední hodiny — ${kontaktyUrl}\n`;
+
+  return answer;
 }
 
-function isLatestAktualitaQuestion(q) {
-  return /nejnov[eě]j[sš]i\s+aktualit/i.test(normalizeCzech(q));
-}
+function makeBioodpadAnswer() {
+  const bioUrl = "https://www.obec-radim.cz/urad/skladka-bioodpadu/";
+  const content = getPageContentByUrl(bioUrl);
+  if (!content) return null;
 
-function isLatestUredniDeskaQuestion(q) {
-  const s = normalizeCzech(q);
-  return s.includes("nejnov") && (s.includes("uredni deska") || s.includes("úřední deska"));
+  // Typicky v textu bývá: parcela KN 699, za hřbitovní zdí, otevřeno nepřetržitě
+  const parcel = (content.match(/\bparcele?\s+KN\s+\d+\b/i) || [])[0] || "";
+  const zaHrbitovem = /za\s+hřbitovn/i.test(content) ? "za hřbitovní zdí" : "";
+  const nonstop = /nepřetržit/i.test(content) ? "V tuto chvíli je skládka otevřena nepřetržitě." : "";
+
+  let where = "";
+  if (parcel && zaHrbitovem) where = `Skládka bioodpadu v Radimi se nachází na ${parcel} v k. ú. Radim, ${zaHrbitovem}.`;
+  else if (parcel) where = `Skládka bioodpadu v Radimi se nachází na ${parcel} v k. ú. Radim.`;
+  else where = `Umístění skládky bioodpadu je uvedeno na webu obce.`;
+
+  const kontakty = makeKontaktyAnswer(); // vezmeme telefon/email z kontaktů, pokud jde
+  // vytáhneme z něj jen "Kontakt:" řádek
+  let contactLine = "Není uvedeno";
+  if (kontakty) {
+    const m = kontakty.match(/Kontakt:\n([\s\S]*?)\n\nOdkazy:/);
+    if (m && m[1]) contactLine = m[1].trim();
+  }
+
+  const answer =
+    `Odpověď:\n${where} ${nonstop}`.trim() +
+    `\n\nOdpovědná osoba / úřad:\nObecní úřad Radim\n\n` +
+    `Kontakt:\n${contactLine}\n\n` +
+    `Odkazy:\n- Skládka bioodpadu — ${bioUrl}\n`;
+
+  return answer;
 }
 
 // ============================================
-// Helpers
+// ✅ LLM část (ponechaná jako fallback)
 // ============================================
 
 function sleep(ms) {
@@ -362,9 +293,6 @@ async function api(path_, { method = "GET", body, headers = {} } = {}, apiKey) {
   return json ?? {};
 }
 
-/**
- * Vezme poslední assistant zprávu podle created_at.
- */
 function extractLatestAssistantText(messagesListJson) {
   const data = Array.isArray(messagesListJson?.data) ? messagesListJson.data : [];
   const assistantMsgs = data.filter(
@@ -383,127 +311,65 @@ function extractLatestAssistantText(messagesListJson) {
   return parts.join("\n\n");
 }
 
-/**
- * Vezme text z message.content (jen textové části).
- */
-function extractMessageText(messageObj) {
-  if (!messageObj || !Array.isArray(messageObj.content) || !messageObj.content.length) return "";
-  const parts = messageObj.content
-    .map((c) => (c?.type === "text" ? c.text?.value : ""))
-    .filter(Boolean);
-  return parts.join("\n\n").trim();
-}
-
-/**
- * Odstraní úniky interních zdrojů / názvů souborů a lehce dočistí text.
- */
 function stripInternalLeaks(text) {
   let t = String(text || "");
-
-  // typicky: "Zdroj: 00_PEOPLE_obec_radim.txt" apod.
   t = t.replace(/^\s*Zdroj\s*:\s*.*$/gim, "");
   t = t.replace(/^\s*Zdroje?\s*:\s*.*$/gim, "");
-
-  // odstraň zmínky interních souborů (00_*, 99_FULL_*, *.txt) pokud se objeví v textu
   t = t.replace(/\b\d{2}_[A-Z0-9_]+\.(txt|md)\b/gi, "");
   t = t.replace(/\b99_FULL_[A-Z0-9_]+\b/gi, "");
-
-  // odstraň zmínky "knowledge base", "vector store" apod.
   t = t.replace(/\b(knowledge\s*base|vector\s*store|file_search|internal\s*source)\b/gi, "");
-
-  // whitespace
   t = t.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
   return t;
 }
 
-/**
- * Minimum cleaning:
- */
 function cleanAnswer(text) {
   let t = String(text || "");
-
-  // file_search citace
   t = t.replace(/【\s*\d+\s*:\s*\d+\s*†[^】]*】/g, "");
-
-  // odstranit tečku/čárku/středník atd. za URL (klikatelnost)
   t = t.replace(/(https?:\/\/[^\s)\]]+)[\.,;:!?]+/g, "$1");
-
-  // zrušit prázdné markdown odkazy
   t = t.replace(/\[([^\]]+)\]\(\s*\)/g, "$1");
-
-  // whitespace
   t = t.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
-
-  // interní úniky
   t = stripInternalLeaks(t);
-
   return t;
 }
 
-/**
- * ✅ Whitelist domén – nepustíme ven vymyšlené URL
- */
 function isAllowedDomain(url) {
   try {
     const u = new URL(url);
     const host = u.hostname.toLowerCase();
-
-    const allowed = new Set([
-      "obec-radim.cz",
-      "www.obec-radim.cz",
-      "zsradim.cz",
-      "www.zsradim.cz",
-    ]);
-
+    const allowed = new Set(["obec-radim.cz", "www.obec-radim.cz", "zsradim.cz", "www.zsradim.cz"]);
     return allowed.has(host);
   } catch {
     return false;
   }
 }
 
-/**
- * Robustní opravy URL
- */
 function normalizeSingleUrl(raw) {
   let u = String(raw || "").trim();
   if (!u) return u;
 
-  // ořež koncovou interpunkci
   u = u.replace(/[)\]}>,.;:!?]+$/g, "");
-
-  // někdy se objeví "www.https://..."
   u = u.replace(/^www\.(https?:\/\/)/i, "$1");
-
-  // ✅ fix dvojité schéma "https://https://..."
   u = u.replace(/^https?:\/\/https?:\/\//i, "https://");
-
-  // další zdvojení
   u = u.replace(/^(https?:\/\/)(https?:\/\/)+/i, "$1");
 
-  // fix domény bez tečky
+  // ✅ oprav špatně vypadlý '?'
+  u = u.replace(/https:\/\/www\.obec-radim\.cz\/hledej=&lang=cs/i, KEY_LINKS.hledani);
+  u = u.replace(/https:\/\/www\.obec-radim\.cz\/\?hledej=&lang=cs/i, KEY_LINKS.hledani);
+  u = u.replace(/https:\/\/www\.obec-radim\.cz\/\?calendar=&lang=cs/i, KEY_LINKS.kalendar);
+
   u = u.replace(/\/\/www\.obec-radimcz/gi, "//www.obec-radim.cz");
   u = u.replace(/\/\/obec-radimcz/gi, "//obec-radim.cz");
   u = u.replace(/obec-radimcz/gi, "obec-radim.cz");
 
-  // fix chybějící ".html" (typicky "...-1html" nebo "...-2html")
   u = u.replace(/(\d+)html(\b|\/|\?|#)/gi, "$1.html$2");
-
-  // ✅ fix chybějící tečky u přípon v e_download / evt_file linkách (…_1docx → …_1.docx)
   u = u.replace(/(obsah\d+_\d+)(pdf|docx|xlsx|xls|doc|pptx)(?=(&|$))/gi, "$1.$2");
   u = u.replace(/(\d+cs_?\d*)(pdf|docx|xlsx|xls|doc|pptx)(?=(&|$))/gi, "$1.$2");
-
-  // občas useknuté .pdf
   u = u.replace(/\.pd$/i, ".pdf");
-
-  // dvojité //
   u = u.replace(/([^:]\/)\/+/g, "$1");
 
   return u;
 }
 
-/**
- * ✅ Normalize URLs + vyhoď všechny nepovolené domény
- */
 function normalizeUrlsInText(text) {
   let t = String(text || "");
   if (!t) return t;
@@ -512,207 +378,32 @@ function normalizeUrlsInText(text) {
 
   t = t.replace(re, (m) => {
     const fixed = normalizeSingleUrl(m);
-
-    // mimo whitelist -> pryč
     if (!isAllowedDomain(fixed)) return "";
-
-    // finální ořez interpunkce
     return fixed.replace(/[)\]}>,.;:!?]+$/g, "");
   });
 
-  // dočistit mezery po vyhozených URL
   t = t.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n");
   t = t.replace(/[ \t]{2,}/g, " ").trim();
 
   return t;
 }
 
-/* =========================================================
-   ✅ Cena / podmínky: relevance + backend stripper
-   ========================================================= */
-
-function isPriceRelevantQuestion(userText) {
-  const s = normalizeCzech(userText);
-  return /\b(cena|kolik stoji|poplatek|poplatky|cenik|pronajem|pronajmout|rezerv|hala|sal|hriste|kurty|areal)\b/.test(
-    s
-  );
-}
-
-function removePriceSectionIfNotRelevant(answerText, userText) {
-  let t = String(answerText || "");
-  if (!t) return t;
-
-  // když uživatel cenu neřeší, sekci pryč
-  if (!isPriceRelevantQuestion(userText)) {
-    t = t.replace(
-      /(^|\n)Cena\s*\/\s*podmínky:\s*\n([\s\S]*?)(?=\n(?:Odkazy:|$)|\n{2,})/i,
-      "\n"
-    );
-    t = t.replace(/\n{3,}/g, "\n\n").trim();
-    return t;
-  }
-
-  // když je relevantní, ale jen "Není uvedeno", pryč
-  t = t.replace(
-    /(^|\n)Cena\s*\/\s*podmínky:\s*\n\s*Není uvedeno\s*(?=\n(?:Odkazy:|$)|\n{2,})/i,
-    "\n"
-  );
-  t = t.replace(/\n{3,}/g, "\n\n").trim();
-
-  return t;
-}
-
-/**
- * ✅ FINÁLNÍ INSTRUKCE PRO ASISTENTA
- */
-function buildRunInstructions({ hardSearch = false } = {}) {
-  const base =
-    `Jsi oficiální AI asistent obce ${OBEC_NAZEV}.\n` +
-    `Tvým úkolem je pomáhat občanům jako digitální úředník a navigátor po webu obce ${OBEC_NAZEV}.\n\n` +
-
-    `Odpovídáš výhradně na základě oficiálních veřejných informací obce ${OBEC_NAZEV} (web obce, dokumenty, úřední deska).\n` +
-    `Nikdy nepoužívej informace z jiných obcí.\n\n` +
-
-    `🚫 ZÁKAZ HÁDÁNÍ A HALUCINACÍ\n` +
-    `Nevymýšlej jména, kontakty, ceny, termíny ani postupy.\n` +
-    `Jména a kontakty uváděj jen pokud jsou v podkladech.\n\n` +
-
-    `🔒 INTERNÍ ZDROJE\n` +
-    `NIKDY nevypisuj názvy interních souborů, indexů nebo zdrojů (např. 00_*.txt, 99_FULL_*, "Zdroj: ...").\n` +
-    `Uživatel má vidět jen odpověď + veřejné odkazy na web obce.\n\n` +
-
-    `🧭 NAVIGACE\n` +
-    `Tvůj cíl je, aby uživatel vždy dostal:\n` +
-    `- krátkou jasnou odpověď,\n` +
-    `- kdo je odpovědný (úřad / funkce),\n` +
-    `- kontakt (pokud existuje),\n` +
-    `- a hlavně relevantní ODKAZ na správnou stránku nebo dokument.\n\n` +
-
-    `Kanonické rozcestníky (používej přesně tyto URL, když jsou relevantní):\n` +
-    `- Kontakty: ${KEY_LINKS.kontakty}\n` +
-    `- Úřední deska: ${KEY_LINKS.uredniDeska}\n` +
-    `- Aktuality: ${KEY_LINKS.aktuality}\n` +
-    `- Kalendář: ${KEY_LINKS.kalendar}\n` +
-    `- Hledání: ${KEY_LINKS.hledani}\n\n` +
-
-    `Pokud v dotazu dostaneš blok "POVINNÉ ODKAZY", MUSÍŠ použít alespoň jeden z nich a NESMÍŠ vymýšlet jiné odkazy.\n\n` +
-
-    `Pokud se uživatel ptá na vyhlášku / nařízení / dokument (např. odpady, psi, poplatky):\n` +
-    `- najdi konkrétní položku v podkladech,\n` +
-    `- uveď název dokumentu,\n` +
-    `- a přilož PŘÍMÝ ODKAZ ke stažení (pokud existuje) nebo odkaz na stránku na úřední desce.\n\n` +
-
-    `Pokud informace chybí nebo není jednoznačná, napiš přesně:\n` +
-    `„Tato informace není v dostupných podkladech obce uvedena.“\n\n` +
-
-    `🧾 FORMÁT ODPOVĚDI\n` +
-    `Odpověď:\n(stručně, případně krokově u postupu)\n\n` +
-    `Odpovědná osoba / úřad:\n(jméno+funkce jen pokud existuje, jinak "Obecní úřad Radim")\n\n` +
-    `Kontakt:\n(telefon/e-mail jen pokud existuje, jinak "Není uvedeno")\n\n` +
-    `Odkazy:\n- Název stránky nebo dokumentu – https://…\n`;
-
-  const hard =
-    `\n` +
-    `🧠 DODATEČNÁ INSTRUKCE (HARD SEARCH)\n` +
-    `Před odpovědí AKTIVNĚ vyhledej v podkladech relevantní část.\n` +
-    `U typických dotazů (úřední hodiny, odpady, poplatky, úřední deska, vyhlášky) hledej i na stránkách typu "Kontakty", "Úřední deska", "Hledání" a v dokumentech.\n` +
-    `Pokud je v podkladech uveden konkrétní odkaz, použij jej.\n` +
-    `U dotazů na “nejnovější” preferuj položky s nejnovějším uvedeným datem.\n`;
-
-  return hardSearch ? base + hard : base;
-}
-
-/**
- * ✅ POVINNÝ KONTEXT WRAPPER (USER MESSAGE – VŽDY)
- * + volitelné backend hints (POVINNÉ ODKAZY / NEJNOVĚJŠÍ …)
- */
-function wrapUserQuestion(userText, extraHints = "") {
-  const t = String(userText || "").trim();
-  const hints = extraHints ? `\n\n${String(extraHints).trim()}\n` : "";
+function buildRunInstructions() {
   return (
-    `KONTEXT: Tento chat slouží výhradně pro obec ${OBEC_NAZEV}. Uživatel chce navigaci po webu obce a relevantní veřejné odkazy.\n` +
-    `DOTAZ UŽIVATELE: ${t}` +
-    hints
+    `Jsi oficiální AI asistent obce ${OBEC_NAZEV}.\n` +
+    `Odpovídáš výhradně z oficiálních podkladů obce (web, dokumenty, úřední deska).\n` +
+    `Nevymýšlej jména, kontakty ani odkazy.\n` +
+    `Odkazy uváděj jen pokud jsou v podkladech.\n\n` +
+    `Formát:\n` +
+    `Odpověď:\n...\n\nOdpovědná osoba / úřad:\n...\n\nKontakt:\n...\n\nOdkazy:\n- ... — https://...\n`
   );
 }
 
-/* =========================================================
-   ✅ HARD COREFERENCE: přepis zájmen -> explicitní osoba
-   ========================================================= */
-
-const PERSON_REGEX =
-  /\b([A-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ][a-záčďéěíňóřšťúůýž]+)\s+([A-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ][a-záčďéěíňóřšťúůýž]+)\b/g;
-
-function pickLastPersonFromText(text) {
-  const t = String(text || "");
-  const matches = [...t.matchAll(PERSON_REGEX)].map((m) => `${m[1]} ${m[2]}`);
-
-  const filtered = matches.filter((name) => {
-    const n = name.toLowerCase();
-    if (n.startsWith("obec ")) return false;
-    if (n.startsWith("obecní ")) return false;
-    if (n.includes("obecní úřad")) return false;
-    return true;
-  });
-
-  return filtered.length ? filtered[filtered.length - 1] : "";
+function wrapUserQuestion(userText) {
+  const t = String(userText || "").trim();
+  return `KONTEXT: Tento chat slouží výhradně pro obec ${OBEC_NAZEV}.\nDOTAZ UŽIVATELE: ${t}`;
 }
 
-function messageAlreadyContainsPersonName(msg) {
-  return PERSON_REGEX.test(String(msg || ""));
-}
-
-function isContactQuestion(msg) {
-  const s = normalizeCzech(msg);
-  return /\b(email|e-mail|mail|telefon|kontakt|zavolat|volat)\b/.test(s);
-}
-
-function hasPronounReference(msg) {
-  const s = normalizeCzech(msg);
-  return /\b(na ni|na nej|na ne|na neho|jeji|jeho|ji|mu|nej|ni|tomu|te|toho|ta|ten|to)\b/.test(s);
-}
-
-function rewriteToExplicitPersonQuestion(original, personName) {
-  const q = String(original || "").trim();
-  const p = String(personName || "").trim();
-  if (!q || !p) return q;
-
-  const wantsEmail = /\b(email|e-mail|mail)\b/i.test(q);
-  const wantsPhone = /\b(telefon|kontakt|zavolat|volat)\b/i.test(q);
-
-  if (wantsEmail && wantsPhone) return `Jaký je e-mail a telefon na ${p}?`;
-  if (wantsEmail) return `Jaký je e-mail na ${p}?`;
-  if (wantsPhone) return `Jaký je telefon na ${p}?`;
-
-  return `Dotaz se týká osoby ${p}: ${q}`;
-}
-
-async function getLastReferencedPersonFromThread(threadId, apiKey, limit = 12) {
-  try {
-    const messages = await api(`/threads/${threadId}/messages?limit=${limit}`, {}, apiKey);
-    const data = Array.isArray(messages?.data) ? messages.data : [];
-    if (!data.length) return "";
-
-    const orderedDesc = [...data].sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
-
-    for (const m of orderedDesc) {
-      if (!m || (m.role !== "user" && m.role !== "assistant")) continue;
-      const txt = extractMessageText(m);
-      if (!txt) continue;
-      const p = pickLastPersonFromText(txt);
-      if (p) return p;
-    }
-
-    return "";
-  } catch {
-    return "";
-  }
-}
-
-/**
- * ✅ Spolehlivé zajištění threadu:
- * - když je incoming thread_id neplatný (404), vytvoří nový.
- */
 async function ensureThreadId(incomingThreadId, apiKey) {
   let threadId = incomingThreadId;
 
@@ -733,9 +424,6 @@ async function ensureThreadId(incomingThreadId, apiKey) {
   }
 }
 
-/**
- * ✅ Spolehlivé přidání zprávy do threadu s jednorázovým fallbackem při 404.
- */
 async function addUserMessageWithFallback(threadId, content, apiKey) {
   try {
     await api(
@@ -769,13 +457,6 @@ async function addUserMessageWithFallback(threadId, content, apiKey) {
   }
 }
 
-const REQUIRED_FALLBACK = "Tato informace není v dostupných podkladech obce uvedena.";
-
-function looksLikeFallback(answer) {
-  const t = normalizeCzech(answer);
-  return t.includes("tato informace neni v dostupnych podkladech obce uvedena");
-}
-
 async function runAssistant({ threadId, assistantId, apiKey, instructions }) {
   const run = await api(
     `/threads/${threadId}/runs`,
@@ -801,24 +482,11 @@ async function runAssistant({ threadId, assistantId, apiKey, instructions }) {
     }
 
     await sleep(650);
-
     const check = await api(`/threads/${threadId}/runs/${run.id}`, {}, apiKey);
     const status = check.status;
 
     if (status === "queued" || status === "in_progress") continue;
-
-    if (status === "requires_action") {
-      return {
-        ok: false,
-        error: "Run requires action (tool call not handled in function).",
-        status,
-      };
-    }
-
-    if (status !== "completed") {
-      return { ok: false, error: "Run failed", status };
-    }
-
+    if (status !== "completed") return { ok: false, error: "Run failed", status };
     break;
   }
 
@@ -850,8 +518,9 @@ export default async function handler(req) {
       return jsonResponse(400, { ok: false, error: "Missing message" });
     }
 
-    // Reset threadu
     const msgTrim = String(message).trim();
+
+    // Reset threadu
     if (msgTrim.toLowerCase() === "reset") {
       const created = await api("/threads", { method: "POST" }, apiKey);
       return jsonResponse(200, { ok: true, answer: "Resetováno.", thread_id: created.id });
@@ -860,119 +529,35 @@ export default async function handler(req) {
     // Thread
     let threadId = await ensureThreadId(body?.thread_id, apiKey);
 
-    // Coreference
-    let outgoingMessage = msgTrim;
-    const needRewrite =
-      isContactQuestion(outgoingMessage) &&
-      hasPronounReference(outgoingMessage) &&
-      !messageAlreadyContainsPersonName(outgoingMessage);
+    // ✅ 1) Deterministické FAQ (pokud máme FULL v deployi)
+    // (když FULL není, vrátí null a spadne to na asistenta)
+    let deterministic = null;
 
-    if (needRewrite) {
-      const lastPerson = await getLastReferencedPersonFromThread(threadId, apiKey, 12);
-      if (lastPerson) {
-        outgoingMessage = rewriteToExplicitPersonQuestion(outgoingMessage, lastPerson);
-      }
+    if (isBioodpadQuestion(msgTrim)) deterministic = makeBioodpadAnswer();
+    else if (isUredniHodinyQuestion(msgTrim)) deterministic = makeUredniHodinyAnswer();
+    else if (isKontaktyQuestion(msgTrim)) deterministic = makeKontaktyAnswer();
+
+    if (deterministic) {
+      deterministic = normalizeUrlsInText(cleanAnswer(deterministic));
+      return jsonResponse(200, { ok: true, answer: deterministic, thread_id: threadId });
     }
 
-    // ====== BACKEND HINTS (deterministická navigace + dokumenty) ======
-    const docLike = isDocLikeQuestion(msgTrim);
-    let extraHints = "";
-
-    // 1) Nejnovější aktualita / úřední deska – doplníme deterministicky, pokud umíme z FULL
-    if (isLatestAktualitaQuestion(msgTrim)) {
-      const latest = findLatestAktualitaFromFull();
-      if (latest) {
-        extraHints +=
-          `NEJNOVĚJŠÍ AKTUALITA (použij toto, nevymýšlej):\n` +
-          `- ${latest.title} (${latest.date}) — ${latest.url}\n`;
-      } else {
-        // fallback: aspoň rozcestník
-        extraHints += `ROZCESTNÍK AKTUALIT:\n- Aktuality — ${KEY_LINKS.aktuality}\n`;
-      }
-    }
-
-    if (isLatestUredniDeskaQuestion(msgTrim)) {
-      const latest = findLatestUredniDeskaFromFull();
-      if (latest) {
-        extraHints +=
-          `NEJNOVĚJŠÍ ÚŘEDNÍ DESKA (použij toto, nevymýšlej):\n` +
-          `- ${latest.title} (od ${latest.date}) — ${latest.url}\n`;
-      } else {
-        extraHints += `ROZCESTNÍK ÚŘEDNÍ DESKY:\n- Úřední deska — ${KEY_LINKS.uredniDeska}\n`;
-      }
-    }
-
-    // 2) Dokumenty – vynutíme linky z DOCUMENTS INDEX
-    if (docLike) {
-      extraHints += buildDocHintsBlock(msgTrim, { force: true });
-    }
-
-    // 3) Obecné navigační rozcestníky podle intentu (jen pomocné, bezpečné)
-    const s = normalizeCzech(msgTrim);
-    if (/\b(uredni hodiny|kontakt|kontakty|telefon|email|e-mail)\b/.test(s)) {
-      extraHints += `KANONICKÝ ODKAZ:\n- Kontakty a úřední hodiny — ${KEY_LINKS.kontakty}\n`;
-    }
-    if (/\b(uredni deska|vyveseno|vyhlaska|narizeni|zamer|rozpocet|usneseni)\b/.test(s)) {
-      extraHints += `KANONICKÝ ODKAZ:\n- Úřední deska — ${KEY_LINKS.uredniDeska}\n`;
-    }
-    if (/\b(aktualit|novink|co noveho)\b/.test(s)) {
-      extraHints += `KANONICKÝ ODKAZ:\n- Aktuality — ${KEY_LINKS.aktuality}\n`;
-    }
-
-    // Wrapper
-    outgoingMessage = wrapUserQuestion(outgoingMessage, extraHints);
-
-    // 1) add msg
+    // ✅ 2) Fallback na Assistants (pro zbytek)
+    let outgoingMessage = wrapUserQuestion(msgTrim);
     threadId = await addUserMessageWithFallback(threadId, outgoingMessage, apiKey);
 
-    // 2) run (normal)
-    let r = await runAssistant({
+    const r = await runAssistant({
       threadId,
       assistantId,
       apiKey,
-      instructions: buildRunInstructions({ hardSearch: false }),
+      instructions: buildRunInstructions(),
     });
 
-    // 3) retry (hard search) když to vypadá na falešný fallback
-    if (r.ok && looksLikeFallback(r.answer)) {
-      const r2 = await runAssistant({
-        threadId,
-        assistantId,
-        apiKey,
-        instructions: buildRunInstructions({ hardSearch: true }),
-      });
-
-      if (r2.ok && r2.answer && !looksLikeFallback(r2.answer)) {
-        r = r2;
-      } else if (r2.ok && r2.answer) {
-        r = r2;
-      }
-    }
-
     let answer = r.ok ? r.answer : "";
-
-    // finální úklid + cena sekce
     answer = cleanAnswer(answer);
     answer = normalizeUrlsInText(answer);
-    answer = removePriceSectionIfNotRelevant(answer, msgTrim);
 
-    // ====== ENFORCEMENT: když je to dokumentový dotaz, a model nepoužil povinné odkazy, doplníme je ======
-    if (docLike) {
-      const best = findBestDocs(msgTrim, 3)
-        .map((d) => normalizeSingleUrl(d.url))
-        .filter((u) => u && isAllowedDomain(u));
-
-      const hasAny = best.some((u) => answer.includes(u));
-      if (!hasAny && best.length) {
-        // připojíme odkaz(y) deterministicky – uživatel je chce hlavně funkční
-        const tail =
-          "\n\nOdkazy:\n" + best.map((u) => `- Dokument ke stažení — ${u}`).join("\n");
-        answer = (answer || "").trim() + tail;
-        answer = normalizeUrlsInText(answer);
-      }
-    }
-
-    if (!answer) answer = REQUIRED_FALLBACK;
+    if (!answer) answer = "Tato informace není v dostupných podkladech obce uvedena.";
 
     return jsonResponse(200, { ok: true, answer, thread_id: threadId });
   } catch (err) {
