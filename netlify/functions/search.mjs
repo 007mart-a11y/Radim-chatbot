@@ -16,6 +16,9 @@ const corsHeaders = {
 const OPENAI_BASE_URL = "https://api.openai.com/v1";
 const OBEC_NAZEV = "Radim";
 
+// ✅ nastav si “dnes” (můžeš později udělat dynamicky)
+const TODAY_ISO = "2026-02-09"; // YYYY-MM-DD
+
 // Kanonické (bezpečné) rozcestníky
 const KEY_LINKS = {
   homepage: "https://www.obec-radim.cz/",
@@ -75,12 +78,15 @@ function loadFullText() {
 function buildPagesIndex(fullText) {
   if (!fullText) return null;
 
-  // Velmi jednoduchý parser: vytáhne bloky:
   // URL: ...
   // TITLE: ...
   // CONTENT: ...
   const pages = new Map();
-  const re = /=== PAGE[\s\S]*?URL:\s*(.+?)\nTITLE:\s*([\s\S]*?)\nCONTENT:\n([\s\S]*?)(?=\n={10,}|\n=== PAGE|\s*$)/g;
+
+  // Pozn.: některé stránky nemají TITLE, tak ho nevyžadujeme
+  const re =
+    /=== PAGE[\s\S]*?URL:\s*(.+?)\n(?:TITLE:\s*([\s\S]*?)\n)?CONTENT:\n([\s\S]*?)(?=\n={10,}|\n=== PAGE|\s*$)/g;
+
   let m;
   while ((m = re.exec(fullText))) {
     const url = String(m[1] || "").trim();
@@ -112,6 +118,35 @@ function normalizeCzech(s) {
 }
 
 // ============================================
+// ✅ Intent detection (hlavní změna)
+// ============================================
+
+function isEventsQuestion(q) {
+  const s = normalizeCzech(q);
+  return /\b(akce|kalendar|kalendar akci|program|pro deti|detske|co se kona|co je v radimi|co je noveho|nejnovejsi|aktualne)\b/.test(
+    s
+  );
+}
+
+function isExplicitHistoryQuestion(q) {
+  const s = normalizeCzech(q);
+
+  // uživatel chce minulost: "co bylo", "loni", "v roce 2024", "minuly rok", apod.
+  if (/\b(co bylo|drive|minule|minuly|loni|predloni|historie|archiv)\b/.test(s)) return true;
+
+  // pokud obsahuje explicitní rok <= 2025 (v době 2026) – bereme jako "historický dotaz"
+  const years = [...s.matchAll(/\b(20\d{2})\b/g)].map((m) => Number(m[1]));
+  if (years.some((y) => y <= 2025)) return true;
+
+  return false;
+}
+
+function isLatestNewsQuestion(q) {
+  const s = normalizeCzech(q);
+  return /\b(nejnovejsi|co je noveho|aktualne|posledni|nove na uredni desce)\b/.test(s);
+}
+
+// ============================================
 // ✅ Deterministické odpovědi (bez LLM)
 // ============================================
 
@@ -131,7 +166,6 @@ function isBioodpadQuestion(q) {
 }
 
 function extractContactsFromKontaktyPage(content) {
-  // očekáváme v textu aspoň tel + email + úřední hodiny
   const phones = [...content.matchAll(/\+420\s?\d{3}\s?\d{3}\s?\d{3}|\b\d{3}\s?\d{3}\s?\d{3}\b/g)]
     .map((m) => m[0].replace(/\s+/g, " ").trim())
     .filter(Boolean);
@@ -140,7 +174,6 @@ function extractContactsFromKontaktyPage(content) {
     .map((m) => m[0].trim())
     .filter(Boolean);
 
-  // úřední hodiny – často "Středa: 16:00 - 19:00"
   const hoursLine =
     content
       .split("\n")
@@ -157,15 +190,12 @@ function extractContactsFromKontaktyPage(content) {
 function makeKontaktyAnswer() {
   const kontaktyUrl = KEY_LINKS.kontakty;
   const page = getPageContentByUrl(kontaktyUrl);
-
-  // fallback: vezmeme aspoň údaje z FULLTEXTOVÉHO HLEDÁNÍ (v tvém FULL to bývá)
-  const searchPage = getPageContentByUrl("https://www.obec-radim.cz/?hledej=&lang=cs");
+  const searchPage = getPageContentByUrl(KEY_LINKS.hledani);
 
   const src = page || searchPage;
   if (!src) return null;
 
-  const { phones, emails, hoursLine } = extractContactsFromKontaktyPage(src);
-
+  const { phones, emails } = extractContactsFromKontaktyPage(src);
   const phone = phones?.[0] || "";
   const email = emails?.[0] || "";
 
@@ -173,26 +203,24 @@ function makeKontaktyAnswer() {
   if (phone) contactLines.push(`Telefon: ${phone}`);
   if (email) contactLines.push(`E-mail: ${email}`);
 
-  const answer =
+  return (
     `Odpověď:\n` +
     `Kontakty na Obecní úřad Radim jsou uvedeny níže.\n\n` +
     `Odpovědná osoba / úřad:\nObecní úřad Radim\n\n` +
     `Kontakt:\n${contactLines.length ? contactLines.join(", ") : "Není uvedeno"}\n\n` +
-    `Odkazy:\n- Kontakty a úřední hodiny — ${kontaktyUrl}\n`;
-
-  return answer;
+    `Odkazy:\n- Kontakty a úřední hodiny — ${kontaktyUrl}\n`
+  );
 }
 
 function makeUredniHodinyAnswer() {
   const kontaktyUrl = KEY_LINKS.kontakty;
-  const page = getPageContentByUrl(kontaktyUrl) || getPageContentByUrl("https://www.obec-radim.cz/?hledej=&lang=cs");
+  const page = getPageContentByUrl(kontaktyUrl) || getPageContentByUrl(KEY_LINKS.hledani);
   if (!page) return null;
 
   const { phones, emails, hoursLine } = extractContactsFromKontaktyPage(page);
 
   let hours = "";
   if (hoursLine) {
-    // z "Středa: 16:00 - 19:00" uděláme hezké
     const m = hoursLine.match(/středa\s*:\s*([0-9]{1,2}:[0-9]{2})\s*-\s*([0-9]{1,2}:[0-9]{2})/i);
     if (m) hours = `Úřední hodiny Obecního úřadu Radim jsou ve středu od ${m[1]} do ${m[2]}.`;
     else hours = `Úřední hodiny jsou uvedeny na stránce Kontaktů.`;
@@ -207,13 +235,12 @@ function makeUredniHodinyAnswer() {
   if (phone) contactLines.push(`Telefon: ${phone}`);
   if (email) contactLines.push(`E-mail: ${email}`);
 
-  const answer =
+  return (
     `Odpověď:\n${hours}\n\n` +
     `Odpovědná osoba / úřad:\nObecní úřad Radim\n\n` +
     `Kontakt:\n${contactLines.length ? contactLines.join(", ") : "Není uvedeno"}\n\n` +
-    `Odkazy:\n- Kontakty a úřední hodiny — ${kontaktyUrl}\n`;
-
-  return answer;
+    `Odkazy:\n- Kontakty a úřední hodiny — ${kontaktyUrl}\n`
+  );
 }
 
 function makeBioodpadAnswer() {
@@ -221,7 +248,6 @@ function makeBioodpadAnswer() {
   const content = getPageContentByUrl(bioUrl);
   if (!content) return null;
 
-  // Typicky v textu bývá: parcela KN 699, za hřbitovní zdí, otevřeno nepřetržitě
   const parcel = (content.match(/\bparcele?\s+KN\s+\d+\b/i) || [])[0] || "";
   const zaHrbitovem = /za\s+hřbitovn/i.test(content) ? "za hřbitovní zdí" : "";
   const nonstop = /nepřetržit/i.test(content) ? "V tuto chvíli je skládka otevřena nepřetržitě." : "";
@@ -231,25 +257,23 @@ function makeBioodpadAnswer() {
   else if (parcel) where = `Skládka bioodpadu v Radimi se nachází na ${parcel} v k. ú. Radim.`;
   else where = `Umístění skládky bioodpadu je uvedeno na webu obce.`;
 
-  const kontakty = makeKontaktyAnswer(); // vezmeme telefon/email z kontaktů, pokud jde
-  // vytáhneme z něj jen "Kontakt:" řádek
+  const kontakty = makeKontaktyAnswer();
   let contactLine = "Není uvedeno";
   if (kontakty) {
     const m = kontakty.match(/Kontakt:\n([\s\S]*?)\n\nOdkazy:/);
     if (m && m[1]) contactLine = m[1].trim();
   }
 
-  const answer =
+  return (
     `Odpověď:\n${where} ${nonstop}`.trim() +
     `\n\nOdpovědná osoba / úřad:\nObecní úřad Radim\n\n` +
     `Kontakt:\n${contactLine}\n\n` +
-    `Odkazy:\n- Skládka bioodpadu — ${bioUrl}\n`;
-
-  return answer;
+    `Odkazy:\n- Skládka bioodpadu — ${bioUrl}\n`
+  );
 }
 
 // ============================================
-// ✅ LLM část (ponechaná jako fallback)
+// ✅ LLM část (Assistants) + tvrdé filtrování
 // ============================================
 
 function sleep(ms) {
@@ -295,19 +319,11 @@ async function api(path_, { method = "GET", body, headers = {} } = {}, apiKey) {
 
 function extractLatestAssistantText(messagesListJson) {
   const data = Array.isArray(messagesListJson?.data) ? messagesListJson.data : [];
-  const assistantMsgs = data.filter(
-    (m) => m?.role === "assistant" && Array.isArray(m?.content) && m.content.length
-  );
-
+  const assistantMsgs = data.filter((m) => m?.role === "assistant" && Array.isArray(m?.content) && m.content.length);
   if (!assistantMsgs.length) return "";
-
   assistantMsgs.sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
   const msg = assistantMsgs[0];
-
-  const parts = msg.content
-    .map((c) => (c?.type === "text" ? c.text?.value : ""))
-    .filter(Boolean);
-
+  const parts = msg.content.map((c) => (c?.type === "text" ? c.text?.value : "")).filter(Boolean);
   return parts.join("\n\n");
 }
 
@@ -352,7 +368,6 @@ function normalizeSingleUrl(raw) {
   u = u.replace(/^https?:\/\/https?:\/\//i, "https://");
   u = u.replace(/^(https?:\/\/)(https?:\/\/)+/i, "$1");
 
-  // ✅ oprav špatně vypadlý '?'
   u = u.replace(/https:\/\/www\.obec-radim\.cz\/hledej=&lang=cs/i, KEY_LINKS.hledani);
   u = u.replace(/https:\/\/www\.obec-radim\.cz\/\?hledej=&lang=cs/i, KEY_LINKS.hledani);
   u = u.replace(/https:\/\/www\.obec-radim\.cz\/\?calendar=&lang=cs/i, KEY_LINKS.kalendar);
@@ -384,19 +399,77 @@ function normalizeUrlsInText(text) {
 
   t = t.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n");
   t = t.replace(/[ \t]{2,}/g, " ").trim();
-
   return t;
 }
 
-function buildRunInstructions() {
+// ============================================
+// ✅ “Akce” filtr: nepustit staré roky
+// ============================================
+
+function extractYearsFromText(text) {
+  const s = String(text || "");
+  const years = [...s.matchAll(/\b(20\d{2})\b/g)].map((m) => Number(m[1]));
+  return [...new Set(years)];
+}
+
+function shouldBlockPastEventsAnswer(userQ, answer) {
+  // pokud se uživatel explicitně ptá na minulost, neblokujeme
+  if (isExplicitHistoryQuestion(userQ)) return false;
+
+  // blokujeme jen pro “akce/nejnovější”
+  if (!isEventsQuestion(userQ) && !isLatestNewsQuestion(userQ)) return false;
+
+  // pokud odpověď obsahuje roky výrazně v minulosti, je to podezřelé
+  const years = extractYearsFromText(answer);
+  if (!years.length) return false;
+
+  // v kontextu 2026 nechceme běžně vracet 2023/2024/2025 jako “plánované”
+  return years.some((y) => y <= 2025);
+}
+
+function makeNoUpcomingEventsFallback(userQ) {
+  // stručná oficiální odpověď + odkazy
+  const wantsKids = /\b(deti|detske|pro deti)\b/.test(normalizeCzech(userQ));
+  const prefix = wantsKids ? "plánované akce pro děti" : "plánované akce";
   return (
-    `Jsi oficiální AI asistent obce ${OBEC_NAZEV}.\n` +
-    `Odpovídáš výhradně z oficiálních podkladů obce (web, dokumenty, úřední deska).\n` +
-    `Nevymýšlej jména, kontakty ani odkazy.\n` +
-    `Odkazy uváděj jen pokud jsou v podkladech.\n\n` +
-    `Formát:\n` +
-    `Odpověď:\n...\n\nOdpovědná osoba / úřad:\n...\n\nKontakt:\n...\n\nOdkazy:\n- ... — https://...\n`
+    `Odpověď:\n` +
+    `Na webu obce ${OBEC_NAZEV} nejsou k datu ${TODAY_ISO.split("-").reverse().join(". ")} v dostupných podkladech uvedeny žádné ${prefix}.\n\n` +
+    `Odpovědná osoba / úřad:\nObecní úřad ${OBEC_NAZEV}\n\n` +
+    `Kontakt:\nViz kontakty obce.\n\n` +
+    `Odkazy:\n` +
+    `- Kalendář akcí — ${KEY_LINKS.kalendar}\n` +
+    `- Aktuality — ${KEY_LINKS.aktuality}\n`
   );
+}
+
+// ============================================
+// ✅ Instructions (hlavní změna: datum + pravidla pro akce)
+// ============================================
+
+function buildRunInstructions(userQ) {
+  const todayCz = TODAY_ISO.split("-").reverse().join(". ");
+  const wantsEvents = isEventsQuestion(userQ) || isLatestNewsQuestion(userQ);
+  const allowsHistory = isExplicitHistoryQuestion(userQ);
+
+  let rules =
+    `Jsi oficiální AI asistent obce ${OBEC_NAZEV}.\n` +
+    `Dnes je ${todayCz}.\n` +
+    `Odpovídáš výhradně z oficiálních podkladů obce (web, dokumenty, úřední deska) dostupných v nástrojích asistenta.\n` +
+    `Nevymýšlej fakta. Pokud údaj není v podkladech, napiš přesně: "Tato informace není v dostupných podkladech obce uvedena."\n\n`;
+
+  if (wantsEvents && !allowsHistory) {
+    rules +=
+      `PRAVIDLA PRO AKCE / AKTUÁLNÍ INFORMACE:\n` +
+      `- Uváděj pouze položky, které jsou aktuální nebo budoucí (nevracej staré akce z let minulých).\n` +
+      `- Pokud v podkladech nejsou žádné budoucí akce, napiš to na rovinu a přidej odkazy na kalendář a aktuality.\n\n`;
+  }
+
+  rules +=
+    `Formát odpovědi (dodrž vždy):\n` +
+    `Odpověď:\n...\n\nOdpovědná osoba / úřad:\n...\n\nKontakt:\n...\n\nOdkazy:\n- ... — https://...\n\n` +
+    `Odkazy uváděj jen pokud jsou v podkladech a nejlépe přímé (e_download.php apod.).\n`;
+
+  return rules;
 }
 
 function wrapUserQuestion(userText) {
@@ -530,7 +603,6 @@ export default async function handler(req) {
     let threadId = await ensureThreadId(body?.thread_id, apiKey);
 
     // ✅ 1) Deterministické FAQ (pokud máme FULL v deployi)
-    // (když FULL není, vrátí null a spadne to na asistenta)
     let deterministic = null;
 
     if (isBioodpadQuestion(msgTrim)) deterministic = makeBioodpadAnswer();
@@ -550,7 +622,7 @@ export default async function handler(req) {
       threadId,
       assistantId,
       apiKey,
-      instructions: buildRunInstructions(),
+      instructions: buildRunInstructions(msgTrim),
     });
 
     let answer = r.ok ? r.answer : "";
@@ -558,6 +630,13 @@ export default async function handler(req) {
     answer = normalizeUrlsInText(answer);
 
     if (!answer) answer = "Tato informace není v dostupných podkladech obce uvedena.";
+
+    // ✅ 3) TVRDÝ filtr pro akce/nejnovější: nepustíme staré roky
+    if (shouldBlockPastEventsAnswer(msgTrim, answer)) {
+      answer = makeNoUpcomingEventsFallback(msgTrim);
+      answer = normalizeUrlsInText(cleanAnswer(answer));
+      return jsonResponse(200, { ok: true, answer, thread_id: threadId });
+    }
 
     return jsonResponse(200, { ok: true, answer, thread_id: threadId });
   } catch (err) {

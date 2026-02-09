@@ -2,6 +2,13 @@
 // FULL crawl + clean output + DOCUMENTS index (direct download links)
 // + build LATEST file (00_LATEST_...) + upload both to OpenAI Vector Store + cleanup
 //
+// FIXES:
+// - OpenAI-Beta header for vector store ops
+// - Robust vector store listing (pagination)
+// - Cleanup uses filename from embedded file OR /v1/files fallback
+// - Cleanup uses vector-store created_at (not only file created_at)
+// - Debug prints so you always see what it thinks is FULL/LATEST
+//
 // Requirements: Node 18+ (native fetch/FormData/Blob), dependency: jsdom
 //   npm i jsdom
 //
@@ -11,17 +18,11 @@
 //   VECTOR_STORE_ID=...
 //
 //   CLEANUP_OLD=1 (default) | 0
-//   KEEP_LATEST=2 (default)                // keep last N FULL files
-//   FULL_PREFIX=99_FULL_obec_radim (default)
-//   FULL_OUT_DIR=knowledge (default)
-//   FULL_OUT_FILE=99_FULL_obec_radim.txt (default)
+//   KEEP_LATEST=1 (default)          // keep last N FULL files
 //
-//   // LATEST (new)
-//   LATEST_PREFIX=00_LATEST_obec_radim (default)
-//   LATEST_OUT_FILE=00_LATEST_obec_radim.txt (default)
-//   LATEST_MAX_ITEMS=40 (default)
+//   // LATEST
 //   CLEANUP_OLD_LATEST=1 (default) | 0
-//   KEEP_LATEST_LATEST=6 (default)         // keep last N LATEST files
+//   KEEP_LATEST_LATEST=6 (default)  // keep last N LATEST files
 //
 //   MAX_PAGES=450 (default)
 //   CONCURRENCY=3 (default)
@@ -56,6 +57,9 @@ const MAX_PAGES = parseInt(process.env.MAX_PAGES ?? "450", 10);
 const CONCURRENCY = Math.max(1, parseInt(process.env.CONCURRENCY ?? "3", 10));
 const REQUEST_TIMEOUT_MS = parseInt(process.env.REQUEST_TIMEOUT_MS ?? "25000", 10);
 
+// Required for vector stores / assistants v2 endpoints
+const OPENAI_BETA_HEADER = { "OpenAI-Beta": "assistants=v2" };
+
 // ---------- UTIL ----------
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -66,7 +70,6 @@ function absUrl(u, base = SITE_BASE_URL) {
     return null;
   }
 }
-
 function sameOrigin(url) {
   try {
     const a = new URL(url);
@@ -76,45 +79,34 @@ function sameOrigin(url) {
     return false;
   }
 }
-
 function normalizeUrl(url) {
   try {
     const u = new URL(url);
     u.hash = "";
-    // remove typical tracking params, keep functional ones
     const drop = ["utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content", "fbclid", "gclid"];
     for (const k of drop) u.searchParams.delete(k);
-    // keep query, because municipal CMS often uses ?id=...
-    // normalize: remove trailing multiple slashes
     u.pathname = u.pathname.replace(/\/{2,}/g, "/");
     return u.toString();
   } catch {
     return url;
   }
 }
-
 function isProbablyBinary(url) {
   return /\.(jpg|jpeg|png|webp|gif|svg|mp4|webm|avi|mov|mp3|wav|zip|rar|7z|tar|gz|bz2|exe|dmg)$/i.test(url);
 }
-
 function isPdf(url) {
   return /\.pdf(\?.*)?$/i.test(url);
 }
-
 function isDownloadDoc(url) {
   return /\.(pdf|doc|docx|xls|xlsx|odt|ods|ppt|pptx|rtf|txt|csv|zip)(\?.*)?$/i.test(url);
 }
-
 function isMailtoOrTel(url) {
   return /^mailto:/i.test(url) || /^tel:/i.test(url);
 }
-
 function looksLikeLoginOrAdmin(url) {
   return /\/admin\/?$/i.test(url) || /\/(wp-admin|administrator)\b/i.test(url);
 }
-
 function looksLikeGalleryHeavy(url) {
-  // fotogalerie bývá extrémně šumová, zpravidla bez přínosu pro Q&A odkazy
   return /\/fotogalerie\b/i.test(url);
 }
 
@@ -126,7 +118,6 @@ function stripWeirdWhitespace(s) {
     .replace(/[ \t]{2,}/g, " ")
     .trim();
 }
-
 function dedupeAdjacentLines(text) {
   const lines = text.split("\n").map((l) => l.trim());
   const out = [];
@@ -143,13 +134,12 @@ function dedupeAdjacentLines(text) {
   }
   return out.join("\n").trim();
 }
-
 function sha1(s) {
   return crypto.createHash("sha1").update(s).digest("hex");
 }
 
 function isJunkLine(line) {
-  const l = line.toLowerCase();
+  const l = (line || "").toLowerCase();
   if (!l) return true;
 
   const junkExact = new Set([
@@ -169,15 +159,12 @@ function isJunkLine(line) {
   ]);
   if (junkExact.has(l)) return true;
 
-  // calendar noise
   if (/^(po|út|st|čt|pá|so|ne)$/i.test(line)) return true;
   if (/^\d{1,2}$/.test(line)) return true;
 
-  // month alone
   if (/^(leden|únor|březen|duben|květen|červen|červenec|srpen|září|říjen|listopad|prosinec)$/i.test(line))
     return true;
 
-  // template leftovers
   if (/^tel\.:$/i.test(line)) return true;
   if (/^e-?mail:$/i.test(line)) return true;
 
@@ -210,7 +197,7 @@ function pickTitle(doc) {
 
 function findDateInText(s) {
   if (!s) return null;
-  // 1) 1. 2. 2026 / 01.02.2026
+
   let m = s.match(/\b(\d{1,2})\.\s*(\d{1,2})\.\s*(\d{4})\b/);
   if (m) {
     const dd = String(m[1]).padStart(2, "0");
@@ -218,7 +205,7 @@ function findDateInText(s) {
     const yyyy = m[3];
     return `${yyyy}-${mm}-${dd}`;
   }
-  // 2) 2026-02-01
+
   m = s.match(/\b(\d{4})-(\d{2})-(\d{2})\b/);
   if (m) return `${m[1]}-${m[2]}-${m[3]}`;
 
@@ -242,7 +229,6 @@ function extractMainTextFromHtml(html, url) {
   const dom = new JSDOM(html);
   const doc = dom.window.document;
 
-  // remove obvious junk nodes
   for (const sel of [
     "script",
     "style",
@@ -302,14 +288,12 @@ function extractMainTextFromHtml(html, url) {
 
   let text = node?.textContent || "";
 
-  // extra cleanup blocks that may survive as plain text
   text = text.replace(/Aktuální počasí[\s\S]*?(?=\n\n|$)/gi, "");
   text = text.replace(/Kalendář[\s\S]*?(?=\n\n|$)/gi, "");
   text = text.replace(/Náhodná fotogalerie[\s\S]*?(?=\n\n|$)/gi, "");
 
   const title = pickTitle(doc);
 
-  // published (very rough, only if it exists explicitly)
   const bodyText = doc.body?.textContent || "";
   const published =
     bodyText.match(/Vytvořeno:\s*\d{1,2}\.\s*\d{1,2}\.\s*\d{4}/i)?.[0]?.trim() ||
@@ -343,7 +327,6 @@ function extractLinksAndDownloads(html, currentUrl) {
     const text = (a.textContent || "").trim();
     const titleAttr = (a.getAttribute("title") || "").trim();
 
-    // downloads
     if (isDownloadDoc(nu)) {
       const guessDate = findDateInText(`${text} ${titleAttr} ${nu}`) || null;
       const type = classifyDocType(`${text} ${titleAttr} ${nu}`);
@@ -358,7 +341,6 @@ function extractLinksAndDownloads(html, currentUrl) {
     }
 
     if (isProbablyBinary(nu) && !isPdf(nu)) return;
-
     urls.add(nu);
   });
 
@@ -369,13 +351,11 @@ async function fetchWithTimeout(url, opts = {}) {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), REQUEST_TIMEOUT_MS);
   try {
-    const r = await fetch(url, { ...opts, signal: ctrl.signal });
-    return r;
+    return await fetch(url, { ...opts, signal: ctrl.signal });
   } finally {
     clearTimeout(t);
   }
 }
-
 function isHtmlResponse(r) {
   const ct = r.headers.get("content-type") || "";
   return ct.includes("text/html") || ct.includes("application/xhtml+xml");
@@ -386,29 +366,20 @@ function isHtmlResponse(r) {
    ============================================================ */
 
 function pickBestDateForPage(p) {
-  // 1) explicitně z published
   const d1 = findDateInText(p?.published || "");
   if (d1) return d1;
-
-  // 2) z URL
   const d2 = findDateInText(p?.url || "");
   if (d2) return d2;
-
-  // 3) z titulku
   const d3 = findDateInText(p?.title || "");
   if (d3) return d3;
-
-  // 4) z prvních ~1500 znaků obsahu
   const sample = (p?.content || "").slice(0, 1500);
   const d4 = findDateInText(sample);
   if (d4) return d4;
-
   return null;
 }
 
 function isLatestPageUrl(url) {
-  // držíme to jednoduché: aktuality / kalendář / úřední deska / zpravodaj
-  return /\/(aktualne\/aktuality|aktualne\/kalendar-akci|uredni-deska|zpravodaj)\b/i.test(url || "");
+  return /\/(aktualne\/aktuality|aktualne\/kalendar-akci|urad\/uredni-deska|uredni-deska|zpravodaj)\b/i.test(url || "");
 }
 
 async function buildLatestFile(latestPath, pages, docs) {
@@ -505,8 +476,8 @@ async function buildFullKnowledgeFile(outPath) {
   const seen = new Set();
 
   const pages = [];
-  const pageHashSeen = new Set(); // dedupe near-duplicates
-  const documents = new Map(); // url -> doc meta (best)
+  const pageHashSeen = new Set();
+  const documents = new Map();
 
   let processed = 0;
 
@@ -522,13 +493,13 @@ async function buildFullKnowledgeFile(outPath) {
       seen.add(url);
 
       if (looksLikeLoginOrAdmin(url)) continue;
-      if (looksLikeGalleryHeavy(url)) continue; // reduce noise
+      if (looksLikeGalleryHeavy(url)) continue;
       if (isProbablyBinary(url) && !isPdf(url)) continue;
 
       try {
         const r = await fetchWithTimeout(url, {
           redirect: "follow",
-          headers: { "User-Agent": "RadimFullCrawler/2.0 (+https://example.local)" },
+          headers: { "User-Agent": "RadimFullCrawler/2.3" },
         });
 
         if (!r.ok) {
@@ -537,7 +508,6 @@ async function buildFullKnowledgeFile(outPath) {
         }
 
         if (isPdf(url)) {
-          // keep as document
           if (!documents.has(url)) {
             documents.set(url, {
               url,
@@ -559,20 +529,16 @@ async function buildFullKnowledgeFile(outPath) {
         const html = await r.text();
         processed++;
 
-        // Links + downloads
         const { links, downloads } = extractLinksAndDownloads(html, url);
-
         for (const u of links) {
           if (!seen.has(u)) queue.push(u);
         }
 
-        // Store downloads globally (best-effort merge)
         for (const d of downloads) {
           const prev = documents.get(d.url);
           if (!prev) {
             documents.set(d.url, d);
           } else {
-            // prefer richer title, prefer having date, prefer specific type
             const betterTitle = (prev.title || "").length >= (d.title || "").length ? prev.title : d.title;
             const betterDate = prev.date || d.date || null;
             const betterType = prev.type !== "DOKUMENT" ? prev.type : d.type;
@@ -586,26 +552,19 @@ async function buildFullKnowledgeFile(outPath) {
           }
         }
 
-        // Content
         const { title, published, cleaned } = extractMainTextFromHtml(html, url);
 
         const important =
-          /\/(aktualne|aktuality|uredni-deska|kalendar-akci|zpravodaj|urad|obec|organizace-a-spolky|vyhlasky|dokumenty)\b/i.test(
+          /\/(aktualne|aktuality|urad\/uredni-deska|uredni-deska|kalendar-akci|zpravodaj|urad|obec|organizace-a-spolky|vyhlasky|dokumenty)\b/i.test(
             url
           );
 
-        if (!important && cleaned.length < 250) {
-          continue;
-        }
+        if (!important && cleaned.length < 250) continue;
 
-        // dedupe by content hash (avoid template duplicates)
         const contentKey = sha1(`${title}\n${cleaned}`.slice(0, 20000));
-        if (pageHashSeen.has(contentKey)) {
-          continue;
-        }
+        if (pageHashSeen.has(contentKey)) continue;
         pageHashSeen.add(contentKey);
 
-        // local downloads for page (limit noise)
         const localDownloads = downloads.slice(0, 60).map((d) => ({
           url: d.url,
           title: d.title,
@@ -628,20 +587,15 @@ async function buildFullKnowledgeFile(outPath) {
     }
   }
 
-  const workers = Array.from({ length: CONCURRENCY }, () => worker());
-  await Promise.all(workers);
+  await Promise.all(Array.from({ length: CONCURRENCY }, () => worker()));
 
-  // stable sort: homepage first, then by URL
   pages.sort((a, b) => {
     if (a.url === startUrl) return -1;
     if (b.url === startUrl) return 1;
     return a.url.localeCompare(b.url);
   });
 
-  // documents array
   const docs = Array.from(documents.values());
-
-  // sort docs: newest first if has date, else by title
   docs.sort((a, b) => {
     const da = a.date || "";
     const db = b.date || "";
@@ -658,42 +612,32 @@ async function buildFullKnowledgeFile(outPath) {
     ``,
     `Tento soubor je FULL crawl webu obce Radim.`,
     `Obsahuje text stránek + INDEX dokumentů ke stažení (přímé odkazy).`,
-    `Pozn.: Šablonový balast a duplicitní stránky jsou omezeny (deduplikace podle obsahu).`,
     ``,
     `==============================`,
     `=== DOCUMENTS INDEX (${docs.length})`,
-    `Formát položek: TYPE | DATE | TITLE | URL | FOUND_ON`,
+    `Formát: TYPE | DATE | TITLE | URL | FOUND_ON`,
     ``,
   ].join("\n");
 
   let docsBlock = "";
   for (const d of docs) {
-    const type = d.type || "DOKUMENT";
-    const date = d.date || "";
-    const title = (d.title || "").replace(/\s+/g, " ").trim();
-    const url = d.url;
-    const foundOn = d.foundOn || "";
-    docsBlock += `${type} | ${date} | ${title} | ${url} | ${foundOn}\n`;
+    docsBlock += `${d.type || "DOKUMENT"} | ${d.date || ""} | ${(d.title || "").replace(/\s+/g, " ").trim()} | ${
+      d.url
+    } | ${d.foundOn || ""}\n`;
   }
 
   let pagesBlock = `\n==============================\n=== PAGES (${pages.length})\n\n`;
-
   for (const p of pages) {
-    pagesBlock += `==============================\n`;
-    pagesBlock += `=== PAGE\n`;
-    pagesBlock += `URL: ${p.url}\n`;
+    pagesBlock += `==============================\n=== PAGE\nURL: ${p.url}\n`;
     if (p.title) pagesBlock += `TITLE: ${p.title}\n`;
     if (p.published) pagesBlock += `PUBLISHED: ${p.published}\n`;
-
-    if (p.downloads && p.downloads.length) {
+    if (p.downloads?.length) {
       pagesBlock += `DOWNLOADS:\n`;
       for (const d of p.downloads) {
         pagesBlock += `- ${d.type || "DOKUMENT"} | ${d.date || ""} | ${d.title || ""} | ${d.url}\n`;
       }
     }
-
-    pagesBlock += `CONTENT:\n`;
-    pagesBlock += `${p.content}\n\n`;
+    pagesBlock += `CONTENT:\n${p.content}\n\n`;
   }
 
   const finalText = header + docsBlock + pagesBlock;
@@ -705,21 +649,26 @@ async function buildFullKnowledgeFile(outPath) {
   return { pages, docs };
 }
 
-// ---------- OpenAI helpers (fetch, bez SDK) ----------
+// ---------- OpenAI helpers ----------
 async function oaiFetch(url, options = {}) {
-  const r = await fetch(url, {
-    ...options,
-    headers: {
-      Authorization: `Bearer ${OPENAI_API_KEY}`,
-      ...(options.headers || {}),
-    },
-  });
+  const headers = {
+    Authorization: `Bearer ${OPENAI_API_KEY}`,
+    ...OPENAI_BETA_HEADER,
+    ...(options.headers || {}),
+  };
+
+  const r = await fetch(url, { ...options, headers });
   const txt = await r.text();
+
   let json = null;
   try {
     json = JSON.parse(txt);
   } catch {}
-  if (!r.ok) throw new Error(`OpenAI error ${r.status}: ${txt}`);
+
+  if (!r.ok) {
+    const msg = json?.error?.message || txt;
+    throw new Error(`OpenAI error ${r.status}: ${msg}`);
+  }
   return json ?? txt;
 }
 
@@ -729,10 +678,7 @@ async function uploadFileToOpenAI(filepath) {
   form.append("purpose", "assistants");
   form.append("file", new Blob([data]), path.basename(filepath));
 
-  const file = await oaiFetch("https://api.openai.com/v1/files", {
-    method: "POST",
-    body: form,
-  });
+  const file = await oaiFetch("https://api.openai.com/v1/files", { method: "POST", body: form });
   return file.id;
 }
 
@@ -744,10 +690,28 @@ async function attachToVectorStore(fileId) {
   });
 }
 
-async function listVectorStoreFiles() {
-  return await oaiFetch(`https://api.openai.com/v1/vector_stores/${VECTOR_STORE_ID}/files?limit=100`, {
-    method: "GET",
-  });
+async function listVectorStoreFilesPage(after = null, limit = 100) {
+  const url =
+    `https://api.openai.com/v1/vector_stores/${VECTOR_STORE_ID}/files?limit=${limit}` + (after ? `&after=${after}` : "");
+  return await oaiFetch(url, { method: "GET" });
+}
+
+async function listAllVectorStoreFiles(limit = 100) {
+  const all = [];
+  let after = null;
+
+  while (true) {
+    const page = await listVectorStoreFilesPage(after, limit);
+    const data = page?.data || [];
+    all.push(...data);
+
+    if (!page?.has_more) break;
+
+    const last = data[data.length - 1];
+    if (!last?.id) break;
+    after = last.id;
+  }
+  return all;
 }
 
 async function deleteVectorStoreFile(vsFileId) {
@@ -761,10 +725,92 @@ async function getFileMeta(fileId) {
 }
 
 function isFullName(name) {
-  return name?.startsWith(PREFIX);
+  return (name || "").startsWith(PREFIX);
 }
 function isLatestName(name) {
-  return name?.startsWith(LATEST_PREFIX);
+  return (name || "").startsWith(LATEST_PREFIX);
+}
+
+function pickFilenameFromVsItem(it) {
+  // Some responses include embedded file object
+  // Examples:
+  // it.file = { id, filename, ... }
+  // Or only file_id -> then need /v1/files
+  const embedded = it?.file?.filename || it?.file?.name;
+  return embedded || "";
+}
+
+async function resolveFilename(it) {
+  const embedded = pickFilenameFromVsItem(it);
+  if (embedded) return embedded;
+
+  const fid = it?.file_id || it?.file?.id;
+  if (!fid) return "";
+
+  try {
+    const meta = await getFileMeta(fid);
+    return meta?.filename || "";
+  } catch {
+    return "";
+  }
+}
+
+function resolveCreatedAt(it, fileMetaCreatedAt) {
+  // Prefer vector-store attachment time (it.created_at) for “keep latest in store”
+  // Fallback to file meta created_at
+  return it?.created_at || fileMetaCreatedAt || 0;
+}
+
+async function buildIndexForCleanup(items) {
+  // returns [{ vsId, fileId, filename, created_at }]
+  const out = [];
+  for (const it of items) {
+    const vsId = it?.id;
+    const fileId = it?.file_id || it?.file?.id;
+    if (!vsId || !fileId) continue;
+
+    const filename = await resolveFilename(it);
+    let metaCreatedAt = 0;
+    if (!filename) {
+      // last resort: try meta just for created_at
+      try {
+        const meta = await getFileMeta(fileId);
+        metaCreatedAt = meta?.created_at || 0;
+      } catch {}
+    }
+
+    const created_at = resolveCreatedAt(it, metaCreatedAt);
+
+    out.push({ vsId, fileId, filename, created_at });
+  }
+  return out;
+}
+
+async function cleanupByPrefix(prefixName, keepN, matchFn) {
+  const items = await listAllVectorStoreFiles(100);
+
+  console.log(`Vector store files (ALL): ${items.length}`);
+
+  const indexed = await buildIndexForCleanup(items);
+
+  // DEBUG (always)
+  console.log("== VS FILES DEBUG ==");
+  for (const x of indexed) {
+    console.log("-", x.filename || "(no-filename)", "| created_at:", x.created_at, "| vsId:", x.vsId, "| fileId:", x.fileId);
+  }
+
+  const matched = indexed.filter((x) => matchFn(x.filename));
+
+  matched.sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
+
+  const toDelete = matched.slice(Math.max(keepN, 0));
+
+  console.log(`${prefixName} in store: ${matched.length}, keeping: ${Math.min(keepN, matched.length)}, deleting: ${toDelete.length}`);
+
+  for (const d of toDelete) {
+    console.log(`Deleting ${prefixName}:`, d.filename, "| vsId:", d.vsId);
+    await deleteVectorStoreFile(d.vsId);
+  }
 }
 
 // ---------- MAIN ----------
@@ -779,117 +825,49 @@ export async function main() {
   console.log("SITE:", SITE_BASE_URL);
   console.log("FULL OUT:", outPath);
   console.log("LATEST OUT:", latestPath);
-  console.log("FULL PREFIX:", PREFIX);
-  console.log("LATEST PREFIX:", LATEST_PREFIX);
+  console.log("VECTOR_STORE_ID:", VECTOR_STORE_ID);
 
-  // A) build FULL
   const { pages, docs } = await buildFullKnowledgeFile(outPath);
 
   const stat = await fs.stat(outPath);
-  if (stat.size < 50_000) {
-    throw new Error(`FULL file too small (${stat.size} bytes) – refusing upload`);
-  }
+  if (stat.size < 50_000) throw new Error(`FULL file too small (${stat.size} bytes) – refusing upload`);
 
-  // A2) build LATEST
   await buildLatestFile(latestPath, pages, docs);
 
   const latestStat = await fs.stat(latestPath);
-  if (latestStat.size < 5_000) {
-    throw new Error(`LATEST file too small (${latestStat.size} bytes) – refusing upload`);
-  }
+  if (latestStat.size < 5_000) throw new Error(`LATEST file too small (${latestStat.size} bytes) – refusing upload`);
 
-  // B) upload + attach FULL
-  console.log("Uploading FULL file to OpenAI...");
+  console.log("Uploading FULL...");
   const fileId = await uploadFileToOpenAI(outPath);
   console.log("Uploaded FULL file_id:", fileId);
 
-  console.log("Attaching FULL to vector store...");
+  console.log("Attaching FULL...");
   const vsAttach = await attachToVectorStore(fileId);
-  console.log("Attached FULL:", vsAttach?.id || "ok");
+  console.log("Attached FULL (vs_file_id):", vsAttach?.id || "(no id)");
 
-  // B2) upload + attach LATEST
-  console.log("Uploading LATEST file to OpenAI...");
+  console.log("Uploading LATEST...");
   const latestFileId = await uploadFileToOpenAI(latestPath);
   console.log("Uploaded LATEST file_id:", latestFileId);
 
-  console.log("Attaching LATEST to vector store...");
+  console.log("Attaching LATEST...");
   const vsAttachLatest = await attachToVectorStore(latestFileId);
-  console.log("Attached LATEST:", vsAttachLatest?.id || "ok");
+  console.log("Attached LATEST (vs_file_id):", vsAttachLatest?.id || "(no id)");
 
-  // C) cleanup old FULLs (keep KEEP_LATEST)
+  // Cleanup FULL
   if (CLEANUP_OLD) {
-    console.log("Cleanup old FULL files in vector store...");
-    const list = await listVectorStoreFiles();
-    const items = list?.data || [];
-
-    const fullItems = [];
-    for (const it of items) {
-      const fid = it?.file_id || it?.file?.id;
-      if (!fid) continue;
-      const meta = await getFileMeta(fid);
-      if (isFullName(meta?.filename)) {
-        fullItems.push({
-          vsId: it.id,
-          fileId: fid,
-          filename: meta.filename,
-          created_at: meta.created_at || 0,
-        });
-      }
-    }
-
-    fullItems.sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
-    const toDelete = fullItems.slice(KEEP_LATEST);
-
-    console.log(
-      `FULL items in store: ${fullItems.length}, keeping: ${Math.min(KEEP_LATEST, fullItems.length)}, deleting: ${toDelete.length}`
-    );
-    for (const d of toDelete) {
-      console.log("Deleting FULL:", d.filename, d.vsId);
-      await deleteVectorStoreFile(d.vsId);
-    }
+    console.log("Cleanup old FULL files (robust)...");
+    await cleanupByPrefix("FULL", KEEP_LATEST, isFullName);
   }
 
-  // D) cleanup old LATEST (keep KEEP_LATEST_LATEST)
+  // Cleanup LATEST
   if (CLEANUP_OLD_LATEST) {
-    console.log("Cleanup old LATEST files in vector store...");
-    const list = await listVectorStoreFiles();
-    const items = list?.data || [];
-
-    const latestItems = [];
-    for (const it of items) {
-      const fid = it?.file_id || it?.file?.id;
-      if (!fid) continue;
-      const meta = await getFileMeta(fid);
-      if (isLatestName(meta?.filename)) {
-        latestItems.push({
-          vsId: it.id,
-          fileId: fid,
-          filename: meta.filename,
-          created_at: meta.created_at || 0,
-        });
-      }
-    }
-
-    latestItems.sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
-    const toDeleteLatest = latestItems.slice(KEEP_LATEST_LATEST);
-
-    console.log(
-      `LATEST items in store: ${latestItems.length}, keeping: ${Math.min(
-        KEEP_LATEST_LATEST,
-        latestItems.length
-      )}, deleting: ${toDeleteLatest.length}`
-    );
-
-    for (const d of toDeleteLatest) {
-      console.log("Deleting LATEST:", d.filename, d.vsId);
-      await deleteVectorStoreFile(d.vsId);
-    }
+    console.log("Cleanup old LATEST files (robust)...");
+    await cleanupByPrefix("LATEST", KEEP_LATEST_LATEST, isLatestName);
   }
 
   console.log("DONE ✅");
 }
 
-// --- runner (so `node scripts/full_radim_build_and_upload.mjs` actually runs) ---
 if (import.meta.url === `file://${process.argv[1]}`) {
   main().catch((e) => {
     console.error("FULL script failed:", e);

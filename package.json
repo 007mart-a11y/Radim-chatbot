@@ -5,6 +5,7 @@
   "dependencies": {
     "jsdom": "^27.4.0",
     "node-fetch": "^3.3.2",
-    "openai": "^4.0.0"
+    "openai": "^4.0.0",
+    "pdf-parse": "^2.4.5"
   }
 }
