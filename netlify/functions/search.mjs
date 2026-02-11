@@ -25,6 +25,8 @@ const KEY_LINKS = {
   aktuality: "https://www.obec-radim.cz/aktualne/aktuality/",
   kalendar: "https://www.obec-radim.cz/aktualne/kalendar-akci/",
   hledani: "https://www.obec-radim.cz/?hledej=&lang=cs",
+  sportAreal: "https://www.obec-radim.cz/organizace-a-spolky/sokolove/sportovni-areal/",
+  sokol: "https://www.obec-radim.cz/organizace-a-spolky/sokolove/o-nas/",
 };
 
 // ============================================
@@ -44,6 +46,10 @@ const LATEST_FILE_CANDIDATES = [
 ];
 
 const PEOPLE_FILE_CANDIDATES = [
+  // ✅ nejčastější reálná cesta
+  "knowledge/people/00_PEOPLE_obec_radim.txt",
+  "public/knowledge/people/00_PEOPLE_obec_radim.txt",
+  // fallbacky
   "knowledge/00_PEOPLE_obec_radim.txt",
   "public/knowledge/00_PEOPLE_obec_radim.txt",
   "00_PEOPLE_obec_radim.txt",
@@ -102,7 +108,7 @@ function loadAllLocal() {
 
   for (const rel of PEOPLE_FILE_CANDIDATES) {
     const t = safeReadText(rel);
-    if (t && t.length > 500) {
+    if (t && t.length > 300) {
       _cache.peopleText = t;
       break;
     }
@@ -133,11 +139,6 @@ function todayISO() {
 function buildPagesIndex(fullText) {
   if (!fullText) return null;
 
-  // bloky:
-  // === PAGE
-  // URL: ...
-  // TITLE: ...
-  // CONTENT:
   const pages = new Map();
   const re =
     /=== PAGE[\s\S]*?URL:\s*(.+?)\n(?:TITLE:\s*([\s\S]*?)\n)?(?:PUBLISHED:\s*([\s\S]*?)\n)?[\s\S]*?CONTENT:\n([\s\S]*?)(?=\n={10,}|\n=== PAGE|\s*$)/g;
@@ -232,7 +233,7 @@ function getLatestItems() {
 
 function wantsHistory(q) {
   const s = normalizeCzech(q);
-  return /\b(minule|loni|vloni|archiv|historie|predchozi|předchozi|v roce|rok 2023|rok 2024|2023|2024)\b/.test(s);
+  return /\b(minule|loni|vloni|archiv|historie|predchozi|předchozi|v roce|rok|2023|2024)\b/.test(s);
 }
 
 // ============================================
@@ -240,7 +241,7 @@ function wantsHistory(q) {
 // ============================================
 
 function parsePeople(peopleText) {
-  const idx = []; // { org, role, alias[], name, tel, email, resp }
+  const idx = [];
   if (!peopleText) return idx;
 
   const lines = peopleText.split("\n");
@@ -318,7 +319,6 @@ function peopleLookup(query) {
 
   const q = normalizeCzech(query);
 
-  // jednoduché skórování: role/alias/org výskyt
   let best = null;
   let bestScore = 0;
 
@@ -334,9 +334,10 @@ function peopleLookup(query) {
       if (a && q.includes(a)) score += 5;
     }
 
-    // specifické dotazy
-    if (/\b(sokol)\b/.test(q) && /sokol/.test(org)) score += 4;
-    if (/\b(starostk|starosta)\b/.test(q) && /starostk/.test(role)) score += 6;
+    // dotazy sokol / hasici / starosta
+    if (/\b(sokol)\b/.test(q) && /sokol/.test(org)) score += 5;
+    if (/\b(hasic|hasiči|sdh)\b/.test(q) && /sdh/.test(org)) score += 5;
+    if (/\b(starostk|starosta)\b/.test(q) && /starostk/.test(role)) score += 8;
 
     if (score > bestScore) {
       bestScore = score;
@@ -344,7 +345,7 @@ function peopleLookup(query) {
     }
   }
 
-  return bestScore >= 5 ? best : null;
+  return bestScore >= 6 ? best : null;
 }
 
 // ============================================
@@ -399,7 +400,7 @@ function normalizeUrlsInText(text) {
 }
 
 // ============================================
-// ✅ Odpověď builder (kratší, bez duplicit)
+// ✅ Odpověď builder (kratší, bez duplicit, max 3 linky)
 // ============================================
 
 function formatAnswer({ answer, contact, links }) {
@@ -413,17 +414,24 @@ function formatAnswer({ answer, contact, links }) {
 
   const ls = Array.isArray(links) ? links.filter(Boolean) : [];
   if (ls.length) {
-    const uniq = [...new Set(ls.map((x) => normalizeSingleUrl(x)))].filter(Boolean);
-    if (uniq.length) {
-      blocks.push(`Odkazy:\n- ${uniq.join("\n- ")}`);
+    const uniq = [];
+    const seen = new Set();
+    for (const raw of ls) {
+      const u = normalizeSingleUrl(raw);
+      if (!u) continue;
+      if (seen.has(u)) continue;
+      seen.add(u);
+      uniq.push(u);
+      if (uniq.length >= 3) break;
     }
+    if (uniq.length) blocks.push(`Odkazy:\n- ${uniq.join("\n- ")}`);
   }
 
   return blocks.join("\n\n").trim();
 }
 
 // ============================================
-// ✅ Deterministické dotazy (IQ +50)
+// ✅ Deterministické dotazy
 // ============================================
 
 function isKontaktyQuestion(q) {
@@ -433,7 +441,7 @@ function isKontaktyQuestion(q) {
 
 function isUredniHodinyQuestion(q) {
   const s = normalizeCzech(q);
-  return /\b(uredni hodiny|úřední hodiny|kdy ma urad otevreno|oteviraci doba|kdy je otevreno)\b/.test(s);
+  return /\b(uredni hodiny|úřední hodiny|kdy ma urad otevreno|oteviraci doba|kdy je otevreno|konzultacni|konzultační)\b/.test(s);
 }
 
 function isBioodpadQuestion(q) {
@@ -468,62 +476,77 @@ function isBudgetFinanceQuestion(q) {
 
 function isDogFeeQuestion(q) {
   const s = normalizeCzech(q);
-  return /\b(poplatek.*psa|poplatek.*psy|poplatek ze psu|poplatek ze psů|pes|psy)\b/.test(s) && /\b(poplatek|kolik)\b/.test(s);
+  return /\b(poplatek|kolik)\b/.test(s) && /\b(pes|psy|psu|psů)\b/.test(s);
 }
 
-function extractContactsFromKontaktyPage(content) {
-  const phones = [...content.matchAll(/\+420\s?\d{3}\s?\d{3}\s?\d{3}|\b\d{3}\s?\d{3}\s?\d{3}\b/g)]
+function isHallRentQuestion(q) {
+  const s = normalizeCzech(q);
+  return /\b(pronajem|pronájem|hala|sportovni hala|sportovní hala|rezervace)\b/.test(s);
+}
+
+function isSokolApplicationQuestion(q) {
+  const s = normalizeCzech(q);
+  return /\b(prihlask|přihlášk)\b/.test(s) && /\b(sokol)\b/.test(s);
+}
+
+function isFireKidsQuestion(q) {
+  const s = normalizeCzech(q);
+  return /\b(hasi(c|či)|sdh)\b/.test(s) && /\b(krouzek|kroužek|mladez|mládež|deti|děti)\b/.test(s);
+}
+
+function extractContactsFromText(content) {
+  const phones = [...String(content || "").matchAll(/\+420\s?\d{3}\s?\d{3}\s?\d{3}|\b\d{3}\s?\d{3}\s?\d{3}\b/g)]
     .map((m) => m[0].replace(/\s+/g, " ").trim())
     .filter(Boolean);
 
-  const emails = [...content.matchAll(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi)]
+  const emails = [...String(content || "").matchAll(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi)]
     .map((m) => m[0].trim())
     .filter(Boolean);
 
-  // adresa
-  const addrLine =
-    content
-      .split("\n")
-      .map((l) => l.trim())
-      .find((l) => /\bRadim\s+\d+,\s*\d{3}\s*\d{2}\s*Radim\b/i.test(l)) || "";
-
-  // úřední hodiny – často "Středa 16:00–19:00"
   const hoursLine =
-    content
+    String(content || "")
       .split("\n")
       .map((l) => l.trim())
       .find((l) => normalizeCzech(l).includes("streda") && /\d{1,2}:\d{2}/.test(l)) || "";
 
+  const addrLine =
+    String(content || "")
+      .split("\n")
+      .map((l) => l.trim())
+      .find((l) => /\bRadim\s+\d+,\s*\d{3}\s*\d{2}\s*Radim\b/i.test(l)) || "";
+
   return {
     phones: [...new Set(phones)],
     emails: [...new Set(emails)],
-    addrLine,
     hoursLine,
+    addrLine,
   };
 }
 
 function getKontaktySourceText() {
-  // primárně /urad/kontakty/
   const p1 = getPageContentByUrl(KEY_LINKS.kontakty);
   if (p1) return p1;
-
-  // fallback: homepage často obsahuje kontakty/box
   const p2 = getPageContentByUrl(KEY_LINKS.homepage);
   if (p2) return p2;
-
-  // fallback search
   const p3 = getPageContentByUrl(KEY_LINKS.hledani);
   if (p3) return p3;
-
   return null;
+}
+
+function kontaktyCompactLine() {
+  const src = getKontaktySourceText();
+  if (!src) return "Telefon: +420 731 409 498, E-mail: urad@obec-radim.cz";
+  const { phones, emails } = extractContactsFromText(src);
+  const p = phones?.[0] ? `Telefon: ${phones[0]}` : "Telefon: +420 731 409 498";
+  const e = emails?.[0] ? `E-mail: ${emails[0]}` : "E-mail: urad@obec-radim.cz";
+  return `${p}, ${e}`;
 }
 
 function makeKontaktyAnswerShort() {
   const src = getKontaktySourceText();
   if (!src) return null;
 
-  const { phones, emails, addrLine } = extractContactsFromKontaktyPage(src);
-
+  const { phones, emails, addrLine } = extractContactsFromText(src);
   const parts = [];
   if (addrLine) parts.push(`Adresa: ${addrLine}`);
   if (phones?.[0]) parts.push(`Telefon: ${phones[0]}`);
@@ -539,15 +562,8 @@ function makeUredniHodinyAnswerShort() {
   const src = getKontaktySourceText();
   if (!src) return null;
 
-  const { hoursLine } = extractContactsFromKontaktyPage(src);
-
-  let hours = "";
-  if (hoursLine) {
-    const cleaned = hoursLine.replace(/\s+/g, " ").trim();
-    hours = `Úřední hodiny: ${cleaned.replace(/^[-–•]\s*/, "")}`;
-  } else {
-    hours = `Úřední hodiny jsou uvedeny na stránce kontaktů.`;
-  }
+  const { hoursLine } = extractContactsFromText(src);
+  const hours = hoursLine ? `Úřední hodiny: ${hoursLine.replace(/\s+/g, " ").trim()}` : "Úřední hodiny jsou uvedeny na stránce kontaktů.";
 
   return formatAnswer({
     answer: hours,
@@ -569,86 +585,19 @@ function makeBioodpadAnswerShort() {
   else if (parcel) where = `Nachází se na ${parcel} (k. ú. Radim).`;
   else where = `Umístění je uvedeno na webu obce.`;
 
-  const kontakty = makeKontaktyAnswerShort();
-  // krátký kontakt jen když se ptá na skládku (dává smysl)
-  const src = getKontaktySourceText();
-  let contact = "";
-  if (src) {
-    const { phones, emails } = extractContactsFromKontaktyPage(src);
-    const p = phones?.[0] ? `Telefon: ${phones[0]}` : "";
-    const e = emails?.[0] ? `E-mail: ${emails[0]}` : "";
-    contact = [p, e].filter(Boolean).join(", ");
-  }
-
   return formatAnswer({
     answer: `${where} ${nonstop}`.trim(),
-    contact,
+    contact: kontaktyCompactLine(),
     links: [bioUrl],
   });
 }
 
-function makeEventsAnswerShort(q) {
-  const latest = getLatestItems();
-  if (!latest?.length) {
-    return formatAnswer({
-      answer: "V podkladech nejsou uvedeny žádné aktuální/budoucí akce.",
-      links: [KEY_LINKS.kalendar],
-    });
-  }
-
-  const onlyFuture = !wantsHistory(q);
-  const t0 = todayISO();
-
-  // bereme primárně PAGE, které jsou typicky kalendář/aktuality
-  let items = latest
-    .filter((it) => it.url && (it.kind === "PAGE" || it.kind === "DOC"))
-    .filter((it) => {
-      if (!onlyFuture) return true;
-      if (!it.date) return true;
-      return it.date >= t0;
-    });
-
-  // pro dotazy "pro děti" zkus prioritizovat dětské
-  const s = normalizeCzech(q);
-  const wantsKids = /\b(deti|děti|pro deti|pro děti|karneval|tabor|tábor)\b/.test(s);
-  if (wantsKids) {
-    const kids = items.filter((it) => /děti|deti|karneval|tábor|tabor/i.test((it.title || "") + " " + (it.type || "")));
-    if (kids.length) items = kids;
-  }
-
-  items = items.slice(0, 8);
-
-  if (!items.length) {
-    return formatAnswer({
-      answer: onlyFuture
-        ? `V podkladech nejsou uvedeny žádné aktuální/budoucí akce (od ${t0.split("-").reverse().join(". ")}).`
-        : "V podkladech nejsou uvedeny žádné akce.",
-      links: [KEY_LINKS.kalendar],
-    });
-  }
-
-  const lines = items.map((it) => {
-    const d = it.date ? it.date.split("-").reverse().join(". ") : "";
-    const title = (it.title || it.type || it.url).trim();
-    return `- ${d ? `${d} — ` : ""}${title}\n  ${it.url}`;
-  });
-
-  return formatAnswer({
-    answer: `Aktuální položky:\n${lines.join("\n")}`,
-    links: [KEY_LINKS.kalendar],
-  });
-}
-
 function makeStatsAnswerShort() {
-  // homepage má statistické údaje – taháme z FULL stránky homepage
   const content = getPageContentByUrl(KEY_LINKS.homepage);
   if (!content) return null;
 
   const txt = content.replace(/\s+/g, " ").trim();
-
-  // rozloha: "Rozloha: 10,38 km²" apod.
   const areaM = txt.match(/\brozloh[aay]\s*[:\-]?\s*([0-9]+(?:[.,][0-9]+)?)\s*km\s*[²2]/i);
-  // obyvatelé: "Počet obyvatel: 440" apod.
   const popM = txt.match(/\bpočet\s+obyvatel\s*[:\-]?\s*([0-9]{2,6})\b/i);
 
   const parts = [];
@@ -656,15 +605,55 @@ function makeStatsAnswerShort() {
   if (areaM?.[1]) parts.push(`Rozloha: ${areaM[1].replace(",", ".")} km²`);
 
   if (!parts.length) {
+    return formatAnswer({ answer: "Statistické údaje jsou uvedeny na hlavní stránce obce.", links: [KEY_LINKS.homepage] });
+  }
+
+  return formatAnswer({ answer: parts.join("\n"), links: [KEY_LINKS.homepage] });
+}
+
+function makeEventsAnswerShort(q) {
+  const latest = getLatestItems();
+  const t0 = todayISO();
+  const onlyFuture = !wantsHistory(q);
+
+  if (!latest?.length) {
     return formatAnswer({
-      answer: "Statistické údaje jsou uvedeny na hlavní stránce obce.",
-      links: [KEY_LINKS.homepage],
+      answer: "Seznam akcí najdete v kalendáři obce.",
+      links: [KEY_LINKS.kalendar],
     });
   }
 
+  let items = latest.filter((it) => it.url);
+
+  if (onlyFuture) {
+    items = items.filter((it) => !it.date || it.date >= t0);
+  }
+
+  const s = normalizeCzech(q);
+  const wantsKids = /\b(deti|děti|karneval|tabor|tábor)\b/.test(s);
+  if (wantsKids) {
+    const kids = items.filter((it) => /děti|deti|karneval|tábor|tabor/i.test((it.title || "") + " " + (it.type || "")));
+    if (kids.length) items = kids;
+  }
+
+  items = items.slice(0, 6);
+
+  if (!items.length) {
+    return formatAnswer({
+      answer: onlyFuture ? "V podkladech nejsou uvedeny žádné aktuální/budoucí akce." : "V podkladech nejsou uvedeny žádné akce.",
+      links: [KEY_LINKS.kalendar],
+    });
+  }
+
+  const lines = items.map((it) => {
+    const d = it.date ? it.date.split("-").reverse().join(". ") : "";
+    const title = (it.title || it.type || "").trim() || "Položka";
+    return `- ${d ? `${d} — ` : ""}${title}\n  ${it.url}`;
+  });
+
   return formatAnswer({
-    answer: parts.join("\n"),
-    links: [KEY_LINKS.homepage],
+    answer: `Aktuální položky:\n${lines.join("\n")}`,
+    links: [KEY_LINKS.kalendar],
   });
 }
 
@@ -695,61 +684,131 @@ function makeBudgetAnswerShort() {
   });
 }
 
-function makeDogFeeAnswerMaybeFromDocs() {
+function findDocByKeywords(keywords) {
   const docs = getDocs();
   if (!docs?.length) return null;
 
-  // najdi nejnovější vyhlášku ze psů
+  const keys = keywords.map(normalizeCzech);
+  const scored = docs
+    .map((d) => {
+      const hay = normalizeCzech(`${d.type} ${d.title} ${d.url}`);
+      let score = 0;
+      for (const k of keys) if (hay.includes(k)) score += 2;
+      return { d, score };
+    })
+    .filter((x) => x.score >= 4);
+
+  scored.sort((a, b) => b.score - a.score || (b.d.date || "").localeCompare(a.d.date || ""));
+  return scored[0]?.d || null;
+}
+
+function makeSokolApplicationAnswer() {
+  const doc = findDocByKeywords(["přihláška", "sokol", "tj sokol radim"]);
+  if (!doc) {
+    return formatAnswer({
+      answer: "Přihlášku do TJ Sokol Radim najdete v dokumentech u Sokola (pokud je zveřejněná).",
+      links: [KEY_LINKS.sokol],
+    });
+  }
+  return formatAnswer({
+    answer: "Přihláška do TJ Sokol Radim:",
+    links: [doc.url, KEY_LINKS.sokol],
+  });
+}
+
+function findDogFeeAmountFromPages() {
+  const pages = getPages();
+  if (!pages) return "";
+
+  // prohledej jen relevantní stránky (úřední deska / vyhlášky / poplatek ze psů)
+  const candidates = [];
+  for (const [url, content] of pages.entries()) {
+    const hay = normalizeCzech(url + " " + content);
+    if (!/psu|psů|poplatek/.test(hay)) continue;
+    if (!/uredni-deska|vyhlask|vyhlášk|ozv|obecne zavazna vyhlaska|obecně závazná vyhláška/i.test(url + " " + content)) continue;
+    candidates.push({ url, content });
+  }
+
+  for (const c of candidates) {
+    // typicky bývá “... činí 150 Kč ...”
+    const m1 = c.content.match(/\bčiní\s*(\d{2,4})\s*Kč\b/i);
+    if (m1?.[1]) return `${m1[1]} Kč`;
+    // fallback: první rozumná částka v Kč
+    const m2 = c.content.match(/\b(\d{2,4})\s*Kč\b/i);
+    if (m2?.[1]) return `${m2[1]} Kč`;
+  }
+  return "";
+}
+
+function makeDogFeeAnswer() {
+  const docs = getDocs();
+  if (!docs?.length) return null;
+
   const hits = docs
-    .filter((d) => /poplatk.*ps/i.test(d.title) || /psu|psů/i.test(d.title))
+    .filter((d) => /psu|psů|poplatk.*ps/i.test(d.title + " " + d.type))
     .sort((a, b) => (b.date || "").localeCompare(a.date || ""))
-    .slice(0, 3);
+    .slice(0, 5);
 
   if (!hits.length) return null;
-
-  // pokus: někdy je částka přímo v HTML stránce úřední desky (ne v PDF)
-  // najdeme případnou stránku úřední desky podle názvu v PAGES
-  let amount = "";
-  const pages = getPages();
-  if (pages) {
-    for (const it of hits) {
-      // pokud v title existuje stránka na úřední desce v pages textu, zkus vytáhnout částku
-      // (heuristika: projdeme pár relevantních page URL, kde je "vyhlaska" a "psu")
-      for (const [url, content] of pages.entries()) {
-        if (!/uredni-deska|vyhlask/i.test(url)) continue;
-        if (!/psu|psů/i.test(url + " " + content)) continue;
-
-        const m = content.match(/\b(\d{2,4})\s*Kč\b/i);
-        if (m?.[1]) {
-          amount = `${m[1]} Kč`;
-          break;
-        }
-      }
-      if (amount) break;
-    }
-  }
 
   const best = hits[0];
   const dd = best.date ? best.date.split("-").reverse().join(". ") : "";
 
+  const amount = findDogFeeAmountFromPages();
+
   if (amount) {
     return formatAnswer({
-      answer: `Poplatek za psa: ${amount} (dle vyhlášky${dd ? `, vyvěšeno ${dd}` : ""}).`,
+      answer: `Poplatek za psa: ${amount} ročně (dle vyhlášky${dd ? `, vyvěšeno ${dd}` : ""}).`,
       links: [best.url, KEY_LINKS.uredniDeska],
     });
   }
 
-  // bezpečný fallback: pošli vyhlášku bez částky (ať se to nevymýšlí)
+  // bezpečný fallback: pošli vyhlášku bez částky, nic nevymýšlej
   return formatAnswer({
     answer: `Vyhláška k místnímu poplatku ze psů${dd ? ` (vyvěšeno ${dd})` : ""}:`,
     links: [best.url, KEY_LINKS.uredniDeska],
   });
 }
 
+function makeHallRentAnswer() {
+  // 1) zkus vytáhnout z relevantní stránky sportovního areálu
+  const p = getPageContentByUrl(KEY_LINKS.sportAreal) || getPageContentByUrl(KEY_LINKS.sportAreal + "kde-sportujeme/");
+  const s = String(p || "");
+  const m = s.match(/\b(\d{2,4})\s*Kč\s*(?:\/|za)\s*hod/i); // 250 Kč/hod
+  const amount = m?.[1] ? `${m[1]} Kč/hod` : "";
+
+  // 2) kontakt na správce areálu z PEOPLE (Lukáš Karban)
+  const person = peopleLookup("správce areálu sokol");
+  const contact = person?.tel ? `Tel: ${person.tel}` : "";
+
+  if (amount) {
+    return formatAnswer({
+      answer: `Pronájem sportovní haly: ${amount}. Rezervace přes správce sportovního areálu.`,
+      contact,
+      links: [KEY_LINKS.sportAreal],
+    });
+  }
+
+  // když částka není v textu (nebo FULL chybí), pořád vrať správného člověka
+  if (person?.tel) {
+    return formatAnswer({
+      answer: "Pronájem sportovní haly vyřizuje správce sportovního areálu.",
+      contact,
+      links: [KEY_LINKS.sportAreal],
+    });
+  }
+
+  return formatAnswer({
+    answer: "Pronájem sportovní haly je uveden u sportovního areálu; pro rezervaci kontaktujte obecní úřad.",
+    contact: kontaktyCompactLine(),
+    links: [KEY_LINKS.sportAreal, KEY_LINKS.kontakty],
+  });
+}
+
 function makeSimpleContactFallback() {
   return formatAnswer({
     answer: "Tato informace není v dostupných podkladech obce uvedena.",
-    contact: "Telefon: +420 731 409 498, E-mail: urad@obec-radim.cz",
+    contact: kontaktyCompactLine(),
     links: [KEY_LINKS.kontakty],
   });
 }
@@ -763,7 +822,8 @@ function tokenize(q) {
     .replace(/[^a-z0-9\s]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
-  const toks = s.split(" ").filter((t) => t.length >= 3 && !["kde", "jak", "kdy", "kolik", "proc", "proč", "kter", "ktery", "ktera", "ktere", "jake", "jaky", "jaka", "jake", "dnes", "ted", "teď"].includes(t));
+  const stop = new Set(["kde","jak","kdy","kolik","proc","proč","kter","ktery","ktera","ktere","jake","jaky","jaka","dnes","ted","teď","mi","me","to","se","na"]);
+  const toks = s.split(" ").filter((t) => t.length >= 3 && !stop.has(t));
   return [...new Set(toks)];
 }
 
@@ -779,18 +839,16 @@ function pickRelevantPageSnippets(question, limit = 3) {
     const hay = normalizeCzech(url + " " + content);
     let score = 0;
     for (const t of toks) {
-      if (hay.includes(t)) score += 1;
-      // bonus za více výskytů
+      if (hay.includes(t)) score += 2;
       const re = new RegExp(`\\b${t}\\b`, "g");
       const matches = hay.match(re);
-      if (matches?.length) score += Math.min(3, matches.length);
+      if (matches?.length) score += Math.min(4, matches.length);
     }
-    // boost pro “úřední deska / úřad / obec / organizace”
     if (/\/urad\//.test(url)) score += 3;
     if (/\/aktualne\//.test(url)) score += 2;
     if (/\/organizace-a-spolky\//.test(url)) score += 2;
 
-    if (score >= 6) scored.push({ url, score, content });
+    if (score >= 10) scored.push({ url, score, content });
   }
 
   scored.sort((a, b) => b.score - a.score);
@@ -798,8 +856,7 @@ function pickRelevantPageSnippets(question, limit = 3) {
   const out = [];
   for (const it of scored.slice(0, limit)) {
     const raw = String(it.content || "").trim();
-    // zkrátit výřez
-    const snippet = raw.length > 1400 ? raw.slice(0, 1400) + "…" : raw;
+    const snippet = raw.length > 1600 ? raw.slice(0, 1600) + "…" : raw;
     out.push({ url: it.url, snippet });
   }
   return out;
@@ -854,29 +911,18 @@ function extractLatestAssistantText(messagesListJson) {
   const data = Array.isArray(messagesListJson?.data) ? messagesListJson.data : [];
   const assistantMsgs = data.filter((m) => m?.role === "assistant" && Array.isArray(m?.content) && m.content.length);
   if (!assistantMsgs.length) return "";
-
   assistantMsgs.sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
   const msg = assistantMsgs[0];
-
-  const parts = msg.content
-    .map((c) => (c?.type === "text" ? c.text?.value : ""))
-    .filter(Boolean);
-
+  const parts = msg.content.map((c) => (c?.type === "text" ? c.text?.value : "")).filter(Boolean);
   return parts.join("\n\n");
 }
 
 function cleanAnswer(text) {
   let t = String(text || "");
-
-  // odstraň citace file_search
   t = t.replace(/【\s*\d+\s*:\s*\d+\s*†[^】]*】/g, "");
-  // oprava URL teček
   t = t.replace(/(https?:\/\/[^\s)\]]+)[\.,;:!?]+/g, "$1");
   t = t.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
-
-  // hard canonical fixes
   t = t.replace(/https:\/\/www\.obec-radim\.cz\/kontakt\/?/gi, KEY_LINKS.kontakty);
-
   return t.trim();
 }
 
@@ -896,14 +942,14 @@ function buildRunInstructions({ userQ }) {
     `${wantsOld ? `- Uživatel chce historii: můžeš uvést i starší položky.\n` : ""}\n` +
 
     `STRUKTURA ODPOVĚDI (KRÁTKÁ):\n` +
-    `Odpověď:\n- 1–6 krátkých odrážek / 1–4 věty (žádné dlouhé romány)\n\n` +
-    `Kontakt: (jen pokud je potřeba něco řešit s konkrétní osobou/úřadem)\n` +
-    `Odkazy: (max 3 odkazy)\n\n` +
+    `Odpověď:\n- 1–6 krátkých odrážek / 1–4 věty\n\n` +
+    `Kontakt: uveď jen když je potřeba někoho kontaktovat\n` +
+    `Odkazy: max 3\n\n` +
 
     `ZÁKAZY:\n` +
-    `- Neopakuj kontakt 2×.\n` +
-    `- Neuváděj "Odpovědná osoba / úřad" pokud to není jasně uvedeno.\n` +
-    `- Pokud informace v podkladech není, napiš jen: "Tato informace není v dostupných podkladech obce uvedena." a dej odkaz na kontakty.\n`
+    `- Neopakuj kontakty ani odkazy.\n` +
+    `- Neuváděj "Odpovědná osoba / úřad".\n` +
+    `- Pokud něco není v podkladech, napiš přesně: "Tato informace není v dostupných podkladech obce uvedena." a dej odkaz na kontakty.\n`
   );
 }
 
@@ -985,11 +1031,9 @@ async function runAssistant({ threadId, assistantId, apiKey, instructions }) {
 
   while (true) {
     if (Date.now() - started > timeoutMs) return { ok: false, error: "Timeout waiting for response" };
-
     await sleep(650);
     const check = await api(`/threads/${threadId}/runs/${run.id}`, {}, apiKey);
     const status = check.status;
-
     if (status === "queued" || status === "in_progress") continue;
     if (status !== "completed") return { ok: false, error: "Run failed", status };
     break;
@@ -1000,9 +1044,6 @@ async function runAssistant({ threadId, assistantId, apiKey, instructions }) {
 
   answer = cleanAnswer(answer);
   answer = normalizeUrlsInText(answer);
-
-  // kanonické linky
-  answer = answer.replace(/https:\/\/www\.obec-radim\.cz\/kontakt\/?/gi, KEY_LINKS.kontakty);
 
   return { ok: true, answer };
 }
@@ -1036,28 +1077,76 @@ export default async function handler(req) {
       return jsonResponse(200, { ok: true, answer: "Resetováno.", thread_id: created.id });
     }
 
-    // Thread
     let threadId = await ensureThreadId(body?.thread_id, apiKey);
 
-    // ✅ 0) PEOPLE (rychlé dotazy na vedení / kdo vede sokol / starostka)
-    const person = peopleLookup(msgTrim);
-    if (person) {
-      const contactParts = [];
-      if (person.tel && !/neni uvedeno/i.test(person.tel)) contactParts.push(`Tel: ${person.tel}`);
-      if (person.email && !/neni uvedeno/i.test(person.email)) contactParts.push(`E-mail: ${person.email}`);
+    // --------- 0) PEOPLE routy (tvrdě) ----------
+    // “kdo je starosta/starostka”
+    if (/\b(starosta|starostka)\b/i.test(normalizeCzech(msgTrim))) {
+      const p = peopleLookup("starostka obce");
+      if (p?.name) {
+        const contact = p.tel && !/neni uvedeno/i.test(p.tel) ? `Tel: ${p.tel}` : kontaktyCompactLine();
+        return jsonResponse(200, {
+          ok: true,
+          answer: formatAnswer({
+            answer: `Starostka obce Radim: ${p.name}.`,
+            contact,
+            links: [KEY_LINKS.kontakty],
+          }),
+          thread_id: threadId,
+        });
+      }
+      // když PEOPLE chybí, aspoň kontakty
+      return jsonResponse(200, { ok: true, answer: makeSimpleContactFallback(), thread_id: threadId });
+    }
 
+    // “kdo vede sokol”
+    if (/\b(sokol)\b/i.test(normalizeCzech(msgTrim)) && /\b(kdo|vede|predsed|předsed)\b/.test(normalizeCzech(msgTrim))) {
+      const p = peopleLookup("sokol předsedkyně");
+      if (p?.name) {
+        const contactParts = [];
+        if (p.tel && !/neni uvedeno/i.test(p.tel)) contactParts.push(`Tel: ${p.tel}`);
+        if (p.email && !/neni uvedeno/i.test(p.email)) contactParts.push(`E-mail: ${p.email}`);
+        return jsonResponse(200, {
+          ok: true,
+          answer: formatAnswer({
+            answer: `TJ Sokol Radim vede ${p.role}: ${p.name}.`,
+            contact: contactParts.join(", "),
+            links: [KEY_LINKS.sokol],
+          }),
+          thread_id: threadId,
+        });
+      }
+      // fallback: aspoň sokol rozcestník + kontakt na obec
       return jsonResponse(200, {
         ok: true,
         answer: formatAnswer({
-          answer: `${person.role}: ${person.name}${person.org ? ` (${person.org})` : ""}`,
-          contact: contactParts.join(", "),
-          links: [KEY_LINKS.kontakty].filter(Boolean), // u lidí často není přímý link v people – necháme kontakty obce
+          answer: "Vedení TJ Sokol Radim je uvedeno v podkladech obce.",
+          contact: kontaktyCompactLine(),
+          links: [KEY_LINKS.sokol],
         }),
         thread_id: threadId,
       });
     }
 
-    // ✅ 1) Deterministické dotazy
+    // “kdo vede kroužek hasiči / mládež”
+    if (isFireKidsQuestion(msgTrim)) {
+      const p = peopleLookup("sdh vedouci hasicskeho krouzku");
+      if (p?.name) {
+        const contact = p.tel && !/neni uvedeno/i.test(p.tel) ? `Tel: ${p.tel}` : "";
+        return jsonResponse(200, {
+          ok: true,
+          answer: formatAnswer({
+            answer: `Hasičský kroužek (SDH Radim) vede: ${p.name}.`,
+            contact,
+            links: [KEY_LINKS.homepage],
+          }),
+          thread_id: threadId,
+        });
+      }
+      return jsonResponse(200, { ok: true, answer: makeSimpleContactFallback(), thread_id: threadId });
+    }
+
+    // --------- 1) Deterministické dotazy ----------
     if (isBioodpadQuestion(msgTrim)) {
       const a = makeBioodpadAnswerShort();
       if (a) return jsonResponse(200, { ok: true, answer: a, thread_id: threadId });
@@ -1089,28 +1178,42 @@ export default async function handler(req) {
     }
 
     if (isDogFeeQuestion(msgTrim)) {
-      const a = makeDogFeeAnswerMaybeFromDocs();
+      const a = makeDogFeeAnswer();
       if (a) return jsonResponse(200, { ok: true, answer: a, thread_id: threadId });
-      // když nic nenajde, minimálně odkaz na úřední desku
       return jsonResponse(200, {
         ok: true,
-        answer: formatAnswer({
-          answer: "Vyhláška k poplatku ze psů není v dostupných podkladech jednoznačně dohledatelná.",
-          links: [KEY_LINKS.uredniDeska],
-        }),
+        answer: formatAnswer({ answer: "Vyhláška k poplatku ze psů není v dostupných podkladech dohledatelná.", links: [KEY_LINKS.uredniDeska] }),
         thread_id: threadId,
       });
     }
 
-    // Speciální úřední dotazy – pokud není v podkladech, vrať aspoň kontakt (ne zeď)
-    if (isSignatureVerifyQuestion(msgTrim) || isComplaintQuestion(msgTrim)) {
-      return jsonResponse(200, { ok: true, answer: makeSimpleContactFallback(), thread_id: threadId });
+    if (isHallRentQuestion(msgTrim)) {
+      const a = makeHallRentAnswer();
+      if (a) return jsonResponse(200, { ok: true, answer: a, thread_id: threadId });
     }
 
-    // ✅ 2) Kontextové podklady pro LLM
-    const snippets = pickRelevantPageSnippets(msgTrim, 3);
+    if (isSokolApplicationQuestion(msgTrim)) {
+      const a = makeSokolApplicationAnswer();
+      if (a) return jsonResponse(200, { ok: true, answer: a, thread_id: threadId });
+    }
 
-    // ✅ 3) Fallback na Assistants (pro zbytek)
+    // úřední úkony – nezeď, ale kontakty + úřední hodiny
+    if (isSignatureVerifyQuestion(msgTrim) || isComplaintQuestion(msgTrim)) {
+      const hours = makeUredniHodinyAnswerShort();
+      const ans = formatAnswer({
+        answer: "Vyřizuje Obecní úřad Radim. Doporučuji domluvit se telefonicky nebo přijít v úředních hodinách.",
+        contact: kontaktyCompactLine(),
+        links: [KEY_LINKS.kontakty],
+      });
+      return jsonResponse(200, { ok: true, answer: hours ? `${ans}\n\n${hours}` : ans, thread_id: threadId });
+    }
+
+    // --------- 2) Pokud NEMÁŠ lokální knowledge, nežeň LLM do zdi ----------
+    loadAllLocal();
+    const hasLocal = Boolean(_cache.fullText || _cache.latestText || _cache.peopleText);
+
+    // --------- 3) Kontext + LLM fallback ----------
+    const snippets = pickRelevantPageSnippets(msgTrim, 3);
     const outgoingMessage = wrapUserQuestion(msgTrim, snippets);
     threadId = await addUserMessageWithFallback(threadId, outgoingMessage, apiKey);
 
@@ -1126,23 +1229,26 @@ export default async function handler(req) {
     answer = normalizeUrlsInText(answer);
 
     if (!answer) {
-      answer = makeSimpleContactFallback();
+      // když nemáš local knowledge, aspoň nedej "nic"
+      answer = hasLocal ? makeSimpleContactFallback() : formatAnswer({
+        answer: "Tuto informaci se mi nepodařilo dohledat v podkladech. Napište prosím na obecní úřad.",
+        contact: kontaktyCompactLine(),
+        links: [KEY_LINKS.kontakty],
+      });
     }
 
-    // poslední pojistka proti “akcím 2 roky zpět” v LLM fallbacku:
+    // poslední pojistka proti “akcím 2 roky zpět”
     if (isEventsQuestion(msgTrim) && !wantsHistory(msgTrim)) {
-      // pokud odpověď obsahuje jen staré roky, radši vrať kalendář link
       const s = normalizeCzech(answer);
-      if (/\b(2023|2024)\b/.test(s) && !/\b(2026|2025)\b/.test(s)) {
+      const hasOld = /\b(2023|2024)\b/.test(s);
+      const hasNew = /\b(2026|2025)\b/.test(s);
+      if (hasOld && !hasNew) {
         answer = formatAnswer({
           answer: "V podkladech nejsou uvedeny žádné aktuální/budoucí akce.",
           links: [KEY_LINKS.kalendar],
         });
       }
     }
-
-    // kanonické linky
-    answer = answer.replace(/https:\/\/www\.obec-radim\.cz\/kontakt\/?/gi, KEY_LINKS.kontakty);
 
     return jsonResponse(200, { ok: true, answer, thread_id: threadId });
   } catch (err) {
