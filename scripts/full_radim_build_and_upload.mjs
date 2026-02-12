@@ -37,7 +37,9 @@ import fs from "fs/promises";
 import path from "path";
 import crypto from "node:crypto";
 import { JSDOM } from "jsdom";
-import pdfParse from "pdf-parse";
+import { createRequire } from "module";
+const require = createRequire(import.meta.url);
+const pdfParse = require("pdf-parse");
 
 // ---------- ENV ----------
 const SITE_BASE_URL = (process.env.SITE_BASE_URL ?? "https://www.obec-radim.cz").replace(/\/+$/, "");
