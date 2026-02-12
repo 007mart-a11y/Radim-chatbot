@@ -1,8 +1,8 @@
 // netlify/functions/search.mjs
-// Node 18+
+// Node 18+ (Netlify Functions)
 // ENV: OPENAI_API_KEY, VECTOR_STORE_ID
-// Request: { message: string, thread_id?: string }  // thread_id držíme jen kvůli kompatibilitě (tady není nutný)
-// Response: { ok:true, answer:string, thread_id:string }
+// Request:  { message: string, thread_id?: string }
+// Response: { ok:true, answer:string, thread_id:string } | { ok:false, error, details? }
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -16,6 +16,10 @@ const OBEC_NAZEV = "Radim";
 // tvrdý fallback text – přesně jak chceš
 const HARD_FALLBACK = "Tato informace není v dostupných podkladech obce Radim uvedena.";
 
+// důležité: vector store / assistants v2 header (pro search endpointy)
+const OPENAI_BETA_HEADER = { "OpenAI-Beta": "assistants=v2" };
+
+// ---------- helpers ----------
 function jsonResponse(status, data) {
   return new Response(JSON.stringify(data), {
     status,
@@ -43,7 +47,6 @@ async function oaiFetch(path, { method = "GET", headers = {}, body } = {}, apiKe
     method,
     headers: {
       Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
       ...headers,
     },
     body,
@@ -69,33 +72,117 @@ async function oaiFetch(path, { method = "GET", headers = {}, body } = {}, apiKe
 /**
  * Vector Store Search
  * POST /v1/vector_stores/{vector_store_id}/search
- * query: string or string[]
- * max_num_results: 1..50
- * rewrite_query: boolean
- * ranking_options: { ranker, score_threshold }
  */
-async function vectorSearch({ vectorStoreId, query, maxNumResults = 12, rewriteQuery = true, scoreThreshold = 0.15 }, apiKey) {
+async function vectorSearch(
+  { vectorStoreId, query, maxNumResults = 22, rewriteQuery = true, scoreThreshold = 0.12 },
+  apiKey
+) {
   return await oaiFetch(
     `/vector_stores/${vectorStoreId}/search`,
     {
       method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...OPENAI_BETA_HEADER,
+      },
       body: JSON.stringify({
         query,
         max_num_results: maxNumResults,
         rewrite_query: rewriteQuery,
-        ranking_options: {
-          ranker: "auto",
-          score_threshold: scoreThreshold,
-        },
+        ranking_options: { ranker: "auto", score_threshold: scoreThreshold },
       }),
     },
     apiKey
   );
 }
 
-function pickTopChunks(searchJson, limit = 10) {
-  const items = Array.isArray(searchJson?.data) ? searchJson.data : [];
+// ---------- query expansion ----------
+function buildQueryPack(userQ) {
+  const q = String(userQ || "").trim();
+  const qNorm = normalizeCzech(q);
+
+  // “intent hints” – hlavně poplatky/odpady/vyhlášky
+  const hints = [];
+  const n = qNorm;
+
+  const isFees =
+    /\b(poplatek|poplatky|sazba|castka|cena|kolik se plati|kolik stoji)\b/.test(n) ||
+    /\b(pes|psu|odpad|odpady|bioodpad)\b/.test(n);
+
+  const isDecree =
+    /\b(vyhlaska|ozv|narizeni|uredni deska|usneseni|zverejneno|vyveseno)\b/.test(n);
+
+  if (isFees) {
+    hints.push("místní poplatek", "sazba", "částka", "vyhláška", "OZV", "odpadové hospodářství", "poplatek ze psů");
+  }
+  if (/\bpes|psu|psů\b/.test(n)) {
+    hints.push("místní poplatek ze psů", "OZV poplatek ze psů", "vyhláška poplatek ze psů");
+  }
+  if (/\bodpad|odpady\b/.test(n)) {
+    hints.push("poplatek za obecní systém odpadového hospodářství", "OZV odpad", "vyhláška odpadové hospodářství");
+  }
+  if (isDecree) {
+    hints.push("úřední deska", "vyhláška", "nařízení");
+  }
+
+  // prefer PDF text souborů: přidej dotazy, které “trefí” PDFTEXT soubor
+  // (v PDFTEXT souboru jsou hlavičky typu PDF_TYPE / PDF_URL / CONTENT)
+  const pdfBias = [
+    `${q} PDF_URL`,
+    `${q} PDF_TYPE`,
+    `${q} CONTENT`,
+    `${q} VYHLÁŠKA`,
+    `${q} NAŘÍZENÍ`,
+    `${q} OZV`,
+  ];
+
+  // prefer LATEST soubor (obsahuje “LATEST”, “DOC |”, “PAGE |”)
+  const latestBias = [
+    `${q} DOC |`,
+    `${q} PAGE |`,
+    `${q} LATEST`,
+    `${q} úřední deska`,
+  ];
+
+  const expanded = [
+    q,
+    qNorm,
+    `${q} obec Radim`,
+    ...pdfBias,
+    ...latestBias,
+    ...hints.map((h) => `${q} ${h}`),
+  ];
+
+  // odduplikace + limit
+  const seen = new Set();
   const out = [];
+  for (const x of expanded) {
+    const s = String(x || "").trim();
+    if (!s) continue;
+    const k = s.toLowerCase();
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push(s);
+    if (out.length >= 16) break;
+  }
+  return out;
+}
+
+// ---------- chunk picking / ranking ----------
+function filePriority(filename) {
+  const f = String(filename || "").toLowerCase();
+  // nejdřív PDF texty (částky a pravidla), pak LATEST, pak FULL
+  if (f.includes("30_pdf_text_obec_radim")) return 0;
+  if (f.includes("00_latest_obec_radim")) return 1;
+  if (f.includes("99_full_obec_radim")) return 2;
+  // people file nebo ostatní
+  if (f.includes("people") || f.includes("00_people")) return 3;
+  return 4;
+}
+
+function pickTopChunks(searchJson, limit = 12) {
+  const items = Array.isArray(searchJson?.data) ? searchJson.data : [];
+  const all = [];
 
   for (const it of items) {
     const filename = it?.filename || "";
@@ -110,12 +197,36 @@ function pickTopChunks(searchJson, limit = 10) {
 
     if (!text) continue;
 
-    out.push({
+    all.push({
       filename,
       score,
-      text: text.slice(0, 2400), // bezpečně krátké
+      text,
+      prio: filePriority(filename),
     });
+  }
 
+  // řazení: priority souboru, pak score desc
+  all.sort((a, b) => {
+    if (a.prio !== b.prio) return a.prio - b.prio;
+    const sa = typeof a.score === "number" ? a.score : -1;
+    const sb = typeof b.score === "number" ? b.score : -1;
+    return sb - sa;
+  });
+
+  // “1 soubor = max 3 chunky” (aby to nebylo celé z jednoho místa)
+  const perFileCount = new Map();
+  const out = [];
+  for (const c of all) {
+    const key = c.filename || "unknown";
+    const n = perFileCount.get(key) || 0;
+    if (n >= 3) continue;
+    perFileCount.set(key, n + 1);
+
+    out.push({
+      filename: c.filename,
+      score: c.score,
+      text: c.text.slice(0, 2600), // bezpečně krátké
+    });
     if (out.length >= limit) break;
   }
 
@@ -123,51 +234,61 @@ function pickTopChunks(searchJson, limit = 10) {
 }
 
 function buildContextBlock(chunks) {
-  // Kontext je “citovatelný” – model uvidí přesně ty pasáže
-  let ctx = `KONTEXT Z OFICIÁLNÍCH PODKLADŮ OBCE ${OBEC_NAZEV} (výběr relevantních úryvků):\n`;
-  ctx += `---\n`;
+  let ctx = `KONTEXT Z OFICIÁLNÍCH PODKLADŮ OBCE ${OBEC_NAZEV} (relevantní úryvky):\n---\n`;
   chunks.forEach((c, i) => {
     ctx += `[#${i + 1}] ${c.filename || "soubor"} (score: ${c.score ?? "?"})\n`;
-    ctx += `${c.text}\n`;
-    ctx += `---\n`;
+    ctx += `${c.text}\n---\n`;
   });
   return ctx.trim();
 }
 
-function systemPrompt() {
+// ---------- prompts ----------
+function systemPromptAnswer() {
   return (
     `Jsi oficiální AI asistent obce ${OBEC_NAZEV}.\n` +
-    `Odpovídáš POUZE z poskytnutého kontextu (úryvky z oficiálních podkladů).\n` +
+    `Odpovídáš POUZE z poskytnutého kontextu (úryvky z oficiálních podkladů obce).\n` +
     `Nevymýšlej fakta, jména, částky ani kontakty.\n` +
-    `Když odpověď z kontextu nejde jednoznačně doložit, napiš přesně:\n` +
+    `Pokud odpověď nelze z kontextu JEDNOZNAČNĚ doložit, napiš přesně:\n` +
     `"${HARD_FALLBACK}"\n\n` +
     `Dnes je ${todayCZ()}.\n\n` +
     `Styl:\n` +
-    `- stručně a věcně (1–6 bodů nebo 1–4 věty)\n` +
-    `- pokud jde o “kdy / kde / jak” → dej jasný postup\n` +
-    `- pokud je dotaz nejasný → polož 1 doplňující otázku (ale jen když to fakt pomůže)\n`
+    `- stručně a věcně\n` +
+    `- pokud jde o částky/poplatky: uveď přesnou sazbu a podmínky (pokud jsou v kontextu)\n` +
+    `- pokud je dotaz nejasný a v kontextu je více možností: polož 1 doplňující otázku\n`
   );
 }
 
-async function generateAnswer({ userMessage, contextBlock }, apiKey) {
-  // Responses API – jednoduché, rychlé, bez magie Assistants
+// audit prompt – tvrdě zkontroluje oporu v kontextu
+function systemPromptAudit() {
+  return (
+    `Jsi kontrolor (audit) odpovědi AI asistenta obce ${OBEC_NAZEV}.\n` +
+    `Dostaneš: (1) kontext, (2) návrh odpovědi.\n` +
+    `Úkol: rozhodni, zda je odpověď plně podložená kontextem.\n` +
+    `Pokud NE, vrať přesně: "${HARD_FALLBACK}".\n` +
+    `Pokud ANO, vrať původní odpověď beze změn.\n` +
+    `Zakázáno: dohady, obecné rady, domýšlení.\n`
+  );
+}
+
+// ---------- model calls ----------
+async function responsesCall({ system, user }, apiKey) {
   const resp = await oaiFetch(
     `/responses`,
     {
       method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         model: "gpt-4.1-mini",
         temperature: 0.2,
         input: [
-          { role: "system", content: systemPrompt() },
-          { role: "user", content: `${contextBlock}\n\nDOTAZ UŽIVATELE:\n${userMessage}` },
+          { role: "system", content: system },
+          { role: "user", content: user },
         ],
       }),
     },
     apiKey
   );
 
-  // vytáhnout text
   const out = Array.isArray(resp?.output) ? resp.output : [];
   const msg = out.find((x) => x?.type === "message");
   const content = Array.isArray(msg?.content) ? msg.content : [];
@@ -177,9 +298,31 @@ async function generateAnswer({ userMessage, contextBlock }, apiKey) {
     .join("\n")
     .trim();
 
-  return text || HARD_FALLBACK;
+  return text || "";
 }
 
+async function generateAnswer({ userMessage, contextBlock }, apiKey) {
+  const draft = await responsesCall(
+    {
+      system: systemPromptAnswer(),
+      user: `${contextBlock}\n\nDOTAZ UŽIVATELE:\n${userMessage}`,
+    },
+    apiKey
+  );
+
+  // audit: buď vrátí stejnou odpověď, nebo HARD_FALLBACK
+  const audited = await responsesCall(
+    {
+      system: systemPromptAudit(),
+      user: `KONTEXT:\n${contextBlock}\n\nNÁVRH ODPOVĚDI:\n${draft}`,
+    },
+    apiKey
+  );
+
+  return audited || HARD_FALLBACK;
+}
+
+// ---------- post-processing ----------
 function cleanAnswer(t) {
   let s = String(t || "");
 
@@ -192,6 +335,42 @@ function cleanAnswer(t) {
   return s.trim();
 }
 
+function extractUrlsFromText(text, max = 3) {
+  const s = String(text || "");
+  const urls = s.match(/\bhttps?:\/\/[^\s<>"')\]]+/gi) || [];
+  const out = [];
+  const seen = new Set();
+  for (const u of urls) {
+    const clean = u.replace(/[),.;]+$/g, "");
+    if (seen.has(clean)) continue;
+    seen.add(clean);
+    out.push(clean);
+    if (out.length >= max) break;
+  }
+  return out;
+}
+
+function ensureLinks(answer, contextBlock) {
+  const a = String(answer || "").trim();
+  if (!a || a === HARD_FALLBACK) return a;
+
+  const existing = extractUrlsFromText(a, 10);
+  if (existing.length) return a; // už má odkazy
+
+  // zkus vytáhnout URL z kontextu (v PDFTEXT máme PDF_URL / přímé linky)
+  const ctxUrls = extractUrlsFromText(contextBlock, 3);
+  if (!ctxUrls.length) return a;
+
+  return `${a}\n\nOdkazy:\n- ${ctxUrls.join("\n- ")}`.trim();
+}
+
+function looksBad(answer) {
+  const a = String(answer || "");
+  // tyhle fráze nechceme (když se objeví, je to skoro vždy “halucinace”)
+  return /(doporučuji kontaktovat|nejsem si jist|pravděpodobně|mohlo by|zkuste|obecně platí)/i.test(a);
+}
+
+// ---------- handler ----------
 export default async function handler(req) {
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders });
 
@@ -214,39 +393,42 @@ export default async function handler(req) {
     const userQ = message.trim();
     const threadId = (body?.thread_id && String(body.thread_id)) || `thread_local_${Date.now()}`;
 
-    // 1) PŘEDVYHLEDÁVÁNÍ (multi-query)
-    const q1 = userQ;
-    const q2 = normalizeCzech(userQ);
-    const q3 = `${userQ} obec Radim`;
+    // RESET (kompatibilita)
+    if (userQ.toLowerCase() === "reset") {
+      return jsonResponse(200, { ok: true, answer: "Resetováno.", thread_id: `thread_local_${Date.now()}` });
+    }
+
+    // 1) PŘEDVYHLEDÁVÁNÍ (chytřejší multi-query)
+    const queryPack = buildQueryPack(userQ);
 
     const search = await vectorSearch(
       {
         vectorStoreId,
-        query: [q1, q2, q3],
-        maxNumResults: 18,
+        query: queryPack,
+        maxNumResults: 26,
         rewriteQuery: true,
-        scoreThreshold: 0.15,
+        scoreThreshold: 0.12,
       },
       apiKey
     );
 
-    const chunks = pickTopChunks(search, 10);
+    const chunks = pickTopChunks(search, 12);
 
-    // když nic rozumného – tvrdý fallback
     if (!chunks.length) {
       return jsonResponse(200, { ok: true, answer: HARD_FALLBACK, thread_id: threadId });
     }
 
     const contextBlock = buildContextBlock(chunks);
 
-    // 2) ODPOVĚĎ jen z kontextu
+    // 2) ODPOVĚĎ jen z kontextu + audit opory
     let answer = await generateAnswer({ userMessage: userQ, contextBlock }, apiKey);
     answer = cleanAnswer(answer);
 
-    // vynucení fallbacku, když model začne “radit obecně”
-    // (můžeš si tu později přidat další zakázané fráze)
-    const bad = /(doporučuji kontaktovat|nejsem si jist|pravděpodobně|mohlo by|zkuste)/i.test(answer);
-    if (bad) answer = HARD_FALLBACK;
+    // extra bezpečnost: pokud to vypadá jako obecné kecy → fallback
+    if (looksBad(answer)) answer = HARD_FALLBACK;
+
+    // 3) doplnění odkazů, když nejsou v odpovědi
+    answer = ensureLinks(answer, contextBlock);
 
     return jsonResponse(200, { ok: true, answer, thread_id: threadId });
   } catch (err) {
