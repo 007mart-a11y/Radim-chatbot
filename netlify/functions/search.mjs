@@ -1,8 +1,8 @@
 // netlify/functions/search.mjs
-// Node 18+
+// Node 18+ (Netlify Functions)
 // ENV: OPENAI_API_KEY, VECTOR_STORE_ID
 // Request: { message: string, thread_id?: string }
-// Response: { ok:true, answer:string, thread_id:string }
+// Response: { ok:true, answer:string, thread_id:string } | {ok:false,...}
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -12,20 +12,16 @@ const corsHeaders = {
 
 const OPENAI_BASE_URL = "https://api.openai.com/v1";
 const OBEC_NAZEV = "Radim";
-const HARD_FALLBACK = "Tato informace není v dostupných podkladech obce Radim uvedena.";
+
+// NECHCEME být ultra-striktní, ale když fakt nic není:
+const SOFT_FALLBACK =
+  "Tuhle informaci jsem v dostupných podkladech obce Radim nenašel. Pošli mi prosím upřesnění (čeho se to týká / jaký dokument), nebo se podívám na nejbližší relevantní dokument/stránku a pošlu odkaz.";
 
 function jsonResponse(status, data) {
   return new Response(JSON.stringify(data), {
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json; charset=utf-8" },
   });
-}
-
-function normalizeCzech(s) {
-  return String(s || "")
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
 }
 
 function todayCZ() {
@@ -36,14 +32,19 @@ function todayCZ() {
   return `${dd}. ${mm}. ${yyyy}`;
 }
 
+function normalizeCzech(s) {
+  return String(s || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
 async function oaiFetch(path, { method = "GET", headers = {}, body } = {}, apiKey) {
   const res = await fetch(`${OPENAI_BASE_URL}${path}`, {
     method,
     headers: {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
-      // důležité pro vector stores / assistants v2 věci
-      "OpenAI-Beta": "assistants=v2",
       ...headers,
     },
     body,
@@ -66,8 +67,12 @@ async function oaiFetch(path, { method = "GET", headers = {}, body } = {}, apiKe
   return json ?? {};
 }
 
+/**
+ * Vector Store Search
+ * POST /v1/vector_stores/{vector_store_id}/search
+ */
 async function vectorSearch(
-  { vectorStoreId, query, maxNumResults = 18, rewriteQuery = true, scoreThreshold = 0.15 },
+  { vectorStoreId, query, maxNumResults = 30, rewriteQuery = true, scoreThreshold = 0.08 },
   apiKey
 ) {
   return await oaiFetch(
@@ -78,26 +83,88 @@ async function vectorSearch(
         query,
         max_num_results: maxNumResults,
         rewrite_query: rewriteQuery,
-        ranking_options: { ranker: "auto", score_threshold: scoreThreshold },
+        ranking_options: {
+          ranker: "auto",
+          score_threshold: scoreThreshold,
+        },
       }),
     },
     apiKey
   );
 }
 
-function isPdfFocusedQuestion(q) {
+/** ==============================
+ *  Query routing (lehké, chytré)
+ *  ============================== */
+function detectIntent(q) {
   const s = normalizeCzech(q);
-  return (
-    /(vyhlask|vyhlášk|ozv|narizen|nařízení|poplatek|mistni poplatek|odpad|psi|psu|psů|pes|splatnost|sazba|uhrada|platba)/.test(s)
-  );
+
+  const isFees =
+    /\b(poplatek|poplatky|mistni poplatek|místní poplatek|pes|psy|psu|psů|odpad|odpady)\b/.test(s);
+
+  const isDocs =
+    /\b(vyhlaska|vyhláška|ozv|narizeni|nařízení|pdf|dokument|usneseni|usnesení)\b/.test(s);
+
+  const isPeople =
+    /\b(kdo je|kdo ma na starost|kontakt|telefon|email|e-mail|starosta|mistostarosta|místostarosta|predseda|předseda|predsedkyne|předsedkyně)\b/.test(
+      s
+    );
+
+  const isLatest =
+    /\b(dnes|aktualne|aktuálně|nejnovejsi|nejnovější|posledni|poslední|co je noveho|úřední deska|uredni deska|kalendar|kalendář|akce|aktuality)\b/.test(
+      s
+    );
+
+  return { isFees, isDocs, isPeople, isLatest };
 }
 
-function looksLikeLinkQuestion(q) {
-  const s = normalizeCzech(q);
-  return /(odkaz|link|pdf|ke stazeni|ke stažení|stahnout|stáhnout)/.test(s);
+function buildQueries(userQ) {
+  const n = normalizeCzech(userQ);
+  const base = [userQ, n, `${userQ} obec Radim`];
+
+  const intent = detectIntent(userQ);
+
+  const targeted = [];
+  if (intent.isFees) {
+    targeted.push(`${userQ} vyhláška`, `${userQ} sazba`, `${userQ} Kč`, `${userQ} účinnost`, "místní poplatek ze psů Radim vyhláška");
+  }
+  if (intent.isDocs) {
+    targeted.push(`${userQ} PDF`, `${userQ} e_download.php`, `${userQ} úřední deska`);
+  }
+  if (intent.isPeople) {
+    targeted.push(`${userQ} kontakt`, `${userQ} obecní úřad`, `${userQ} funkce`);
+  }
+  if (intent.isLatest) {
+    targeted.push(`${userQ} nejnovější`, `${userQ} 2026`, `${userQ} vyvěšeno`);
+  }
+
+  // oddup
+  const all = [...base, ...targeted].filter(Boolean);
+  const uniq = [];
+  const seen = new Set();
+  for (const q of all) {
+    const k = q.trim().toLowerCase();
+    if (!k || seen.has(k)) continue;
+    seen.add(k);
+    uniq.push(q);
+  }
+
+  return { queries: uniq, intent };
 }
 
-function extractTextFromSearchItem(it) {
+/** ==============================
+ *  Chunk selection: víc kontextu + diverzita zdrojů
+ *  ============================== */
+
+function scoreOf(it) {
+  return typeof it?.score === "number" ? it.score : 0;
+}
+
+function getFilename(it) {
+  return it?.filename || it?.file?.filename || "";
+}
+
+function extractText(it) {
   const chunks = Array.isArray(it?.content) ? it.content : [];
   const text = chunks
     .map((c) => (c?.type === "text" ? c?.text : ""))
@@ -107,111 +174,138 @@ function extractTextFromSearchItem(it) {
   return text;
 }
 
-function filenameOf(it) {
-  // různá pole podle API; ber všechno co jde
-  return it?.filename || it?.file?.filename || it?.file?.name || "";
-}
-
-function pickTopChunks(searchJson, limit = 10, prefer = null) {
-  const items = Array.isArray(searchJson?.data) ? searchJson.data : [];
-
-  const mapped = items
-    .map((it) => {
-      const filename = filenameOf(it);
-      const score = typeof it?.score === "number" ? it.score : 0;
-      const text = extractTextFromSearchItem(it);
-      return { filename, score, text };
-    })
-    .filter((x) => x.text && x.text.trim().length > 40);
-
-  // prefer = "pdf" nebo "latest" nebo null
-  mapped.sort((a, b) => {
-    const ap = preferScore(a.filename, prefer);
-    const bp = preferScore(b.filename, prefer);
-    if (bp !== ap) return bp - ap;
-    return (b.score || 0) - (a.score || 0);
-  });
-
-  return mapped.slice(0, limit).map((x) => ({ ...x, text: x.text.slice(0, 2600) }));
-}
-
-function preferScore(filename, prefer) {
+function sourceBucket(filename) {
   const f = (filename || "").toLowerCase();
-  if (!prefer) return 0;
-  if (prefer === "pdf") {
-    if (f.includes("30_pdf_text")) return 3;
-    if (f.includes("00_latest")) return 2;
-    if (f.includes("99_full")) return 1;
-    return 0;
+  if (f.includes("00_latest")) return "LATEST";
+  if (f.includes("30_pdf_text")) return "PDFTEXT";
+  if (f.includes("people")) return "PEOPLE";
+  if (f.includes("99_full")) return "FULL";
+  return "OTHER";
+}
+
+/**
+ * Vybere víc chunků, ale:
+ * - udrží limit
+ * - přidá diverzitu (LATEST/PDFTEXT/PEOPLE)
+ */
+function pickDiverseChunks(items, intent, limit = 18) {
+  const normalized = items
+    .map((it) => {
+      const filename = getFilename(it);
+      const text = extractText(it);
+      return {
+        filename,
+        bucket: sourceBucket(filename),
+        score: scoreOf(it),
+        text,
+      };
+    })
+    .filter((x) => x.text && x.text.length > 40);
+
+  // seřadit podle skóre desc
+  normalized.sort((a, b) => (b.score || 0) - (a.score || 0));
+
+  const out = [];
+  const usedSig = new Set();
+
+  function addIfOk(x) {
+    const sig = (x.filename + "::" + x.text.slice(0, 180)).toLowerCase();
+    if (usedSig.has(sig)) return false;
+    usedSig.add(sig);
+    out.push({
+      filename: x.filename,
+      bucket: x.bucket,
+      score: x.score,
+      text: x.text.slice(0, 3200), // víc kontextu
+    });
+    return true;
   }
-  if (prefer === "latest") {
-    if (f.includes("00_latest")) return 3;
-    if (f.includes("30_pdf_text")) return 2;
-    if (f.includes("99_full")) return 1;
-    return 0;
+
+  // 1) “Must-have” bucket minima podle intentu
+  const want = {
+    LATEST: intent.isLatest ? 4 : 2,
+    PDFTEXT: intent.isFees || intent.isDocs ? 4 : 1,
+    PEOPLE: intent.isPeople ? 3 : 0,
+    FULL: 6,
+  };
+
+  // nejdřív naplnit preferované bucket
+  const buckets = ["LATEST", "PDFTEXT", "PEOPLE", "FULL"];
+  for (const b of buckets) {
+    const need = want[b] || 0;
+    if (!need) continue;
+    for (const x of normalized) {
+      if (out.length >= limit) break;
+      if (x.bucket !== b) continue;
+      if (out.filter((o) => o.bucket === b).length >= need) break;
+      addIfOk(x);
+    }
   }
-  return 0;
+
+  // 2) doplnit z top skóre napříč vším
+  for (const x of normalized) {
+    if (out.length >= limit) break;
+    addIfOk(x);
+  }
+
+  return out.slice(0, limit);
 }
 
 function buildContextBlock(chunks) {
-  let ctx = `KONTEXT Z OFICIÁLNÍCH PODKLADŮ OBCE ${OBEC_NAZEV} (použij výhradně tyto úryvky):\n---\n`;
+  let ctx = `KONTEXT Z OFICIÁLNÍCH PODKLADŮ OBCE ${OBEC_NAZEV} (vybrané relevantní úryvky):\n`;
+  ctx += `Dnes: ${todayCZ()} (rok 2026)\n`;
+  ctx += `---\n`;
   chunks.forEach((c, i) => {
-    ctx += `[#${i + 1}] ${c.filename || "soubor"} (score: ${c.score ?? "?"})\n`;
-    ctx += `${c.text}\n---\n`;
+    ctx += `[#${i + 1}] ${c.bucket} | ${c.filename || "soubor"} | score: ${c.score ?? "?"}\n`;
+    ctx += `${c.text}\n`;
+    ctx += `---\n`;
   });
   return ctx.trim();
 }
 
-function extractUrlsFromContext(contextBlock, max = 3) {
-  const urls = new Set();
-  const re = /\bhttps?:\/\/[^\s<>"')\]]+/gi;
-  const matches = String(contextBlock || "").match(re) || [];
-  for (const u of matches) {
-    // nechceme 20 odkazů, jen relevantní (typicky e_download / uredni_deska / kontakt)
-    if (!/obec-radim\.cz/i.test(u)) continue;
-    if (/\.jpg|\.png|\.gif|facebook\.com/i.test(u)) continue;
-    urls.add(u.replace(/[),.]+$/g, ""));
-    if (urls.size >= max) break;
-  }
-  return Array.from(urls);
-}
+/** ==============================
+ *  Model: “komplexní asistent”
+ *  ============================== */
 
 function systemPrompt() {
   return (
-    `Jsi oficiální AI asistent obce ${OBEC_NAZEV}.\n` +
-    `Odpovídáš POUZE z poskytnutého kontextu (úryvky z oficiálních podkladů).\n` +
-    `Nevymýšlej fakta, jména, částky ani kontakty.\n` +
-    `Když odpověď z kontextu nejde jednoznačně doložit, napiš přesně:\n` +
-    `"${HARD_FALLBACK}"\n\n` +
-    `Dnes je ${todayCZ()}.\n\n` +
-    `Formát:\n` +
-    `Odpověď: 1–6 krátkých bodů NEBO 1–4 věty.\n` +
-    `Odkazy: 1–3 přímé odkazy, pokud jsou v kontextu dostupné.\n\n` +
-    `Zakázáno:\n` +
-    `- obecné rady typu "doporučuji kontaktovat", pokud to není přímo v kontextu\n` +
-    `- odhadování, pravděpodobně, nejspíš, apod.\n`
+    `Jsi užitečný a spolehlivý AI asistent obce ${OBEC_NAZEV}.\n` +
+    `Pracuj pouze s poskytnutým KONTEXTEM (úryvky ze zdrojů obce).\n` +
+    `Můžeš spojovat informace z více úryvků a domýšlet strukturu odpovědi, ale nevymýšlej fakta, jména ani částky.\n\n` +
+    `PRIORITA ZDROJŮ:\n` +
+    `- 00_LATEST_* = nejnovější info (úřední deska, aktuality, akce, nové dokumenty)\n` +
+    `- 30_PDF_TEXT_* = obsah PDF vyhlášek a dokumentů (čísla/částky ber primárně odsud, pokud jsou uvedené)\n` +
+    `- people = role/osoby/kontakty\n` +
+    `- 99_FULL_* = obecné stránky a navigace\n\n` +
+    `PRAVIDLA:\n` +
+    `- Když jsou v kontextu různé částky/údaje: vyber tu, která je v novější položce nebo přímo v textu vyhlášky (PDFTEXT) a uveď datum/účinnost, pokud je.\n` +
+    `- Když si nejsi jistý, napiš, co přesně v dokumentu stojí, a přilož odkaz na dokument.\n` +
+    `- Odpovídej konkrétně, lidsky, ne úřednický “robot”.\n\n` +
+    `FORMÁT:\n` +
+    `Odpověď:\n- 1–8 bodů (nebo krátký odstavec + body)\n\n` +
+    `Odkazy:\n- 1–5 přímých odkazů (nejrelevantnější)\n`
   );
 }
 
-async function generateAnswer({ userMessage, contextBlock, urlHints }, apiKey) {
-  const promptUser =
-    `${contextBlock}\n\n` +
-    `DOTAZ UŽIVATELE:\n${userMessage}\n\n` +
-    `POVINNOST:\n` +
-    `- pokud odpovídáš, opři to o konkrétní větu/údaj z kontextu\n` +
-    `- pokud je dotaz na vyhlášku/poplatek a v kontextu je PDF text, použij ho\n` +
-    `- do sekce Odkazy dej jen tyto nalezené URL (vyber max 3):\n${urlHints.map((u) => `- ${u}`).join("\n")}\n`;
-
+async function generateAnswer({ userMessage, contextBlock }, apiKey) {
   const resp = await oaiFetch(
     `/responses`,
     {
       method: "POST",
       body: JSON.stringify({
         model: "gpt-4.1-mini",
-        temperature: 0.15,
+        temperature: 0.25,
         input: [
           { role: "system", content: systemPrompt() },
-          { role: "user", content: promptUser },
+          {
+            role: "user",
+            content:
+              `${contextBlock}\n\n` +
+              `DOTAZ UŽIVATELE:\n${userMessage}\n\n` +
+              `POKYNY NAVÍC:\n` +
+              `- Pokud jde o poplatky, vyhledej v kontextu explicitní částku a uveď ji včetně data/účinnosti, pokud je.\n` +
+              `- Pokud jde o osoby/funkce: rozlišuj “starosta obce” vs “starosta SDH” a uveď správnou roli.\n`,
+          },
         ],
       }),
     },
@@ -227,59 +321,37 @@ async function generateAnswer({ userMessage, contextBlock, urlHints }, apiKey) {
     .join("\n")
     .trim();
 
-  return text || HARD_FALLBACK;
+  return text || "";
 }
 
-function cleanAnswer(t) {
+/** ==============================
+ *  Cleanup: citace + seniors odkazy pryč
+ *  ============================== */
+
+function stripCitationsAndFixLinks(t) {
   let s = String(t || "");
+
+  // pryč file_search citace typu 【…†…】
   s = s.replace(/【\s*\d+\s*:\s*\d+\s*†[^】]*】/g, "");
+
+  // ZAKÁZAT seniors variantu webu: přepiš https://www.obec-radim.cz/seniori/... -> https://www.obec-radim.cz/...
+  s = s.replace(/https:\/\/www\.obec-radim\.cz\/seniori\/+/gi, "https://www.obec-radim.cz/");
+
+  // odstraň dvojité lomítka po úpravách (mimo https://)
+  s = s.replace(/https:\/\/www\.obec-radim\.cz\/{2,}/gi, "https://www.obec-radim.cz/");
+
+  // whitespace
   s = s.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+
   return s.trim();
 }
 
-function looksBad(answer) {
-  if (!answer) return true;
-  const a = String(answer);
-
-  // zakázané fráze / obecné kecy
-  if (/(doporučuji kontaktovat|nejsem si jist|pravděpodobně|mohlo by|zkuste|obvykle se)/i.test(a)) return true;
-
-  // pokud to není fallback, chceme aspoň nějakou "kotvu" (číslo/datum/URL/tel/email)
-  if (a !== HARD_FALLBACK) {
-    const hasAnchor =
-      /\b\d{1,3}\s?(kč|Kč)\b/.test(a) ||
-      /\b\d{1,2}\.\s?\d{1,2}\.\s?\d{4}\b/.test(a) ||
-      /\bhttps?:\/\/\S+/i.test(a) ||
-      /\b\d{3}\s?\d{3}\s?\d{3}\b/.test(a) ||
-      /\b\S+@\S+\.\S+\b/.test(a);
-
-    if (!hasAnchor) return true;
-  }
-
-  return false;
-}
-
-function ensureLinks(answer, urlHints) {
-  let t = String(answer || "").trim();
-  if (!t || t === HARD_FALLBACK) return t;
-
-  const hasLinksSection = /\bOdkazy\s*:/i.test(t);
-  const hasAnyUrl = /\bhttps?:\/\/[^\s<>"')\]]+/i.test(t);
-
-  const pick = (urlHints || []).slice(0, 3);
-  if (!pick.length) return t;
-
-  if (!hasAnyUrl) {
-    t += `\n\nOdkazy:\n` + pick.map((u) => `- ${u}`).join("\n");
-    return t.trim();
-  }
-
-  // už nějaké URL má → jen přidej sekci Odkazy, pokud chybí
-  if (!hasLinksSection) {
-    t += `\n\nOdkazy:\n` + pick.map((u) => `- ${u}`).join("\n");
-  }
-
-  return t.trim();
+function hasSomeUsefulAnswer(ans) {
+  const s = (ans || "").trim();
+  if (!s) return false;
+  // když to vyrobí jen “Odpověď:” bez obsahu
+  if (/^Odpověď:\s*$/i.test(s)) return false;
+  return s.length > 40;
 }
 
 export default async function handler(req) {
@@ -290,6 +362,7 @@ export default async function handler(req) {
 
     const apiKey = process.env.OPENAI_API_KEY;
     const vectorStoreId = process.env.VECTOR_STORE_ID;
+
     if (!apiKey) return jsonResponse(500, { ok: false, error: "Missing OPENAI_API_KEY" });
     if (!vectorStoreId) return jsonResponse(500, { ok: false, error: "Missing VECTOR_STORE_ID" });
 
@@ -300,79 +373,74 @@ export default async function handler(req) {
     const userQ = message.trim();
     const threadId = (body?.thread_id && String(body.thread_id)) || `thread_local_${Date.now()}`;
 
-    // ===== 1) Search pass A (široké) =====
-    const q1 = userQ;
-    const q2 = normalizeCzech(userQ);
-    const q3 = `${userQ} obec Radim`;
-    const prefer = isPdfFocusedQuestion(userQ) ? "pdf" : "latest";
+    // 1) Query builder
+    const { queries, intent } = buildQueries(userQ);
+
+    // 2) Dvě vyhledání: širší + cílenější (nižší threshold pro poplatky/PDF)
+    const scoreA = intent.isFees || intent.isDocs ? 0.06 : 0.08;
+    const scoreB = intent.isFees || intent.isDocs ? 0.04 : 0.07;
 
     const searchA = await vectorSearch(
+      { vectorStoreId, query: queries.slice(0, 10), maxNumResults: 30, rewriteQuery: true, scoreThreshold: scoreA },
+      apiKey
+    );
+
+    const searchB = await vectorSearch(
       {
         vectorStoreId,
-        query: [q1, q2, q3],
-        maxNumResults: 24,
+        query: [
+          userQ,
+          `${userQ} vyhláška`,
+          `${userQ} e_download.php`,
+          `${userQ} účinnost`,
+          `${userQ} Kč`,
+          `${userQ} 2025 2026`,
+        ],
+        maxNumResults: 30,
         rewriteQuery: true,
-        scoreThreshold: 0.12,
+        scoreThreshold: scoreB,
       },
       apiKey
     );
 
-    let chunksA = pickTopChunks(searchA, 12, prefer);
+    const itemsA = Array.isArray(searchA?.data) ? searchA.data : [];
+    const itemsB = Array.isArray(searchB?.data) ? searchB.data : [];
 
-    if (!chunksA.length) return jsonResponse(200, { ok: true, answer: HARD_FALLBACK, thread_id: threadId });
-
-    // ===== 2) Search pass B (zacílení podle tématu) =====
-    // když jde o vyhlášky/poplatky/linky, přidej cílené dotazy
-    const focusQueries = [];
-    if (isPdfFocusedQuestion(userQ)) {
-      focusQueries.push(
-        `vyhláška ${OBEC_NAZEV} ${userQ}`,
-        `místní poplatek ${OBEC_NAZEV} ${userQ}`,
-        `e_download.php ${OBEC_NAZEV} ${userQ}`
-      );
-    }
-    if (looksLikeLinkQuestion(userQ)) {
-      focusQueries.push(`PDF odkaz ${OBEC_NAZEV} ${userQ}`, `ke stažení ${OBEC_NAZEV} ${userQ}`);
+    // spoj + oddup podle filename+first chars
+    const merged = [];
+    const seen = new Set();
+    for (const it of [...itemsA, ...itemsB]) {
+      const fn = getFilename(it);
+      const tx = extractText(it);
+      const key = (fn + "::" + (tx || "").slice(0, 200)).toLowerCase();
+      if (!tx) continue;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      merged.push(it);
     }
 
-    let chunks = chunksA;
+    // 3) Vyber víc kontextu + diverzita zdrojů
+    const chunks = pickDiverseChunks(merged, intent, 18);
 
-    if (focusQueries.length) {
-      const searchB = await vectorSearch(
-        {
-          vectorStoreId,
-          query: focusQueries,
-          maxNumResults: 24,
-          rewriteQuery: true,
-          scoreThreshold: 0.10,
-        },
-        apiKey
-      );
-      const chunksB = pickTopChunks(searchB, 10, "pdf");
-
-      // merge + dedupe by (filename + first 120 chars)
-      const seen = new Set();
-      const merged = [];
-      for (const c of [...chunksB, ...chunksA]) {
-        const key = `${c.filename}::${c.text.slice(0, 120)}`;
-        if (seen.has(key)) continue;
-        seen.add(key);
-        merged.push(c);
-        if (merged.length >= 12) break;
-      }
-      chunks = merged;
+    if (!chunks.length) {
+      return jsonResponse(200, { ok: true, answer: SOFT_FALLBACK, thread_id: threadId });
     }
 
     const contextBlock = buildContextBlock(chunks);
-    const urlHints = extractUrlsFromContext(contextBlock, 3);
 
-    // ===== 3) Answer =====
-    let answer = await generateAnswer({ userMessage: userQ, contextBlock, urlHints }, apiKey);
-    answer = cleanAnswer(answer);
+    // 4) Model odpověď
+    let answer = await generateAnswer({ userMessage: userQ, contextBlock }, apiKey);
+    answer = stripCitationsAndFixLinks(answer);
 
-    // ===== 4) Hard guardrail =====
-    if (looksBad(answer)) answer = HARD_FALLBACK;
-    answer = ensureLinks(answer, urlHints);
+    // 5) Když je odpověď slabá, zkusit ještě jednou s vyšším limitem kontextu (fallback pass)
+    if (!hasSomeUsefulAnswer(answer)) {
+      const moreChunks = pickDiverseChunks(merged, intent, 24);
+      const ctx2 = buildContextBlock(moreChunks);
+      answer = await generateAnswer({ userMessage: userQ, contextBlock: ctx2 }, apiKey);
+      answer = stripCitationsAndFixLinks(answer);
+    }
+
+    if (!hasSomeUsefulAnswer(answer)) answer = SOFT_FALLBACK;
 
     return jsonResponse(200, { ok: true, answer, thread_id: threadId });
   } catch (err) {
