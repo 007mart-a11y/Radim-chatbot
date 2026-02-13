@@ -14,8 +14,8 @@ const OPENAI_BASE_URL = "https://api.openai.com/v1";
 const OBEC_NAZEV = "Radim";
 const HARD_FALLBACK = "Tato informace není v dostupných podkladech obce Radim uvedena.";
 
-// IMPORTANT: Vector Stores endpoints require this
-const OPENAI_BETA = { "OpenAI-Beta": "assistants=v2" };
+// Vector Stores + Assistants v2 endpoints require this
+const OPENAI_BETA_HEADER = { "OpenAI-Beta": "assistants=v2" };
 
 function jsonResponse(status, data) {
   return new Response(JSON.stringify(data), {
@@ -53,8 +53,8 @@ async function oaiFetch(
     method,
     headers: {
       Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-      ...(beta ? OPENAI_BETA : {}),
+      ...(beta ? OPENAI_BETA_HEADER : {}),
+      ...(body ? { "Content-Type": "application/json" } : {}),
       ...headers,
     },
     body,
@@ -77,9 +77,10 @@ async function oaiFetch(
   return json ?? {};
 }
 
-// -------- Vector Search --------
+// ---------------- Vector Store search ----------------
+
 async function vectorSearch(
-  { vectorStoreId, query, maxNumResults = 28, rewriteQuery = true, scoreThreshold = 0.10 },
+  { vectorStoreId, query, maxNumResults = 30, rewriteQuery = true, scoreThreshold = 0.10 },
   apiKey
 ) {
   return await oaiFetch(
@@ -94,13 +95,14 @@ async function vectorSearch(
       }),
     },
     apiKey,
-    { beta: true } // ✅ required
+    { beta: true } // ✅ MUST
   );
 }
 
 function flattenChunks(searchJson) {
   const items = Array.isArray(searchJson?.data) ? searchJson.data : [];
   const out = [];
+
   for (const it of items) {
     const filename = it?.filename || it?.file?.filename || "";
     const score = typeof it?.score === "number" ? it.score : 0;
@@ -111,19 +113,11 @@ function flattenChunks(searchJson) {
       .join("\n")
       .trim();
     if (!text) continue;
+
     out.push({ filename, score, text });
   }
-  return out;
-}
 
-function boostScore(filename, baseScore) {
-  const f = (filename || "").toLowerCase();
-  let boost = 0;
-  if (f.includes("00_latest")) boost += 0.22;
-  if (f.includes("30_pdf_text")) boost += 0.30;
-  if (f.includes("00_people")) boost += 0.28;
-  if (f.includes("99_full")) boost += 0.10;
-  return baseScore + boost;
+  return out;
 }
 
 function isLawFeeQuestion(q) {
@@ -135,11 +129,22 @@ function wantsExactQuote(q) {
   return /\b(zkopiruj|cituj|presnou vetu|doslovn|odstavec|clanek)\b/.test(s);
 }
 
-function pickContext(chunks, userQ, limitChars = 18000) {
+function boostScore(filename, baseScore) {
+  const f = (filename || "").toLowerCase();
+  let boost = 0;
+  if (f.includes("30_pdf_text")) boost += 0.35;   // důležité pro vyhlášky
+  if (f.includes("00_people")) boost += 0.30;     // starosta, kontakty, funkce
+  if (f.includes("00_latest")) boost += 0.20;     // nejnovější
+  if (f.includes("99_full")) boost += 0.10;       // zbytek webu
+  return baseScore + boost;
+}
+
+function pickContext(chunks, userQ, limitChars = 20000) {
   const sorted = [...chunks].sort(
     (a, b) => boostScore(b.filename, b.score) - boostScore(a.filename, a.score)
   );
 
+  // Když jde o vyhlášky/poplatky → preferuj PDF_TEXT + LATEST + PEOPLE
   let ordered = sorted;
   if (isLawFeeQuestion(userQ)) {
     const pdf = sorted.filter((c) => (c.filename || "").toLowerCase().includes("30_pdf_text"));
@@ -159,12 +164,12 @@ function pickContext(chunks, userQ, limitChars = 18000) {
   const blocks = [];
 
   for (const c of ordered) {
-    const snippet = c.text.slice(0, 3000);
-    const sig = `${c.filename}::${snippet.slice(0, 240)}`;
+    const snippet = c.text.slice(0, 3200);
+    const sig = `${c.filename}::${snippet.slice(0, 250)}`;
     if (seen.has(sig)) continue;
     seen.add(sig);
 
-    const b = `[#] ${c.filename || "soubor"} (score:${c.score.toFixed(3)})\n${snippet}\n`;
+    const b = `[#] ${c.filename || "soubor"} (score:${(c.score ?? 0).toFixed(3)})\n${snippet}\n`;
     if (total + b.length > limitChars) break;
     blocks.push(b);
     total += b.length;
@@ -173,18 +178,21 @@ function pickContext(chunks, userQ, limitChars = 18000) {
   return deSeniorizeLinks(blocks.join("\n---\n").trim());
 }
 
+// ---------------- Answer generation ----------------
+
 function systemPrompt(userQ) {
   const quoteMode = wantsExactQuote(userQ);
+
   return (
-    `Jsi chytrý a praktický AI asistent obce ${OBEC_NAZEV}.\n` +
-    `Odpovídej primárně z poskytnutého kontextu (LATEST/FULL/PDF_TEXT/PEOPLE).\n` +
+    `Jsi chytrý, praktický AI asistent obce ${OBEC_NAZEV}.\n` +
+    `Odpovídej primárně z poskytnutého KONTEKSTU (LATEST/FULL/PDF_TEXT/PEOPLE).\n` +
     `Nevymýšlej fakta.\n` +
-    `Pokud se odpověď nedá doložit z kontextu, napiš přesně:\n` +
+    `Pokud odpověď nelze doložit z kontextu, napiš přesně:\n` +
     `"${HARD_FALLBACK}"\n\n` +
     `Dnes je ${todayCZ()}.\n\n` +
     (quoteMode
-      ? `Uživatel chce DOSLOVNOU citaci: vrať max 2 věty doslova z kontextu a nic navíc.\n`
-      : `Dej stručnou odpověď (1–6 bodů / 1–4 věty) a na konci 1–3 relevantní odkazy.\n`)
+      ? `Uživatel chce DOSLOVNOU citaci: vrať max 2 věty doslova z KONTEKSTU, bez omáčky.\n`
+      : `Dej věcnou odpověď (1–6 bodů / 1–4 věty) a pokud máš URL v kontextu, přidej 1–3 odkazy.\n`)
   );
 }
 
@@ -218,10 +226,10 @@ function cleanAnswer(t) {
   return s.trim();
 }
 
+// ---------------- Handler ----------------
+
 export default async function handler(req) {
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders });
-
-  const threadId = `thread_local_${Date.now()}`;
 
   try {
     if (req.method !== "POST") return jsonResponse(405, { ok: false, error: "Method not allowed" });
@@ -237,35 +245,49 @@ export default async function handler(req) {
     if (!message || typeof message !== "string") return jsonResponse(400, { ok: false, error: "Missing message" });
 
     const userQ = message.trim();
+    const threadId = (body?.thread_id && String(body.thread_id)) || `thread_local_${Date.now()}`;
 
     const queries = [
       userQ,
       normalizeCzech(userQ),
       `${userQ} obec Radim`,
-      isLawFeeQuestion(userQ) ? `${userQ} článek odstavec výše poplatku` : null,
+      isLawFeeQuestion(userQ) ? `${userQ} vyhláška článek odstavec částka` : null,
     ].filter(Boolean);
 
-    // ✅ pokud Vector Search spadne, nechceme “všechno fallback” bez důvodu,
-    // ale teď už by to padat nemělo (hlavička je správně)
-    const search = await vectorSearch(
-      { vectorStoreId, query: queries, maxNumResults: 28, rewriteQuery: true, scoreThreshold: 0.10 },
+    // 1) první pokus (rychlý, threshold)
+    let search = await vectorSearch(
+      { vectorStoreId, query: queries, maxNumResults: 30, rewriteQuery: true, scoreThreshold: 0.10 },
       apiKey
     );
+    let chunks = flattenChunks(search);
 
-    const chunks = flattenChunks(search);
+    // 2) fallback search (bez thresholdu) – když store OK, tak to něco vrátí skoro vždy
     if (!chunks.length) {
-      return jsonResponse(200, { ok: true, answer: HARD_FALLBACK, thread_id: body?.thread_id || threadId });
+      search = await vectorSearch(
+        { vectorStoreId, query: queries, maxNumResults: 50, rewriteQuery: false, scoreThreshold: 0.0 },
+        apiKey
+      );
+      chunks = flattenChunks(search);
     }
 
-    const contextText = pickContext(chunks, userQ, 18000);
+    if (!chunks.length) {
+      // Tohle znamená: store prázdný / neindexovaný / špatné VECTOR_STORE_ID
+      return jsonResponse(200, { ok: true, answer: HARD_FALLBACK, thread_id: threadId });
+    }
+
+    const contextText = pickContext(chunks, userQ, 20000);
 
     let answer = await generateAnswer({ userQ, contextText }, apiKey);
     answer = cleanAnswer(answer);
     if (!answer) answer = HARD_FALLBACK;
 
-    return jsonResponse(200, { ok: true, answer, thread_id: body?.thread_id || threadId });
+    return jsonResponse(200, { ok: true, answer, thread_id: threadId });
   } catch (err) {
-    // i tady radši vrať fallback než prázdno
-    return jsonResponse(200, { ok: true, answer: HARD_FALLBACK, thread_id: threadId });
+    // NE maskovat: tohle ti konečně ukáže, co se děje
+    return jsonResponse(500, {
+      ok: false,
+      error: "Server error",
+      details: err?.message || String(err),
+    });
   }
 }
