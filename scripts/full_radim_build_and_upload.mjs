@@ -1,9 +1,10 @@
 // scripts/full_radim_build_and_upload.mjs
-// FULL crawl + clean output + DOCUMENTS index (direct download links)
-// + build LATEST file + build PDF_TEXT file (extract text from important PDFs)
-// + upload all to OpenAI Vector Store + cleanup
+// Node 20+ doporučeno (kvůli moderním deps). Node 18 jen se starými verzemi deps.
 //
-// Requirements: Node 18+ (native fetch/FormData/Blob), deps: jsdom, pdf-parse
+// FULL crawl + LATEST + PDF_TEXT (text z důležitých PDF)
+// Upload do OpenAI Vector Store + cleanup
+//
+// Deps: jsdom, pdf-parse
 //   npm i jsdom pdf-parse
 //
 // Env:
@@ -21,10 +22,10 @@
 //   LATEST_MAX_ITEMS=40 (default)
 //
 // PDF_TEXT:
-//   PDFTEXT_MAX_PDFS=60 (default)               // how many important PDFs to extract daily
-//   PDFTEXT_MAX_BYTES=6000000 (default)         // max PDF size (6 MB)
-//   PDFTEXT_MAX_CHARS_PER_PDF=65000 (default)   // max extracted chars per PDF
-//   PDFTEXT_CONCURRENCY=2 (default)             // parallel PDF fetch+parse
+//   PDFTEXT_MAX_PDFS=60 (default)
+//   PDFTEXT_MAX_BYTES=6000000 (default)         // 6 MB
+//   PDFTEXT_MAX_CHARS_PER_PDF=65000 (default)
+//   PDFTEXT_CONCURRENCY=2 (default)
 //   CLEANUP_OLD_PDFTEXT=1 (default) | 0
 //   KEEP_LATEST_PDFTEXT=3 (default)
 //
@@ -113,13 +114,6 @@ function normalizeUrl(url) {
 function isProbablyBinary(url) {
   return /\.(jpg|jpeg|png|webp|gif|svg|mp4|webm|avi|mov|mp3|wav|zip|rar|7z|tar|gz|bz2|exe|dmg)$/i.test(url);
 }
-function isPdfUrl(u) {
-  const s = String(u || "");
-  return /\.pdf(\?.*)?$/i.test(s) || (/e_download\.php/i.test(s) && /original=.*\.pdf/i.test(s));
-}
-function isDownloadDoc(url) {
-  return /\.(pdf|doc|docx|xls|xlsx|odt|ods|ppt|pptx|rtf|txt|csv|zip)(\?.*)?$/i.test(url) || /e_download\.php/i.test(url);
-}
 function isMailtoOrTel(url) {
   return /^mailto:/i.test(url) || /^tel:/i.test(url);
 }
@@ -128,6 +122,40 @@ function looksLikeLoginOrAdmin(url) {
 }
 function looksLikeGalleryHeavy(url) {
   return /\/fotogalerie\b/i.test(url);
+}
+
+// ✅ robustní pdf detekce (URL i parametry)
+function looksLikePdfUrl(u) {
+  const s = String(u || "");
+  if (/\.pdf(\?.*)?$/i.test(s)) return true;
+
+  // e_download.php?file=...pdf
+  if (/e_download\.php/i.test(s)) {
+    try {
+      const url = new URL(s);
+      const file = url.searchParams.get("file") || "";
+      const orig = url.searchParams.get("original") || "";
+      if (/\.pdf$/i.test(orig)) return true;
+      if (/\.pdf$/i.test(file)) return true;
+      if (/\.pdf/i.test(file)) return true; // někdy je to encoded
+    } catch {
+      // ignore
+      if (/\.pdf/i.test(s)) return true;
+    }
+  }
+
+  // evt_file.php apod.
+  if (/evt_file\.php/i.test(s) && /\.pdf/i.test(s)) return true;
+
+  return false;
+}
+
+function isDownloadDoc(url) {
+  return (
+    /\.(pdf|doc|docx|xls|xlsx|odt|ods|ppt|pptx|rtf|txt|csv|zip)(\?.*)?$/i.test(url) ||
+    /e_download\.php/i.test(url) ||
+    /evt_file\.php/i.test(url)
+  );
 }
 
 function stripWeirdWhitespace(s) {
@@ -158,6 +186,36 @@ function dedupeAdjacentLines(text) {
 }
 function sha1(s) {
   return crypto.createHash("sha1").update(String(s || "")).digest("hex");
+}
+
+function findDateInText(s) {
+  if (!s) return null;
+
+  let m = s.match(/\b(\d{1,2})\.\s*(\d{1,2})\.\s*(\d{4})\b/);
+  if (m) {
+    const dd = String(m[1]).padStart(2, "0");
+    const mm = String(m[2]).padStart(2, "0");
+    const yyyy = m[3];
+    return `${yyyy}-${mm}-${dd}`;
+  }
+
+  m = s.match(/\b(\d{4})-(\d{2})-(\d{2})\b/);
+  if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+
+  return null;
+}
+
+function classifyDocType(titleOrUrl) {
+  const s = (titleOrUrl || "").toLowerCase();
+  if (s.includes("vyhláška") || s.includes("obecně závazná vyhláška") || s.includes("ozv")) return "VYHLÁŠKA";
+  if (s.includes("nařízení")) return "NAŘÍZENÍ";
+  if (s.includes("zpravodaj")) return "ZPRAVODAJ";
+  if (s.includes("úřední deska") || s.includes("uredni-deska") || s.includes("záměr") || s.includes("zamer"))
+    return "ÚŘEDNÍ_DESKA";
+  if (s.includes("rozpočet") || s.includes("rozpočt") || s.includes("rozpoct")) return "ROZPOČET";
+  if (s.includes("formulář") || s.includes("formular")) return "FORMULÁŘ";
+  if (s.includes("svoz") || s.includes("odpady") || s.includes("bioodpad")) return "ODPADY";
+  return "DOKUMENT";
 }
 
 function isJunkLine(line) {
@@ -215,36 +273,6 @@ function pickTitle(doc) {
   if (h1) return h1;
   const t = doc.querySelector("title")?.textContent?.trim();
   return t || "";
-}
-
-function findDateInText(s) {
-  if (!s) return null;
-
-  let m = s.match(/\b(\d{1,2})\.\s*(\d{1,2})\.\s*(\d{4})\b/);
-  if (m) {
-    const dd = String(m[1]).padStart(2, "0");
-    const mm = String(m[2]).padStart(2, "0");
-    const yyyy = m[3];
-    return `${yyyy}-${mm}-${dd}`;
-  }
-
-  m = s.match(/\b(\d{4})-(\d{2})-(\d{2})\b/);
-  if (m) return `${m[1]}-${m[2]}-${m[3]}`;
-
-  return null;
-}
-
-function classifyDocType(titleOrUrl) {
-  const s = (titleOrUrl || "").toLowerCase();
-  if (s.includes("vyhláška") || s.includes("obecně závazná vyhláška") || s.includes("ozv")) return "VYHLÁŠKA";
-  if (s.includes("nařízení")) return "NAŘÍZENÍ";
-  if (s.includes("zpravodaj")) return "ZPRAVODAJ";
-  if (s.includes("úřední deska") || s.includes("uredni-deska") || s.includes("záměr") || s.includes("zamer"))
-    return "ÚŘEDNÍ_DESKA";
-  if (s.includes("rozpočet") || s.includes("rozpočt") || s.includes("rozpoct")) return "ROZPOČET";
-  if (s.includes("formulář") || s.includes("formular")) return "FORMULÁŘ";
-  if (s.includes("svoz") || s.includes("odpady") || s.includes("bioodpad")) return "ODPADY";
-  return "DOKUMENT";
 }
 
 function extractMainTextFromHtml(html) {
@@ -362,7 +390,7 @@ function extractLinksAndDownloads(html, currentUrl) {
       return;
     }
 
-    if (isProbablyBinary(nu) && !isPdfUrl(nu)) return;
+    if (isProbablyBinary(nu) && !looksLikePdfUrl(nu)) return;
     urls.add(nu);
   });
 
@@ -379,8 +407,12 @@ async function fetchWithTimeout(url, opts = {}) {
   }
 }
 function isHtmlResponse(r) {
-  const ct = r.headers.get("content-type") || "";
+  const ct = (r.headers.get("content-type") || "").toLowerCase();
   return ct.includes("text/html") || ct.includes("application/xhtml+xml");
+}
+function isPdfResponse(r) {
+  const ct = (r.headers.get("content-type") || "").toLowerCase();
+  return ct.includes("application/pdf");
 }
 
 /* ============================================================
@@ -412,13 +444,7 @@ async function buildLatestFile(latestPath, pages, docs) {
     .map((p) => {
       const date = pickBestDateForPage(p);
       const snippet = (p.content || "").split("\n").slice(0, 12).join("\n").trim();
-      return {
-        kind: "PAGE",
-        date: date || "",
-        title: (p.title || "").trim(),
-        url: p.url,
-        snippet,
-      };
+      return { kind: "PAGE", date: date || "", title: (p.title || "").trim(), url: p.url, snippet };
     });
 
   const docItems = (docs || [])
@@ -482,8 +508,7 @@ async function buildLatestFile(latestPath, pages, docs) {
     }
   }
 
-  const text = header + body.trim() + "\n";
-  await fs.writeFile(latestPath, text, "utf-8");
+  await fs.writeFile(latestPath, (header + body.trim() + "\n").trim() + "\n", "utf-8");
   console.log("LATEST written:", latestPath);
 }
 
@@ -495,14 +520,11 @@ function isImportantPdfDoc(d) {
   const t = String(d?.type || "").toUpperCase();
   const s = `${d?.title || ""} ${d?.foundOn || ""} ${d?.url || ""}`.toLowerCase();
 
-  // Primárně vyhlášky/nařízení + odpady/poplatky
   if (t.includes("VYHLÁŠKA") || t.includes("NAŘÍZENÍ") || t.includes("ODPADY")) return true;
-
-  // Úřední deska / rozpočty často obsahují pravidla i částky
   if (t.includes("ÚŘEDNÍ_DESKA") || t.includes("ROZPOČET")) return true;
 
-  // Textové signály
-  if (s.includes("poplatek") || s.includes("odpad") || s.includes("psů") || s.includes("psu") || s.includes("vyhl")) return true;
+  if (s.includes("poplatek") || s.includes("odpad") || s.includes("psů") || s.includes("psu") || s.includes("vyhl"))
+    return true;
 
   return false;
 }
@@ -510,9 +532,16 @@ function isImportantPdfDoc(d) {
 async function fetchPdfBuffer(url) {
   const r = await fetchWithTimeout(url, {
     redirect: "follow",
-    headers: { "User-Agent": "RadimFullCrawler/2.4 (pdf)" },
+    headers: { "User-Agent": "RadimFullCrawler/2.5 (pdf)" },
   });
   if (!r.ok) throw new Error(`PDF fetch failed ${r.status}`);
+
+  // ✅ tady je zásadní rozdíl: ověřujeme content-type
+  if (!isPdfResponse(r)) {
+    const ct = r.headers.get("content-type") || "";
+    throw new Error(`Not a PDF by content-type: ${ct}`);
+  }
+
   const ab = await r.arrayBuffer();
   return Buffer.from(ab);
 }
@@ -520,36 +549,40 @@ async function fetchPdfBuffer(url) {
 async function extractPdfTextFromUrl(url) {
   const buf = await fetchPdfBuffer(url);
 
-  if (buf.length > PDFTEXT_MAX_BYTES) {
-    throw new Error(`PDF too large: ${buf.length} bytes`);
-  }
+  if (buf.length > PDFTEXT_MAX_BYTES) throw new Error(`PDF too large: ${buf.length} bytes`);
 
   const parsed = await pdfParse(buf);
   let text = stripWeirdWhitespace(parsed?.text || "");
 
-  // když je to sken bez textové vrstvy, text bude prázdný
-  if (text.length < 200) {
-    throw new Error("PDF has almost no extractable text (likely scanned image)");
-  }
+  if (text.length < 200) throw new Error("PDF has almost no extractable text (likely scanned image)");
 
   if (text.length > PDFTEXT_MAX_CHARS_PER_PDF) {
     text = text.slice(0, PDFTEXT_MAX_CHARS_PER_PDF) + "\n\n[ZKRÁCENO]";
   }
-
   return text;
 }
 
 async function buildPdfTextFile(pdfTextPath, docs) {
   await fs.mkdir(path.dirname(pdfTextPath), { recursive: true });
 
+  // kandidáti: primárně URL co vypadají jako PDF, ale když je vyhláška/odpady a je to download,
+  // tak to zkusíme taky (a necháme rozhodnout content-type)
   const candidates = (docs || [])
-    .filter((d) => d?.url && isPdfUrl(d.url))
+    .filter((d) => d?.url)
+    .filter((d) => {
+      if (looksLikePdfUrl(d.url)) return true;
+      // fallback: vyhláška/odpady přes download linky, které nemají pdf v URL
+      if (isImportantPdfDoc(d) && /e_download\.php|evt_file\.php/i.test(d.url)) return true;
+      return false;
+    })
     .filter(isImportantPdfDoc);
 
-  // nejdřív nejnovější
-  candidates.sort((a, b) => (String(b.date || "").localeCompare(String(a.date || "")) || String(a.title || "").localeCompare(String(b.title || ""))));
+  candidates.sort(
+    (a, b) =>
+      String(b.date || "").localeCompare(String(a.date || "")) ||
+      String(a.title || "").localeCompare(String(b.title || ""))
+  );
 
-  // odduplikuj podle URL
   const uniq = [];
   const seen = new Set();
   for (const d of candidates) {
@@ -566,14 +599,13 @@ async function buildPdfTextFile(pdfTextPath, docs) {
     `Zdroj: ${SITE_BASE_URL}`,
     ``,
     `Tento soubor obsahuje TEXT extrahovaný z vybraných PDF (vyhlášky, nařízení, odpady, poplatky, úřední deska…).`,
-    `Pozn.: Pokud je PDF pouze sken bez textové vrstvy, nebude zde obsah (bude hláška).`,
+    `Pozn.: Pokud je PDF pouze sken bez textové vrstvy, bude zde hláška [NELZE EXTRAHOVAT TEXT].`,
     ``,
     `==============================`,
     `=== PDF TEXT (${picked.length})`,
     ``,
   ].join("\n");
 
-  // jednoduchý worker pool kvůli výkonu
   const results = new Array(picked.length).fill(null);
 
   let idx = 0;
@@ -600,14 +632,13 @@ async function buildPdfTextFile(pdfTextPath, docs) {
         results[i] = `${meta}\n[NELZE EXTRAHOVAT TEXT] ${e?.message || String(e)}\n`;
       }
 
-      // malé uvolnění
       if (i % 5 === 0) await sleep(50);
     }
   }
 
   await Promise.all(Array.from({ length: PDFTEXT_CONCURRENCY }, () => worker()));
 
-  const final = header + results.join("\n") + "\n";
+  const final = (header + results.join("\n") + "\n").trim() + "\n";
   await fs.writeFile(pdfTextPath, final, "utf-8");
   console.log("PDFTEXT written:", pdfTextPath);
 }
@@ -644,12 +675,12 @@ async function buildFullKnowledgeFile(outPath) {
 
       if (looksLikeLoginOrAdmin(url)) continue;
       if (looksLikeGalleryHeavy(url)) continue;
-      if (isProbablyBinary(url) && !isPdfUrl(url)) continue;
+      if (isProbablyBinary(url) && !looksLikePdfUrl(url)) continue;
 
       try {
         const r = await fetchWithTimeout(url, {
           redirect: "follow",
-          headers: { "User-Agent": "RadimFullCrawler/2.4" },
+          headers: { "User-Agent": "RadimFullCrawler/2.5" },
         });
 
         if (!r.ok) {
@@ -657,15 +688,17 @@ async function buildFullKnowledgeFile(outPath) {
           continue;
         }
 
-        // PDF stránka jako stránka neřešíme, ale přidáme do documents
-        if (isPdfUrl(url) && !documents.has(url)) {
-          documents.set(url, {
-            url,
-            title: path.basename(new URL(url).pathname),
-            date: findDateInText(url),
-            type: classifyDocType(url),
-            foundOn: "",
-          });
+        // ✅ Pokud server vrátí PDF (podle content-type), přidáme mezi docs a dál neparsujeme jako HTML
+        if (isPdfResponse(r)) {
+          if (!documents.has(url)) {
+            documents.set(url, {
+              url,
+              title: path.basename(new URL(url).pathname) || "dokument.pdf",
+              date: findDateInText(url),
+              type: classifyDocType(url),
+              foundOn: "",
+            });
+          }
           processed++;
           continue;
         }
@@ -731,7 +764,7 @@ async function buildFullKnowledgeFile(outPath) {
 
         if (processed % 30 === 0) await sleep(120);
       } catch {
-        // swallow (timeouts etc.)
+        // ignore
       }
     }
   }
@@ -789,7 +822,7 @@ async function buildFullKnowledgeFile(outPath) {
     pagesBlock += `CONTENT:\n${p.content}\n\n`;
   }
 
-  const finalText = header + docsBlock + pagesBlock;
+  const finalText = (header + docsBlock + pagesBlock).trim() + "\n";
   await fs.writeFile(outPath, finalText, "utf-8");
 
   console.log("FULL written:", outPath);
@@ -933,14 +966,7 @@ async function buildIndexForCleanup(items) {
 
 async function cleanupByPrefix(prefixName, keepN, matchFn) {
   const items = await listAllVectorStoreFiles(100);
-  console.log(`Vector store files (ALL): ${items.length}`);
-
   const indexed = await buildIndexForCleanup(items);
-
-  console.log("== VS FILES DEBUG ==");
-  for (const x of indexed) {
-    console.log("-", x.filename || "(no-filename)", "| created_at:", x.created_at, "| vsId:", x.vsId, "| fileId:", x.fileId);
-  }
 
   const matched = indexed.filter((x) => matchFn(x.filename));
   matched.sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
@@ -949,7 +975,6 @@ async function cleanupByPrefix(prefixName, keepN, matchFn) {
   console.log(`${prefixName} in store: ${matched.length}, keeping: ${Math.min(keepN, matched.length)}, deleting: ${toDelete.length}`);
 
   for (const d of toDelete) {
-    console.log(`Deleting ${prefixName}:`, d.filename, "| vsId:", d.vsId);
     await deleteVectorStoreFile(d.vsId);
   }
 }
@@ -982,57 +1007,30 @@ export async function main() {
   const latestStat = await fs.stat(latestPath);
   if (latestStat.size < 5_000) throw new Error(`LATEST file too small (${latestStat.size} bytes) – refusing upload`);
 
-  // Build PDF text from important PDFs
   console.log("Building PDF TEXT...");
   await buildPdfTextFile(pdfTextPath, docs);
+
   const pdfTextStat = await fs.stat(pdfTextPath);
-  if (pdfTextStat.size < 2_000) {
-    // neházej fatal, ale zaloguj (když by všechny PDF byly skeny, může to být malé)
-    console.log(`WARN: PDFTEXT file small (${pdfTextStat.size} bytes). Uploading anyway.`);
+  console.log("PDFTEXT size:", pdfTextStat.size, "bytes");
+  if (pdfTextStat.size < 20_000) {
+    console.log("WARN: PDFTEXT is still small -> znamená to, že většina PDF nemá textovou vrstvu, nebo se nenašly PDF kandidáti.");
   }
 
-  // Upload FULL
   console.log("Uploading FULL...");
   const fileId = await uploadFileToOpenAI(fullPath);
-  console.log("Uploaded FULL file_id:", fileId);
+  await attachToVectorStore(fileId);
 
-  console.log("Attaching FULL...");
-  const vsAttach = await attachToVectorStore(fileId);
-  console.log("Attached FULL (vs_file_id):", vsAttach?.id || "(no id)");
-
-  // Upload LATEST
   console.log("Uploading LATEST...");
   const latestFileId = await uploadFileToOpenAI(latestPath);
-  console.log("Uploaded LATEST file_id:", latestFileId);
+  await attachToVectorStore(latestFileId);
 
-  console.log("Attaching LATEST...");
-  const vsAttachLatest = await attachToVectorStore(latestFileId);
-  console.log("Attached LATEST (vs_file_id):", vsAttachLatest?.id || "(no id)");
-
-  // Upload PDFTEXT
   console.log("Uploading PDFTEXT...");
   const pdfTextFileId = await uploadFileToOpenAI(pdfTextPath);
-  console.log("Uploaded PDFTEXT file_id:", pdfTextFileId);
+  await attachToVectorStore(pdfTextFileId);
 
-  console.log("Attaching PDFTEXT...");
-  const vsAttachPdfText = await attachToVectorStore(pdfTextFileId);
-  console.log("Attached PDFTEXT (vs_file_id):", vsAttachPdfText?.id || "(no id)");
-
-  // Cleanup
-  if (CLEANUP_OLD) {
-    console.log("Cleanup old FULL files...");
-    await cleanupByPrefix("FULL", KEEP_LATEST, isFullName);
-  }
-
-  if (CLEANUP_OLD_LATEST) {
-    console.log("Cleanup old LATEST files...");
-    await cleanupByPrefix("LATEST", KEEP_LATEST_LATEST, isLatestName);
-  }
-
-  if (CLEANUP_OLD_PDFTEXT) {
-    console.log("Cleanup old PDFTEXT files...");
-    await cleanupByPrefix("PDFTEXT", KEEP_LATEST_PDFTEXT, isPdfTextName);
-  }
+  if (CLEANUP_OLD) await cleanupByPrefix("FULL", KEEP_LATEST, isFullName);
+  if (CLEANUP_OLD_LATEST) await cleanupByPrefix("LATEST", KEEP_LATEST_LATEST, isLatestName);
+  if (CLEANUP_OLD_PDFTEXT) await cleanupByPrefix("PDFTEXT", KEEP_LATEST_PDFTEXT, isPdfTextName);
 
   console.log("DONE ✅");
 }
