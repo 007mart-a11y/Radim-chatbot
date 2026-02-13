@@ -14,6 +14,9 @@ const OPENAI_BASE_URL = "https://api.openai.com/v1";
 const OBEC_NAZEV = "Radim";
 const HARD_FALLBACK = "Tato informace není v dostupných podkladech obce Radim uvedena.";
 
+// IMPORTANT: Vector Stores endpoints require this
+const OPENAI_BETA = { "OpenAI-Beta": "assistants=v2" };
+
 function jsonResponse(status, data) {
   return new Response(JSON.stringify(data), {
     status,
@@ -40,12 +43,18 @@ function deSeniorizeLinks(s) {
   return String(s || "").replace(/https:\/\/www\.obec-radim\.cz\/seniori\//gi, "https://www.obec-radim.cz/");
 }
 
-async function oaiFetch(path, { method = "GET", headers = {}, body } = {}, apiKey) {
+async function oaiFetch(
+  path,
+  { method = "GET", headers = {}, body } = {},
+  apiKey,
+  { beta = false } = {}
+) {
   const res = await fetch(`${OPENAI_BASE_URL}${path}`, {
     method,
     headers: {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
+      ...(beta ? OPENAI_BETA : {}),
       ...headers,
     },
     body,
@@ -84,7 +93,8 @@ async function vectorSearch(
         ranking_options: { ranker: "auto", score_threshold: scoreThreshold },
       }),
     },
-    apiKey
+    apiKey,
+    { beta: true } // ✅ required
   );
 }
 
@@ -125,7 +135,7 @@ function wantsExactQuote(q) {
   return /\b(zkopiruj|cituj|presnou vetu|doslovn|odstavec|clanek)\b/.test(s);
 }
 
-function pickContext(chunks, userQ, limitChars = 16000) {
+function pickContext(chunks, userQ, limitChars = 18000) {
   const sorted = [...chunks].sort(
     (a, b) => boostScore(b.filename, b.score) - boostScore(a.filename, a.score)
   );
@@ -134,12 +144,14 @@ function pickContext(chunks, userQ, limitChars = 16000) {
   if (isLawFeeQuestion(userQ)) {
     const pdf = sorted.filter((c) => (c.filename || "").toLowerCase().includes("30_pdf_text"));
     const latest = sorted.filter((c) => (c.filename || "").toLowerCase().includes("00_latest"));
+    const people = sorted.filter((c) => (c.filename || "").toLowerCase().includes("00_people"));
     const rest = sorted.filter(
       (c) =>
         !(c.filename || "").toLowerCase().includes("30_pdf_text") &&
-        !(c.filename || "").toLowerCase().includes("00_latest")
+        !(c.filename || "").toLowerCase().includes("00_latest") &&
+        !(c.filename || "").toLowerCase().includes("00_people")
     );
-    ordered = [...pdf, ...latest, ...rest];
+    ordered = [...pdf, ...latest, ...people, ...rest];
   }
 
   const seen = new Set();
@@ -147,7 +159,7 @@ function pickContext(chunks, userQ, limitChars = 16000) {
   const blocks = [];
 
   for (const c of ordered) {
-    const snippet = c.text.slice(0, 2600);
+    const snippet = c.text.slice(0, 3000);
     const sig = `${c.filename}::${snippet.slice(0, 240)}`;
     if (seen.has(sig)) continue;
     seen.add(sig);
@@ -164,14 +176,15 @@ function pickContext(chunks, userQ, limitChars = 16000) {
 function systemPrompt(userQ) {
   const quoteMode = wantsExactQuote(userQ);
   return (
-    `Jsi chytrý, praktický AI asistent obce ${OBEC_NAZEV}.\n` +
+    `Jsi chytrý a praktický AI asistent obce ${OBEC_NAZEV}.\n` +
     `Odpovídej primárně z poskytnutého kontextu (LATEST/FULL/PDF_TEXT/PEOPLE).\n` +
-    `Nevymýšlej fakta. Pokud se odpověď nedá doložit z kontextu, napiš přesně:\n` +
+    `Nevymýšlej fakta.\n` +
+    `Pokud se odpověď nedá doložit z kontextu, napiš přesně:\n` +
     `"${HARD_FALLBACK}"\n\n` +
     `Dnes je ${todayCZ()}.\n\n` +
     (quoteMode
       ? `Uživatel chce DOSLOVNOU citaci: vrať max 2 věty doslova z kontextu a nic navíc.\n`
-      : `Dej stručnou odpověď + na konci 1–3 relevantní odkazy (ne seniorské).\n`)
+      : `Dej stručnou odpověď (1–6 bodů / 1–4 věty) a na konci 1–3 relevantní odkazy.\n`)
   );
 }
 
@@ -189,10 +202,10 @@ async function generateAnswer({ userQ, contextText }, apiKey) {
         ],
       }),
     },
-    apiKey
+    apiKey,
+    { beta: false }
   );
 
-  // ✅ správné čtení pro Responses API
   const text = String(resp?.output_text || "").trim();
   return deSeniorizeLinks(text);
 }
@@ -225,7 +238,6 @@ export default async function handler(req) {
 
     const userQ = message.trim();
 
-    // 1) předvyhledávání
     const queries = [
       userQ,
       normalizeCzech(userQ),
@@ -233,43 +245,27 @@ export default async function handler(req) {
       isLawFeeQuestion(userQ) ? `${userQ} článek odstavec výše poplatku` : null,
     ].filter(Boolean);
 
+    // ✅ pokud Vector Search spadne, nechceme “všechno fallback” bez důvodu,
+    // ale teď už by to padat nemělo (hlavička je správně)
     const search = await vectorSearch(
       { vectorStoreId, query: queries, maxNumResults: 28, rewriteQuery: true, scoreThreshold: 0.10 },
       apiKey
     );
 
     const chunks = flattenChunks(search);
-
     if (!chunks.length) {
       return jsonResponse(200, { ok: true, answer: HARD_FALLBACK, thread_id: body?.thread_id || threadId });
     }
 
-    const contextText = pickContext(chunks, userQ, 16000);
+    const contextText = pickContext(chunks, userQ, 18000);
 
-    // 2) odpověď
-    let answer;
-    try {
-      answer = await generateAnswer({ userQ, contextText }, apiKey);
-    } catch (e) {
-      // ✅ když OpenAI spadne, UI nesmí vidět “Bez odpovědi”
-      return jsonResponse(200, {
-        ok: true,
-        answer: HARD_FALLBACK,
-        thread_id: body?.thread_id || threadId,
-      });
-    }
-
+    let answer = await generateAnswer({ userQ, contextText }, apiKey);
     answer = cleanAnswer(answer);
-
     if (!answer) answer = HARD_FALLBACK;
 
     return jsonResponse(200, { ok: true, answer, thread_id: body?.thread_id || threadId });
   } catch (err) {
-    // i tady radši vrať fallback než nic (kvůli UI)
-    return jsonResponse(200, {
-      ok: true,
-      answer: HARD_FALLBACK,
-      thread_id: body?.thread_id || threadId,
-    });
+    // i tady radši vrať fallback než prázdno
+    return jsonResponse(200, { ok: true, answer: HARD_FALLBACK, thread_id: threadId });
   }
 }
