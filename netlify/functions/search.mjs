@@ -12,7 +12,6 @@ const corsHeaders = {
 
 const OPENAI_BASE_URL = "https://api.openai.com/v1";
 const OBEC_NAZEV = "Radim";
-
 const HARD_FALLBACK = "Tato informace není v dostupných podkladech obce Radim uvedena.";
 
 function jsonResponse(status, data) {
@@ -65,9 +64,35 @@ async function oaiFetch(path, { method = "GET", headers = {}, body } = {}, apiKe
   return json ?? {};
 }
 
-// Vector Store Search
+// ---------- intent helpers ----------
+function isQuoteRequest(q) {
+  const s = normalizeCzech(q);
+  return /\b(cituj|zcopyruj|zkopiruj|presnou vetu|presny text|doslova|max\s*\d+\s*vety|clanek|odstavec)\b/.test(s);
+}
+function isDogFee(q) {
+  const s = normalizeCzech(q);
+  return /\b(poplatek)\b/.test(s) && /\b(pes|psy|psu|psů)\b/.test(s);
+}
+function isWasteFee(q) {
+  const s = normalizeCzech(q);
+  return /\b(poplatek)\b/.test(s) && /\b(odpad|odpadu|odpadoveho|odpadového)\b/.test(s);
+}
+function isBylawLike(q) {
+  const s = normalizeCzech(q);
+  return /\b(vyhlaska|vyhlasky|obecne zavazna|ozv|narizeni|pravni predpis)\b/.test(s);
+}
+function wantsLatest(q) {
+  const s = normalizeCzech(q);
+  return /\b(nejnovejsi|nejnovější|posledni|poslední|aktualni|aktuální|dnes)\b/.test(s);
+}
+function looksLikePeople(q) {
+  const s = normalizeCzech(q);
+  return /\b(starosta|starostka|mistostarosta|mistostarostka|predseda|predsedkyne|tajemnik|spravce|správce|kontakt)\b/.test(s);
+}
+
+// ---------- vector search ----------
 async function vectorSearch(
-  { vectorStoreId, query, maxNumResults = 30, rewriteQuery = true, scoreThreshold = 0.1 },
+  { vectorStoreId, query, maxNumResults = 40, rewriteQuery = true, scoreThreshold = 0.1 },
   apiKey
 ) {
   return await oaiFetch(
@@ -88,36 +113,6 @@ async function vectorSearch(
   );
 }
 
-function isQuoteRequest(q) {
-  const s = normalizeCzech(q);
-  return /\b(cituj|zcopyruj|zkopiruj|presnou vetu|presny text|doslova|max\s*\d+\s*vety|clanek|odstavec)\b/.test(s);
-}
-
-function isDogFee(q) {
-  const s = normalizeCzech(q);
-  return /\b(poplatek)\b/.test(s) && /\b(pes|psy|psu|psů)\b/.test(s);
-}
-
-function isWasteFee(q) {
-  const s = normalizeCzech(q);
-  return /\b(poplatek)\b/.test(s) && /\b(odpad|odpadu|odpadoveho|odpadového)\b/.test(s);
-}
-
-function isBylawLike(q) {
-  const s = normalizeCzech(q);
-  return /\b(vyhlaska|vyhlasky|obecne zavazna|ozv|narizeni|pravni predpis)\b/.test(s);
-}
-
-function wantsLatest(q) {
-  const s = normalizeCzech(q);
-  return /\b(nejnovejsi|nejnovější|posledni|poslední|aktualni|aktuální|dnes)\b/.test(s);
-}
-
-function looksLikePeople(q) {
-  const s = normalizeCzech(q);
-  return /\b(starosta|starostka|mistostarosta|mistostarostka|predseda|predsedkyne|tajemnik|spravce|správce|kontakt)\b/.test(s);
-}
-
 function scoreNum(x) {
   return typeof x === "number" ? x : 0;
 }
@@ -130,8 +125,6 @@ function pickTopChunks(searchJson, userQ, limit = 14) {
   const qDog = isDogFee(userQ);
   const qWaste = isWasteFee(userQ);
   const qBylaw = isBylawLike(userQ);
-
-  // preferuj PDFTEXT pro vyhlášky / poplatky / citace
   const preferPdfText = qQuote || qBylaw || qDog || qWaste;
 
   const expanded = [];
@@ -157,40 +150,27 @@ function pickTopChunks(searchJson, userQ, limit = 14) {
     if (wantsLatest(userQ) && isLatest) boost += 0.2;
     if (looksLikePeople(userQ) && isPeople) boost += 0.2;
 
-    // penalizuj územní plán / OUP pro poplatky
     if ((qDog || qWaste || qBylaw || qQuote) && /oup|uzemni plan|územní plán/i.test(filename)) boost -= 0.35;
 
-    expanded.push({
-      filename,
-      score,
-      boosted: score + boost,
-      text,
-    });
+    expanded.push({ filename, score, boosted: score + boost, text });
   }
 
   expanded.sort((a, b) => (b.boosted || 0) - (a.boosted || 0));
 
-  // Context budget (abychom nepřestřelili tokens)
   const maxChars = preferPdfText ? 32000 : 24000;
   const out = [];
   let used = 0;
 
   for (const e of expanded) {
-    // u PDFTEXT dovol delší úryvek, ať se tam vejde věta pro citaci
     const perItemLimit = /30_PDF_TEXT_/i.test(e.filename) ? 9000 : 4500;
-
     const slice = e.text.slice(0, perItemLimit).trim();
     if (!slice) continue;
 
     const nextCost = slice.length + 200;
     if (out.length >= limit) break;
-    if (used + nextCost > maxChars && out.length >= 6) break; // aspoň něco nechat
+    if (used + nextCost > maxChars && out.length >= 6) break;
 
-    out.push({
-      filename: e.filename,
-      score: e.score,
-      text: slice,
-    });
+    out.push({ filename: e.filename, score: e.score, text: slice });
     used += nextCost;
   }
 
@@ -217,13 +197,37 @@ function systemPrompt(userQ) {
     `- Nevymýšlej fakta, jména, částky ani kontakty.\n` +
     `- Když to z kontextu nejde doložit, napiš přesně: "${HARD_FALLBACK}"\n\n` +
     `Styl:\n` +
-    `- stručně a věcně (1–8 bodů nebo 1–6 vět)\n` +
-    `- když jde o postup, napiš kroky\n` +
-    `- datum vždy DD. MM. RRRR (pokud v kontextu je)\n\n` +
+    `- stručně a věcně\n` +
+    `- datum uváděj, pokud je v kontextu\n\n` +
     (quoteMode
-      ? `Speciální režim citace:\n- Pokud uživatel chce citaci/„přesnou větu“, cituj MAX 2 věty DOSLOVA z kontextu.\n- Pokud v kontextu přesná věta není, vrať fallback.\n\n`
+      ? `Režim citace:\n- Pokud uživatel chce citaci/přesnou větu, cituj MAX 2 věty DOSLOVA z kontextu.\n- Pokud v kontextu přesná věta není, vrať fallback.\n\n`
       : "")
   );
+}
+
+// ✅ ROBUST extractor: posbírá všechna output_text kdekoliv v JSON
+function extractAllOutputText(resp) {
+  const out = [];
+
+  function walk(x) {
+    if (!x) return;
+    if (Array.isArray(x)) {
+      for (const v of x) walk(v);
+      return;
+    }
+    if (typeof x === "object") {
+      // Responses API: {type:"output_text", text:"..."}
+      if (x.type === "output_text" && typeof x.text === "string") out.push(x.text);
+
+      // některé varianty vrací message content s text.value
+      if (x.type === "text" && x.text && typeof x.text.value === "string") out.push(x.text.value);
+
+      for (const k of Object.keys(x)) walk(x[k]);
+    }
+  }
+
+  walk(resp);
+  return out.join("\n").trim();
 }
 
 async function generateAnswer({ userMessage, contextBlock }, apiKey) {
@@ -243,20 +247,11 @@ async function generateAnswer({ userMessage, contextBlock }, apiKey) {
     apiKey
   );
 
-  const out = Array.isArray(resp?.output) ? resp.output : [];
-  const msg = out.find((x) => x?.type === "message");
-  const content = Array.isArray(msg?.content) ? msg.content : [];
-  const text = content
-    .map((c) => (c?.type === "output_text" ? c.text : ""))
-    .filter(Boolean)
-    .join("\n")
-    .trim();
-
-  return text || HARD_FALLBACK;
+  const text = extractAllOutputText(resp);
+  return text || HARD_FALLBACK; // ✅ pojistka
 }
 
 function forceNonSeniorUrls(t) {
-  // všechno /seniori/ přesměruj na klasiku
   return String(t || "")
     .replace(/https:\/\/www\.obec-radim\.cz\/seniori\//gi, "https://www.obec-radim.cz/")
     .replace(/https:\/\/obec-radim\.cz\/seniori\//gi, "https://www.obec-radim.cz/");
@@ -265,23 +260,20 @@ function forceNonSeniorUrls(t) {
 function cleanAnswer(t) {
   let s = String(t || "");
 
-  // pryč citace ve formátu 【…†…】
   s = s.replace(/【\s*\d+\s*:\s*\d+\s*†[^】]*】/g, "");
 
-  // nepouštěj ven názvy interních souborů jako „odkazy“
+  // nenech ven v odpovědi "odkazy" na interní soubory
   s = s.replace(/^\s*-\s*00_PEOPLE_[^\n]+\n?/gim, "");
   s = s.replace(/^\s*00_PEOPLE_[^\n]+\n?/gim, "");
 
   s = forceNonSeniorUrls(s);
 
-  // úklid whitespace
   s = s.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
 
-  return s.trim();
+  return s.trim() || HARD_FALLBACK; // ✅ pojistka #2
 }
 
 function badGeneralAdvice(answer) {
-  // jemné – jen očividné kecy
   return /(pravděpodobně|mohlo by|nejsem si jist|zkuste si dohledat)/i.test(answer);
 }
 
@@ -289,13 +281,8 @@ function buildQueries(userQ) {
   const q = String(userQ || "").trim();
   const n = normalizeCzech(q);
 
-  const queries = [
-    q,
-    n,
-    `${q} obec Radim`,
-  ];
+  const queries = [q, n, `${q} obec Radim`];
 
-  // ROUTING pro poplatky/vyhlášky → donutit retrieval do PDFTEXT a správných dokumentů
   if (isDogFee(q) || (isBylawLike(q) && /ps/i.test(n))) {
     queries.push(
       "místní poplatek ze psů Radim vyhláška článek sazba",
@@ -324,7 +311,6 @@ function buildQueries(userQ) {
     queries.push("00_LATEST Radim úřední deska nejnovější", "nejnovější vyvěšeno Radim úřední deska");
   }
 
-  // odduplikuj
   return Array.from(new Set(queries.map((x) => x.trim()).filter(Boolean)));
 }
 
@@ -350,7 +336,6 @@ export default async function handler(req) {
     const userQ = message.trim();
     const threadId = (body?.thread_id && String(body.thread_id)) || `thread_local_${Date.now()}`;
 
-    // 1) PŘEDVYHLEDÁVÁNÍ (smarter multi-query)
     const queries = buildQueries(userQ);
 
     const search = await vectorSearch(
@@ -372,14 +357,13 @@ export default async function handler(req) {
 
     const contextBlock = buildContextBlock(chunks);
 
-    // 2) ODPOVĚĎ jen z kontextu
     let answer = await generateAnswer({ userMessage: userQ, contextBlock }, apiKey);
     answer = cleanAnswer(answer);
 
     if (badGeneralAdvice(answer)) answer = HARD_FALLBACK;
 
-    // poslední jistota: žádné seniors odkazy
     answer = forceNonSeniorUrls(answer);
+    if (!answer.trim()) answer = HARD_FALLBACK; // ✅ poslední pojistka
 
     return jsonResponse(200, { ok: true, answer, thread_id: threadId });
   } catch (err) {
