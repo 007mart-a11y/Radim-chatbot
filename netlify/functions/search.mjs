@@ -1,4 +1,4 @@
-// netlify/functions/search.mjs (v6 - SIMPLE, retrieval-first, robust, #debug)
+// netlify/functions/search.mjs (v6 - simple + robust quotes)
 // Node 18+ (Netlify Functions)
 // ENV: OPENAI_API_KEY, VECTOR_STORE_ID
 // Request: { message: string, thread_id?: string, history?: {role:"user"|"assistant", content:string}[] }
@@ -13,7 +13,7 @@ const corsHeaders = {
 const OPENAI_BASE_URL = "https://api.openai.com/v1";
 const OPENAI_BETA_HEADER = { "OpenAI-Beta": "assistants=v2" };
 
-const OBEC = "Radim";
+const OBEC_NAZEV = "Radim";
 const HARD_FALLBACK = "Tato informace není v dostupných podkladech obce Radim uvedena.";
 
 function jsonResponse(status, data) {
@@ -53,29 +53,15 @@ function extractLinks(text) {
   return Array.from(out);
 }
 
-function isQuoteRequest(q) {
+function intent(q) {
   const t = normalizeCzech(q);
-  return /(odcituj|cituj|zkopiruj|max\s*2\s*vety|max\s*dve\s*vety|presnou vetu|citace)/i.test(t);
-}
-
-function isPdfIntent(q) {
-  const t = normalizeCzech(q);
-  return /(vyhlask|narizen|poplatek|odpad|psy|psu|castka|sazba|splatnost|cl\.|clanek|odstavec|pdf)/i.test(t);
-}
-
-function isPeopleIntent(q) {
-  const t = normalizeCzech(q);
-  return /(kdo je|starost|mistostarost|kontakt|telefon|email|e-mail)/i.test(t);
-}
-
-function isAccountingQuery(q) {
-  const t = normalizeCzech(q);
-  return /(rozvaha|ucetni|ucetnict|zaverecny ucet|vykaz)/i.test(t);
-}
-
-function isAccountingNoise(text) {
-  const t = normalizeCzech(text).slice(0, 5000);
-  return /(rozvaha|pasiva|aktiva|ucetni obdobi|synteticky ucet|brutto|netto|korekce|uzemni samospravne celky|vykaz)/i.test(t);
+  return {
+    debug: /^\s*#debug\b/i.test(q),
+    quote: /(odcituj|cituj|zkopiruj|max\s*2\s*vety|max\s*dve\s*vety|presnou vetu|citace)/i.test(t),
+    latest: /(nejnovejs|posledn|aktualn|dnes|k\s*datu|uredni\s*desce|vyvesen|ucinn|platn)/i.test(t),
+    pdfish: /(vyhlask|narizen|poplatek|odpad|psy|psu|castka|sazba|splatnost|cl\.|clanek|odstavec|pdf|kc)/i.test(t),
+    people: /(kdo\s*je|starost|mistostarost|kontakt|telefon|email|e-mail|predsed|tajemnik)/i.test(t),
+  };
 }
 
 async function oaiFetch(path, { method = "GET", headers = {}, body } = {}, apiKey) {
@@ -107,7 +93,6 @@ async function oaiFetch(path, { method = "GET", headers = {}, body } = {}, apiKe
 }
 
 async function vectorSearch({ vectorStoreId, query, maxNumResults, scoreThreshold }, apiKey) {
-  // IMPORTANT: query MUST be a STRING (ne array)
   return await oaiFetch(
     `/vector_stores/${vectorStoreId}/search`,
     {
@@ -136,14 +121,28 @@ function flattenChunkText(it) {
     .trim();
 }
 
-function pickChunks(searchJson, userQ, limit = 20) {
-  const items = Array.isArray(searchJson?.data) ? searchJson.data : [];
+// jednoduché boosty podle souboru
+function boostScore(filename, userQ) {
+  const it = intent(userQ);
+  const f = (filename || "").toLowerCase();
+  let b = 0;
 
+  if (it.pdfish && f.includes("30_pdf_text")) b += 0.30;
+  if (it.latest && f.includes("00_latest")) b += 0.22;
+  if (it.people && f.includes("people")) b += 0.22;
+  if (f.includes("99_full")) b += 0.06;
+
+  return b;
+}
+
+function pickChunks(searchJson, userQ, limit) {
+  const items = Array.isArray(searchJson?.data) ? searchJson.data : [];
   const ranked = items
     .map((it) => {
       const filename = getFilename(it);
-      const score = typeof it?.score === "number" ? it.score : 0;
+      const base = typeof it?.score === "number" ? it.score : 0;
       const text = flattenChunkText(it);
+      const score = base + boostScore(filename, userQ);
       return { filename, score, text };
     })
     .filter((x) => x.text && x.text.length > 60)
@@ -151,15 +150,10 @@ function pickChunks(searchJson, userQ, limit = 20) {
 
   const out = [];
   const seen = new Set();
-
   for (const r of ranked) {
-    // odfiltruj účetní bordel, pokud dotaz není účetní
-    if (!isAccountingQuery(userQ) && isAccountingNoise(r.text)) continue;
-
-    const key = (r.filename || "") + "::" + r.text.slice(0, 200);
+    const key = (r.filename || "") + "::" + r.text.slice(0, 220);
     if (seen.has(key)) continue;
     seen.add(key);
-
     out.push({
       filename: r.filename,
       score: Number.isFinite(r.score) ? Number(r.score.toFixed(3)) : null,
@@ -167,49 +161,93 @@ function pickChunks(searchJson, userQ, limit = 20) {
     });
     if (out.length >= limit) break;
   }
-
   return out;
 }
 
-function systemPrompt(userQ) {
-  const quote = isQuoteRequest(userQ);
-  const pdf = isPdfIntent(userQ);
-  const people = isPeopleIntent(userQ);
+function buildQueries(userQ) {
+  const it = intent(userQ);
+  const q = userQ.replace(/^\s*#debug\s*/i, "").trim();
+  const qNorm = normalizeCzech(q);
+  const arr = [q, qNorm, `${q} obec ${OBEC_NAZEV}`];
 
+  if (it.pdfish) arr.push(`${q} sazba splatnost čl. 4 Kč`);
+  if (it.latest) arr.push(`${q} vyvěšeno účinnost datum`);
+
+  return Array.from(new Set(arr)).slice(0, 4);
+}
+
+function splitSentencesCZ(text) {
+  // hrubé, ale stabilní: dělí na věty podle . ! ? + nový řádek
+  const t = String(text || "")
+    .replace(/\r/g, "")
+    .replace(/[ \t]+\n/g, "\n")
+    .trim();
+
+  const parts = t
+    .split(/(?<=[.!?])\s+|\n+/g)
+    .map((x) => x.trim())
+    .filter(Boolean);
+
+  return parts;
+}
+
+// Deterministická citace: najdi max 2 věty, které obsahují “Kč” nebo “Sazba poplatku” apod.
+function makeQuoteAnswer(chunks, userQ) {
+  const q = normalizeCzech(userQ);
+  const wantDog = /(psy|psu|psů|pes)/i.test(q);
+  const wantWaste = /(odpad|odpadu|odpadove)/i.test(q);
+
+  const needles = [];
+  if (wantDog) needles.push("za jednoho psa", "sazba poplatku", "kc");
+  if (wantWaste) needles.push("sazba poplatku", "ciní", "kc", "odpad");
+
+  // fallback needle pro “částka”
+  needles.push("kc", "sazba poplatku", "ciní");
+
+  for (const c of chunks) {
+    const text = c.text || "";
+    const sentences = splitSentencesCZ(text);
+
+    const hits = [];
+    for (const s of sentences) {
+      const ns = normalizeCzech(s);
+      const ok =
+        needles.some((n) => ns.includes(normalizeCzech(n))) ||
+        /(\b\d{1,5}\s*Kč\b|\bKč\b)/i.test(s);
+      if (ok) hits.push(s);
+      if (hits.length >= 2) break;
+    }
+
+    if (hits.length) {
+      // max 2 věty, přesně jak jsou
+      const quoted = hits.slice(0, 2).map((x) => `„${x.replace(/^["„]|["“]$/g, "")}“`).join("\n");
+      return `${quoted}\n(Zdroj: ${c.filename || "soubor"})`;
+    }
+  }
+
+  return HARD_FALLBACK;
+}
+
+function systemPrompt(userQ) {
+  const it = intent(userQ);
   return (
-    `Jsi AI asistent obce ${OBEC}. Odpovídej POUZE podle poskytnutého KONTEXTU.\n` +
-    `Nevymýšlej fakta, jména, částky ani kontakty.\n` +
-    `Pokud informace v kontextu není, odpověz přesně: "${HARD_FALLBACK}"\n\n` +
-    `Pravidla:\n` +
-    `- Odpověz stručně (1–8 bodů).\n` +
-    `- VŽDY přilož odkaz, pokud je v kontextu (stránka nebo PDF).\n` +
-    `- Nepoužívej odkazy se "/seniori/".\n` +
-    (pdf ? `- U vyhlášek/poplatků najdi částku + článek/odstavec a přilož odkaz na PDF.\n` : ``) +
-    (people ? `- U kontaktů uveď jméno + telefon + email, pokud jsou v kontextu, a přilož odkaz na zdroj.\n` : ``) +
-    (quote
-      ? `- Uživatel chce citaci: zkopíruj max 2 věty PŘESNĚ z kontextu (bez parafráze) a připiš (Zdroj: soubor, čl./odst.).\n`
-      : ``)
+    `Jsi AI asistent obce ${OBEC_NAZEV}. Odpovídej pouze podle poskytnutého KONTEXTU.\n` +
+    `Nevymýšlej fakta. Pokud odpověď není v kontextu, napiš přesně: "${HARD_FALLBACK}"\n` +
+    `Vždy přidej odkaz, pokud je v kontextu.\n` +
+    `Nikdy nepoužívej odkazy se "/seniori/".\n` +
+    (it.quote ? `Pozn.: citace se řeší mimo model, ty jen odpověz fakticky, pokud se tě na to někdo ptá.\n` : ``)
   );
 }
 
-function buildContext(chunks, userQ) {
-  const quote = isQuoteRequest(userQ);
-
-  // větší cap pro citace
-  const cap = quote ? 8000 : 4500;
-
-  let ctx =
-    `KONTEXT – OFICIÁLNÍ PODKLADY OBCE ${OBEC}\n` +
-    `Pozn.: odkazy uváděj bez "/seniori/".\n` +
-    `---\n`;
-
+function buildContext(chunks) {
+  // držíme to jednoduché, ale “bohaté”
+  const cap = 3800;
+  let ctx = `KONTEXT (oficiální podklady obce ${OBEC_NAZEV} – úryvky):\n---\n`;
   chunks.forEach((c, i) => {
     let t = c.text || "";
     if (t.length > cap) t = t.slice(0, cap) + "\n[ZKRÁCENO]";
-    ctx += `[#${i + 1}] ${c.filename || "soubor"} (score: ${c.score ?? "?"})\n`;
-    ctx += `${t}\n---\n`;
+    ctx += `[#${i + 1}] ${c.filename || "soubor"}\n${t}\n---\n`;
   });
-
   return ctx.trim();
 }
 
@@ -222,39 +260,48 @@ function extractResponseText(resp) {
     if (item?.type === "message") {
       const content = Array.isArray(item?.content) ? item.content : [];
       for (const c of content) {
-        if ((c?.type === "output_text" || c?.type === "text") && c?.text) out.push(String(c.text));
+        if (c?.type === "output_text" && c?.text) out.push(String(c.text));
+        if (c?.type === "text" && c?.text) out.push(String(c.text));
       }
     }
     if (item?.type === "output_text" && item?.text) out.push(String(item.text));
   }
-
   return out.join("\n").trim();
 }
 
 function cleanAnswer(t) {
   let s = String(t || "");
+
+  // pryč citace typu 【…†…】
   s = s.replace(/【\s*\d+\s*:\s*\d+\s*†[^】]*】/g, "");
+
+  // pryč “Bez odpovědi”
+  if (/^\s*bez odpovědi\s*$/i.test(s.trim())) s = "";
+
+  // seniors odkazy
   s = s.replace(/https:\/\/www\.obec-radim\.cz\/seniori\//g, "https://www.obec-radim.cz/");
+
   s = s.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
   return s;
 }
 
-function isBadAnswer(a) {
-  const s = String(a || "").trim();
-  if (!s) return true;
-  if (s === "Bez odpovědi") return true;
-  if (/od\s+do\s+\./i.test(s)) return true; // "od  do ."
+function isEmptyOrBad(ans) {
+  const a = String(ans || "").trim();
+  if (!a) return true;
+  if (a === "Bez odpovědi") return true;
+  // typické rozbité: "od  do ."
+  if (/od\s+do\s+\./i.test(a)) return true;
   return false;
 }
 
 async function generateAnswer({ userMessage, contextBlock, history, temperature }, apiKey) {
-  const safeHistory = Array.isArray(history) ? history.slice(-10) : [];
+  const safeHistory = Array.isArray(history) ? history.slice(-8) : [];
 
   const input = [
     { role: "system", content: systemPrompt(userMessage) },
     ...safeHistory.map((m) => ({
       role: m.role === "assistant" ? "assistant" : "user",
-      content: String(m.content || "").slice(0, 2000),
+      content: String(m.content || "").slice(0, 1200),
     })),
     { role: "user", content: `${contextBlock}\n\nDOTAZ:\n${userMessage}` },
   ];
@@ -267,25 +314,13 @@ async function generateAnswer({ userMessage, contextBlock, history, temperature 
         model: "gpt-4.1-mini",
         temperature,
         input,
+        max_output_tokens: 450,
       }),
     },
     apiKey
   );
 
   return extractResponseText(resp);
-}
-
-// Query expansion => JEDEN string (ne pole)
-function buildQueryString(userQ) {
-  const q = userQ.trim();
-  const qNorm = normalizeCzech(q);
-  const pdf = isPdfIntent(q);
-  const quote = isQuoteRequest(q);
-
-  let extra = ` obec ${OBEC}`;
-  if (pdf) extra += ` vyhláška poplatek částka Kč článek odstavec sazba splatnost`;
-  if (quote) extra += ` přesná citace dvě věty`;
-  return `${q}\n${qNorm}\n${extra}`.trim();
 }
 
 export default async function handler(req) {
@@ -296,64 +331,73 @@ export default async function handler(req) {
 
     const apiKey = process.env.OPENAI_API_KEY;
     const vectorStoreId = process.env.VECTOR_STORE_ID;
-
     if (!apiKey) return jsonResponse(500, { ok: false, error: "Missing OPENAI_API_KEY" });
     if (!vectorStoreId) return jsonResponse(500, { ok: false, error: "Missing VECTOR_STORE_ID" });
 
     const body = await req.json().catch(() => ({}));
-    const rawMessage = body?.message;
+    const message = body?.message;
+    if (!message || typeof message !== "string") return jsonResponse(400, { ok: false, error: "Missing message" });
 
-    if (!rawMessage || typeof rawMessage !== "string") {
-      return jsonResponse(400, { ok: false, error: "Missing message" });
-    }
-
-    const debug = rawMessage.trim().startsWith("#debug");
-    const userQ = rawMessage.trim().replace(/^#debug\s*/i, "").trim();
+    const userQRaw = message.trim();
+    const it = intent(userQRaw);
+    const userQ = userQRaw.replace(/^\s*#debug\s*/i, "").trim();
 
     const threadId = (body?.thread_id && String(body.thread_id)) || `thread_local_${Date.now()}`;
     const history = Array.isArray(body?.history) ? body.history : null;
 
-    const quote = isQuoteRequest(userQ);
-    const pdf = isPdfIntent(userQ);
+    // 1) RETRIEVAL
+    const queries = buildQueries(userQRaw);
+    const maxNumResults = it.quote ? 50 : it.pdfish ? 40 : 30;
+    const scoreThreshold = it.quote ? 0.05 : 0.10;
 
-    // SEARCH
-    const queryString = buildQueryString(userQ);
-    const maxNumResults = quote ? 70 : pdf ? 60 : 45;
-    const scoreThreshold = quote ? 0.04 : 0.07;
-
-    const search = await vectorSearch(
-      { vectorStoreId, query: queryString, maxNumResults, scoreThreshold },
-      apiKey
-    );
-
-    // CHUNKS
-    const chunkLimit = quote ? 28 : pdf ? 24 : 20;
-    const chunks = pickChunks(search, userQ, chunkLimit);
+    const search = await vectorSearch({ vectorStoreId, query: queries, maxNumResults, scoreThreshold }, apiKey);
+    const chunkLimit = it.quote ? 28 : it.pdfish ? 22 : 18;
+    const chunks = pickChunks(search, userQRaw, chunkLimit);
 
     if (!chunks.length) {
+      return jsonResponse(200, { ok: true, answer: HARD_FALLBACK, thread_id: threadId, links: [], debug: it.debug ? { queries } : undefined });
+    }
+
+    // 2) QUOTES: deterministicky, bez modelu
+    if (it.quote) {
+      const answer = makeQuoteAnswer(chunks, userQRaw);
+
+      const links = Array.from(
+        new Set([
+          ...chunks.flatMap((c) => extractLinks(c.text)),
+          ...extractLinks(answer),
+        ])
+      ).slice(0, 12);
+
       return jsonResponse(200, {
         ok: true,
-        answer: HARD_FALLBACK,
+        answer,
         thread_id: threadId,
-        links: [],
-        ...(debug ? { debug: { queryString, maxNumResults, scoreThreshold, chunks: [] } } : {}),
+        links,
+        debug: it.debug
+          ? {
+              queries,
+              picked: chunks.map((c) => ({ file: c.filename, score: c.score })),
+            }
+          : undefined,
       });
     }
 
-    const contextBlock = buildContext(chunks, userQ);
+    // 3) GENERATION (jen pro normální odpovědi)
+    const contextBlock = buildContext(chunks);
+    const temperature = 0.1;
 
-    // GENERATE
-    const temperature = quote ? 0.0 : 0.1;
-    let answer = await generateAnswer({ userMessage: userQ, contextBlock, history, temperature }, apiKey);
+    let answer = await generateAnswer({ userMessage: userQRaw, contextBlock, history, temperature }, apiKey);
     answer = cleanAnswer(answer);
 
-    if (isBadAnswer(answer)) {
+    // Retry pokud prázdné / rozbité
+    if (isEmptyOrBad(answer)) {
       const retryCtx =
         contextBlock +
-        `\n\nDODATEK: Odpověz konkrétně. Pokud je v kontextu odkaz, přilož ho. Pokud údaj chybí, vrať fallback větu doslova.`;
-      let retry = await generateAnswer({ userMessage: userQ, contextBlock: retryCtx, history, temperature }, apiKey);
+        `\n\nDODATEK: Odpověz konkrétně a přidej odkaz, pokud je v kontextu. Pokud údaj chybí, vrať fallback větu doslova.`;
+      let retry = await generateAnswer({ userMessage: userQRaw, contextBlock: retryCtx, history, temperature }, apiKey);
       retry = cleanAnswer(retry);
-      answer = isBadAnswer(retry) ? HARD_FALLBACK : retry;
+      answer = isEmptyOrBad(retry) ? HARD_FALLBACK : retry;
     }
 
     const links = Array.from(
@@ -368,21 +412,13 @@ export default async function handler(req) {
       answer,
       thread_id: threadId,
       links,
-      ...(debug
+      debug: it.debug
         ? {
-            debug: {
-              vectorStoreId,
-              queryString,
-              maxNumResults,
-              scoreThreshold,
-              picked: chunks.map((c) => ({
-                file: c.filename,
-                score: c.score,
-                preview: (c.text || "").slice(0, 240),
-              })),
-            },
+            queries,
+            picked: chunks.map((c) => ({ file: c.filename, score: c.score })),
+            links,
           }
-        : {}),
+        : undefined,
     });
   } catch (err) {
     return jsonResponse(500, { ok: false, error: "Server error", details: err?.message || String(err) });
