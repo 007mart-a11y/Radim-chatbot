@@ -174,17 +174,57 @@ function findDateInText(s) {
   return null;
 }
 
+/**
+ * ✅ DŮLEŽITÉ: lepší typování, aby se účetnictví netvářilo jako vyhlášky.
+ */
 function classifyDocType(titleOrUrl) {
   const s = (titleOrUrl || "").toLowerCase();
-  if (s.includes("vyhláška") || s.includes("obecně závazná vyhláška") || s.includes("ozv")) return "VYHLÁŠKA";
-  if (s.includes("nařízení")) return "NAŘÍZENÍ";
-  if (s.includes("zpravodaj")) return "ZPRAVODAJ";
-  if (s.includes("úřední deska") || s.includes("uredni-deska") || s.includes("záměr") || s.includes("zamer"))
+
+  // ---- účetnictví / rozvahy / závěrky (NECHCEME v PDF_TEXT) ----
+  if (
+    s.includes("rozvaha") ||
+    s.includes("výkaz zisku") ||
+    s.includes("vykaz zisku") ||
+    s.includes("vysledek hospodareni") ||
+    s.includes("výsledek hospodaření") ||
+    s.includes("účetní závěrka") ||
+    s.includes("ucetni zaverka") ||
+    s.includes("závěrečný účet") ||
+    s.includes("zaverecny ucet") ||
+    s.includes("inventarizace") ||
+    s.includes("příloha účetní") ||
+    s.includes("priloha ucetni") ||
+    s.includes("fin") && s.includes("výkazy")
+  ) {
+    return "ÚČETNICTVÍ";
+  }
+
+  // ---- právní věci ----
+  if (s.includes("vyhláška") || s.includes("obecně závazná vyhláška") || s.includes("obecne zavazna vyhlaska") || s.includes("ozv"))
+    return "VYHLÁŠKA";
+
+  if (s.includes("nařízení") || s.includes("narizeni"))
+    return "NAŘÍZENÍ";
+
+  // ---- tematické ----
+  if (s.includes("poplatek") || s.includes("místní poplatek") || s.includes("mistni poplatek"))
+    return "POPLATKY";
+
+  if (s.includes("odpad") || s.includes("bioodpad") || s.includes("svoz"))
+    return "ODPADY";
+
+  if (s.includes("úřední deska") || s.includes("uredni-deska") || s.includes("uredni deska"))
     return "ÚŘEDNÍ_DESKA";
-  if (s.includes("rozpočet") || s.includes("rozpočt") || s.includes("rozpoct")) return "ROZPOČET";
-  if (s.includes("formulář") || s.includes("formular")) return "FORMULÁŘ";
-  if (s.includes("svoz") || s.includes("odpady") || s.includes("bioodpad")) return "ODPADY";
-  if (s.includes("poplatek") || s.includes("místní poplatek")) return "POPLATKY";
+
+  if (s.includes("rozpočet") || s.includes("rozpoct") || s.includes("rozpočt"))
+    return "ROZPOČET";
+
+  if (s.includes("zpravodaj"))
+    return "ZPRAVODAJ";
+
+  if (s.includes("formulář") || s.includes("formular"))
+    return "FORMULÁŘ";
+
   return "DOKUMENT";
 }
 
@@ -436,20 +476,29 @@ async function buildLatestFile(latestPath, pages, docs) {
    PDF TEXT
    ========================= */
 
+/**
+ * ✅ DŮLEŽITÉ: PDF_TEXT má obsahovat jen právní věci (vyhlášky, nařízení, poplatky, odpady).
+ * Účetnictví (rozvahy apod.) SEM NESMÍ.
+ */
 function isImportantPdfDoc(d) {
-  const s = `${d?.title || ""} ${d?.foundOn || ""} ${d?.url || ""}`.toLowerCase();
   const type = String(d?.type || "").toUpperCase();
+  const s = `${d?.title || ""} ${d?.foundOn || ""} ${d?.url || ""}`.toLowerCase();
 
-  // TOP priorita: vyhlášky / poplatky / odpady
-  if (type.includes("VYHLÁŠKA") || type.includes("NAŘÍZENÍ") || type.includes("POPLATKY") || type.includes("ODPADY")) return true;
-  if (s.includes("poplatek") || s.includes("odpad") || s.includes("psů") || s.includes("psu") || s.includes("vyhl")) return true;
+  // nikdy nechceme účetnictví
+  if (type === "ÚČETNICTVÍ") return false;
+
+  // právní priorita
+  if (type === "VYHLÁŠKA" || type === "NAŘÍZENÍ" || type === "POPLATKY" || type === "ODPADY") return true;
+
+  // fallback podle textu (jen právní klíčová slova)
+  if (s.includes("vyhl") || s.includes("poplatek") || s.includes("odpad")) return true;
 
   return false;
 }
 
 async function fetchBinary(url) {
   const r = await fetchWithTimeout(url, {
-    headers: { "User-Agent": "RadimCrawler/2.5 (pdftext)" },
+    headers: { "User-Agent": "RadimCrawler/2.6 (pdftext)" },
   });
 
   if (!r.ok) throw new Error(`Fetch failed ${r.status}`);
@@ -481,7 +530,7 @@ async function extractPdfTextFromUrl(url) {
   }
   if (!looksLikePdfBuffer(buf)) throw new Error(`Not a PDF by signature`);
 
-  const parsed = await pdfParse(buf); // <-- u pdf-parse@1.1.1 je to funkce
+  const parsed = await pdfParse(buf); // pdf-parse@1.1.1 => funkce
   let text = stripWeirdWhitespace(parsed?.text || "");
 
   if (text.length < 120) throw new Error("PDF has almost no extractable text");
@@ -520,6 +569,7 @@ async function buildPdfTextFile(pdfTextPath, docs) {
     `Zdroj: ${SITE_BASE_URL}`,
     ``,
     `Tento soubor obsahuje TEXT extrahovaný z vybraných PDF (primárně vyhlášky / poplatky / odpady).`,
+    `Pozn.: Účetnictví (rozvahy apod.) je záměrně vyfiltrováno.`,
     `Pokud extrakce selže, uvidíte důvod u položky.`,
     ``,
     `==============================`,
@@ -603,7 +653,7 @@ async function buildFullKnowledgeFile(outPath) {
       if (isProbablyBinary(url) && !isPdfUrl(url)) continue;
 
       try {
-        const r = await fetchWithTimeout(url, { headers: { "User-Agent": "RadimCrawler/2.5" } });
+        const r = await fetchWithTimeout(url, { headers: { "User-Agent": "RadimCrawler/2.6" } });
         if (!r.ok) {
           processed++;
           continue;
@@ -879,7 +929,7 @@ export async function main() {
   const latestPath = path.join(OUT_DIR, LATEST_OUT_FILE);
   const pdfTextPath = path.join(OUT_DIR, PDFTEXT_OUT_FILE);
 
-  console.log("== RADIM FULL + LATEST + PDFTEXT (fixed) ==");
+  console.log("== RADIM FULL + LATEST + PDFTEXT (fixed v2) ==");
   console.log("SITE:", SITE_BASE_URL);
   console.log("FULL OUT:", fullPath);
   console.log("LATEST OUT:", latestPath);
