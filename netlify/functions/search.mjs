@@ -1,15 +1,8 @@
-// netlify/functions/search.mjs (v4)
-// Node 18+ (Netlify Functions)
+// netlify/functions/search.mjs (v5 - retrieval-first, big context)
+// Node 18+
 // ENV: OPENAI_API_KEY, VECTOR_STORE_ID
-// Request: { message: string, thread_id?: string, history?: Array<{role:"user"|"assistant", content:string}> }
+// Request: { message: string, thread_id?: string, history?: {role:"user"|"assistant", content:string}[] }
 // Response: { ok:true, answer:string, thread_id:string, links?: string[] }
-//
-// Cíl v4:
-// - stabilní citace z PDF_TEXT (bez halucinací)
-// - lepší “navazování” na kontext (history + thread summary)
-// - lepší dotazy do Vector Store: kombinace (userQ + poslední userQ + normalized + hinty typu "vyhláška poplatek ze psů")
-// - tvrdá kontrola: když je citace požadovaná, MUSÍ být doslovně z kontextu (jinak fallback)
-// - ořez a normalizace odkazu (bez /seniori/)
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -18,12 +11,9 @@ const corsHeaders = {
 };
 
 const OPENAI_BASE_URL = "https://api.openai.com/v1";
+const OPENAI_BETA_HEADER = { "OpenAI-Beta": "assistants=v2" };
 const OBEC_NAZEV = "Radim";
 const HARD_FALLBACK = "Tato informace není v dostupných podkladech obce Radim uvedena.";
-const MODEL = "gpt-4.1-mini";
-
-// Assistants v2 header (pro vector stores i responses)
-const OPENAI_BETA_HEADER = { "OpenAI-Beta": "assistants=v2" };
 
 function jsonResponse(status, data) {
   return new Response(JSON.stringify(data), {
@@ -63,54 +53,31 @@ function extractLinks(text) {
   const out = new Set();
   let m;
   while ((m = re.exec(s))) {
-    let u = m[0];
-    u = u.replace(/[),.;]+$/g, "");
+    let u = m[0].replace(/[),.;]+$/g, "");
     u = stripSeniors(u);
     if (u.includes("obec-radim.cz")) out.add(u);
   }
   return Array.from(out);
 }
 
-function isQuoteRequest(q) {
+function intent(q) {
   const t = normalizeCzech(q);
-  return /(odcituj|cituj|zkopiruj|zkopíruj|presnou vetu|přesnou větu|max 2 vety|max 2 věty|presne dve vety|přesně dvě věty|citace|doslova)/i.test(
-    t
-  );
+  return {
+    quote: /(odcituj|cituj|zkopiruj|max\s*2\s*vety|max\s*dve\s*vety|presnou vetu|citace)/i.test(t),
+    latest: /(nejnovejs|posledn|aktualn|dnes|k\s*datu|uredni\s*desce|vyvesen|ucinn|platn)/i.test(t),
+    pdfish: /(vyhlask|narizen|poplatek|odpad|psy|psu|castka|sazba|splatnost|cl\.|clanek|odstavec|pdf)/i.test(t),
+    people: /(kdo\s*je|starost|mistostarost|kontakt|telefon|email|e-mail|predsed|tajemnik)/i.test(t),
+  };
 }
 
-function isLatestIntent(q) {
-  const t = normalizeCzech(q);
-  return /(nejnovejs|posledn|aktualn|dnes|k datu|uredni desce|vyvesen|platn|ucinn|účinn)/i.test(t);
-}
-
-function isPeopleIntent(q) {
-  const t = normalizeCzech(q);
-  return /(kdo je|starost|mistostarost|tajemnik|kontakt|telefon|email|e-mail|datova schranka|datová schránka)/i.test(
-    t
-  );
-}
-
-function isPdfHeavyIntent(q) {
-  const t = normalizeCzech(q);
-  return /(vyhlask|nařizen|narizen|poplatek|odpad|psy|psu|castka|částka|sazba|splatnost|cl\.|čl\.|clanek|článek|odstavec|pdf)/i.test(
-    t
-  );
-}
-
-function isDocAsk(q) {
-  // chce “pošli vyhlášku / pdf / odkaz”
-  const t = normalizeCzech(q);
-  return /(posli|pošli|odkaz|pdf|ke stazeni|ke stažení|vyhlask|vyhlášk|narizen|nařízení)/i.test(t);
-}
-
-// ---------- OpenAI ----------
+// --- OpenAI fetch ---
 async function oaiFetch(path, { method = "GET", headers = {}, body } = {}, apiKey) {
   const res = await fetch(`${OPENAI_BASE_URL}${path}`, {
     method,
     headers: {
       Authorization: `Bearer ${apiKey}`,
       ...OPENAI_BETA_HEADER,
-      ...(body ? { "Content-Type": "application/json" } : {}),
+      "Content-Type": "application/json",
       ...headers,
     },
     body,
@@ -129,27 +96,19 @@ async function oaiFetch(path, { method = "GET", headers = {}, body } = {}, apiKe
     err.details = json || text;
     throw err;
   }
-
   return json ?? {};
 }
 
-// Vector Store Search
-async function vectorSearch(
-  { vectorStoreId, query, maxNumResults = 30, rewriteQuery = true, scoreThreshold = 0.1 },
-  apiKey
-) {
-  // OpenAI API umožňuje query jako string; některé účty snesou i array.
-  // Aby to bylo kompatibilní všude: pošli string, ale “slepený” z více dotazů.
-  const q = Array.isArray(query) ? query.filter(Boolean).join("\n") : String(query || "");
-
+// --- Vector store search ---
+async function vectorSearch({ vectorStoreId, query, maxNumResults, scoreThreshold }, apiKey) {
   return await oaiFetch(
     `/vector_stores/${vectorStoreId}/search`,
     {
       method: "POST",
       body: JSON.stringify({
-        query: q,
+        query,
         max_num_results: maxNumResults,
-        rewrite_query: rewriteQuery,
+        rewrite_query: true,
         ranking_options: { ranker: "auto", score_threshold: scoreThreshold },
       }),
     },
@@ -163,55 +122,65 @@ function getFilename(it) {
 
 function flattenChunkText(it) {
   const chunks = Array.isArray(it?.content) ? it.content : [];
-  const text = chunks
+  return chunks
     .map((c) => (c?.type === "text" ? c?.text : ""))
     .filter(Boolean)
     .join("\n")
     .trim();
-  return text;
 }
 
-function scoreBoost(filename, userQ) {
+// Penalizace "účetní bordel" (rozvaha, účetní výkazy) => nebudeme to cpát do kontextu,
+// pokud dotaz není fakt účetní.
+function isAccountingNoise(text) {
+  const t = normalizeCzech(text).slice(0, 5000);
+  return /(rozvaha|vykaz zisku|pasiva|aktiva|uctetni obdobi|synteticky ucet|brutto|netto|korekce|ico|uzemni samospravne celky)/i.test(
+    t
+  );
+}
+
+// Boost podle relevance souboru + intentu
+function scoreBoost(filename, userQ, chunkText) {
   const f = (filename || "").toLowerCase();
-  const latest = isLatestIntent(userQ);
-  const people = isPeopleIntent(userQ);
-  const pdfish = isPdfHeavyIntent(userQ);
+  const it = intent(userQ);
 
   let b = 0;
 
-  // People
-  if (people && f.includes("people")) b += 0.25;
+  // Top zdroje
+  if (it.pdfish && f.includes("30_pdf_text")) b += 0.35;
+  if (it.latest && f.includes("00_latest")) b += 0.28;
+  if (it.people && f.includes("people")) b += 0.28;
 
-  // Latest
-  if (latest && f.includes("00_latest")) b += 0.25;
-
-  // PDF_TEXT (citace / částky)
-  if (pdfish && f.includes("30_pdf_text")) b += 0.35;
-
-  // Full je univerzální
+  // FULL univerzál
   if (f.includes("99_full")) b += 0.08;
+
+  // penalizace účetnictví / rozvah, když se uživatel na to neptá
+  if (!/rozvaha|ucetni|vy(́|)kaz|zaverecny ucet/i.test(normalizeCzech(userQ))) {
+    if (f.includes("30_pdf_text") && isAccountingNoise(chunkText)) b -= 0.35;
+    if (f.includes("99_full") && isAccountingNoise(chunkText)) b -= 0.18;
+  }
 
   return b;
 }
 
-function pickTopChunks(searchJson, userQ, limit = 18) {
+function pickTopChunks(searchJson, userQ, limit) {
   const items = Array.isArray(searchJson?.data) ? searchJson.data : [];
+
   const ranked = items
     .map((it) => {
       const filename = getFilename(it);
       const base = typeof it?.score === "number" ? it.score : 0;
-      const boosted = base + scoreBoost(filename, userQ);
       const text = flattenChunkText(it);
+      const boosted = base + scoreBoost(filename, userQ, text);
       return { filename, base, score: boosted, text };
     })
-    .filter((x) => x.text && x.text.length > 40)
+    .filter((x) => x.text && x.text.length > 60)
     .sort((a, b) => (b.score || 0) - (a.score || 0));
 
   const out = [];
   const seen = new Set();
-
   for (const r of ranked) {
-    const key = (r.filename || "") + "::" + r.text.slice(0, 180);
+    // jednoduché dedupe
+    const key = (r.filename || "") + "::" + r.text.slice(0, 200);
     if (seen.has(key)) continue;
     seen.add(key);
 
@@ -223,45 +192,30 @@ function pickTopChunks(searchJson, userQ, limit = 18) {
 
     if (out.length >= limit) break;
   }
-
   return out;
 }
 
-function compactHistory(history, maxTurns = 6) {
-  // posledních maxTurns USER/ASSISTANT zpráv (jen text)
-  const arr = Array.isArray(history) ? history : [];
-  const cleaned = arr
-    .filter((m) => m && (m.role === "user" || m.role === "assistant") && typeof m.content === "string")
-    .map((m) => ({ role: m.role, content: m.content.trim() }))
-    .filter((m) => m.content);
+function systemPrompt(userQ) {
+  const it = intent(userQ);
 
-  if (!cleaned.length) return [];
-  return cleaned.slice(-maxTurns);
+  return (
+    `Jsi AI asistent obce ${OBEC_NAZEV}. Odpovídej pouze podle poskytnutého KONTEXTU.\n` +
+    `Nevymýšlej fakta. Když údaj není v kontextu, napiš přesně: "${HARD_FALLBACK}"\n\n` +
+    `Pravidla odpovědi:\n` +
+    `- Stručně, prakticky (1–8 bodů).\n` +
+    `- Vždy přidej odkaz, pokud je v kontextu (URL na stránku nebo PDF).\n` +
+    `- U částek a poplatků uveď částku + platnost/účinnost, pokud je uvedena.\n` +
+    `- Nikdy nepoužívej odkazy se "/seniori/".\n` +
+    (it.quote
+      ? `- Uživatel chce CITACI: zkopíruj max 2 věty přesně z kontextu (bez parafráze) a připiš: (Zdroj: <soubor>, čl./odst.).\n`
+      : ``)
+  );
 }
 
-function buildHistoryBlock(historyItems) {
-  if (!historyItems?.length) return "";
-  let s = `\n\nKONTEXT KONVERZACE (poslední zprávy):\n`;
-  for (const m of historyItems) {
-    const tag = m.role === "user" ? "UŽIVATEL" : "ASISTENT";
-    const c = m.content.length > 900 ? m.content.slice(0, 900) + " …" : m.content;
-    s += `- ${tag}: ${c}\n`;
-  }
-  return s.trim();
-}
+function buildBigContext(chunks, userQ) {
+  const it = intent(userQ);
 
-function buildContextBlock(chunks, userQ, historyBlock) {
-  const wantsQuote = isQuoteRequest(userQ);
-  let ctx = `KONTEXT Z OFICIÁLNÍCH PODKLADŮ OBCE ${OBEC_NAZEV} (relevantní úryvky):\n`;
-  ctx += `Dnes je ${todayCZ()}.\n`;
-  ctx += `Pozn.: Odkazy uváděj bez "/seniori/".\n`;
-
-  if (historyBlock) {
-    ctx += `\n${historyBlock}\n`;
-  }
-
-  ctx += `\n---\n`;
-
+  // mapa zdrojů
   const srcCounts = {};
   for (const c of chunks) {
     const f = (c.filename || "").toLowerCase();
@@ -269,46 +223,39 @@ function buildContextBlock(chunks, userQ, historyBlock) {
       f.includes("00_latest") ? "LATEST" :
       f.includes("30_pdf_text") ? "PDF_TEXT" :
       f.includes("people") ? "PEOPLE" :
-      f.includes("99_full") ? "FULL" :
-      "OTHER";
+      f.includes("99_full") ? "FULL" : "OTHER";
     srcCounts[k] = (srcCounts[k] || 0) + 1;
   }
-  ctx += `Zdroje v kontextu: ${Object.entries(srcCounts).map(([k,v]) => `${k}:${v}`).join("  ")}\n`;
 
-  if (wantsQuote) {
-    ctx +=
-      `Uživatel chce CITACI: zkopíruj max 2 věty DOSLOVA z kontextu níže (neparafrázuj).\n` +
-      `- Pokud v kontextu přesná věta není, napiš jen: "${HARD_FALLBACK}"\n` +
-      `- Přidej 1 řádek: Zdroj: <soubor> + čl./odst. (pokud je v textu).\n`;
-  }
+  const explain = [
+    `KONTEXT – OFICIÁLNÍ PODKLADY OBCE ${OBEC_NAZEV}`,
+    `Dnes: ${todayCZ()}`,
+    `Zdroje v kontextu: ${Object.entries(srcCounts).map(([k,v]) => `${k}:${v}`).join("  ")}`,
+    `Pozn.: odkazy uváděj bez "/seniori/".`,
+    ``,
+    `INSTRUKCE K DOTAZU:`,
+    it.pdfish
+      ? `- Toto je dotaz na vyhlášku/poplatek. Hledej primárně v PDF_TEXT, vytáhni konkrétní čl./odst. a dej odkaz na PDF.`
+      : it.latest
+      ? `- Toto je dotaz na nejnovější informace. Preferuj LATEST a uváděj datum + odkaz.`
+      : it.people
+      ? `- Toto je dotaz na kontakty/osoby. Vrať jméno + tel + email (pokud jsou v kontextu) a odkaz na zdrojovou stránku.`
+      : `- Vrať konkrétní odpověď včetně odkazu, pokud existuje.`,
+    it.quote ? `- U citace dodrž max 2 věty, přesně okopírovat.` : ``,
+    `---`,
+  ].filter(Boolean).join("\n");
 
-  ctx += `---\n`;
+  // chunk cap: pro “quote” klidně větší
+  const cap = it.quote ? 6500 : 4200;
 
+  let body = "";
   chunks.forEach((c, i) => {
-    const cap = wantsQuote ? 9000 : 3500;
     let t = c.text || "";
     if (t.length > cap) t = t.slice(0, cap) + "\n[ZKRÁCENO]";
-    ctx += `[#${i + 1}] ${c.filename || "soubor"} (score: ${c.score ?? "?"})\n`;
-    ctx += `${t}\n`;
-    ctx += `---\n`;
+    body += `[#${i + 1}] ${c.filename || "soubor"} (score: ${c.score ?? "?"})\n${t}\n---\n`;
   });
 
-  return ctx.trim();
-}
-
-function systemPrompt() {
-  return (
-    `Jsi pečlivý AI asistent obce ${OBEC_NAZEV}.\n` +
-    `Odpovídej POUZE podle poskytnutého kontextu (úryvky z oficiálních podkladů obce).\n` +
-    `Nevymýšlej fakta, jména, částky ani kontakty.\n` +
-    `Když odpověď v kontextu není, napiš přesně: "${HARD_FALLBACK}"\n\n` +
-    `Pravidla:\n` +
-    `- Buď stručný a praktický (1–8 bodů).\n` +
-    `- U částek a poplatků vždy uveď částku a splatnost/účinnost, pokud je v kontextu.\n` +
-    `- Pokud jde o dokument (vyhláška/nařízení), dej přímý odkaz ke stažení, pokud je v kontextu.\n` +
-    `- Nikdy nedávej odkazy se "/seniori/" – vždy použij klasickou verzi webu.\n` +
-    `- Pokud uživatel chce citaci, zkopíruj max 2 věty DOSLOVA z kontextu.\n`
-  );
+  return `${explain}\n${body}`.trim();
 }
 
 function extractResponseText(resp) {
@@ -339,9 +286,6 @@ function cleanAnswer(t) {
   // pryč citace typu 【…†…】
   s = s.replace(/【\s*\d+\s*:\s*\d+\s*†[^】]*】/g, "");
 
-  // pryč samotné “6:0” tokeny apod.
-  s = s.replace(/\b\d+\s*:\s*\d+\b/g, "");
-
   // oprav seniors odkazy
   s = s.replace(/https:\/\/www\.obec-radim\.cz\/seniori\//g, "https://www.obec-radim.cz/");
 
@@ -351,61 +295,36 @@ function cleanAnswer(t) {
   return s;
 }
 
-function shouldFallback(answer) {
-  const a = normalizeCzech(answer);
+function isBadAnswer(ans) {
+  const a = String(ans || "").trim();
   if (!a) return true;
-
-  // obecné řeči
-  if (
-    /(doporucuji navstivit|doporučuji navštívit|zkuste se podivat|zkuste se podívat|nejsem si jist|pravdepodobne|pravděpodobně|obecne plati|obecně platí)/i.test(
-      answer
-    )
-  ) {
-    return true;
-  }
-
-  // “odpověď” bez konkrétní informace u typických dotazů
-  if (answer.length < 20) return true;
-
+  if (a === "Bez odpovědi") return true;
+  if (/^\s*[-•]?\s*$/m.test(a)) return true;
+  if (/od\s+do\s+\./i.test(a)) return true; // "od  do ."
+  if (/(doporucuji navstivit|doporučuji navštívit|zkuste se podivat|nejsem si jist|pravdepodobne|obecne plati)/i.test(a)) return true;
   return false;
 }
 
-/**
- * ✅ Kritické: při žádosti o citaci nechceme HALUCINACE.
- * Ověříme, že věty v uvozovkách se opravdu nachází v poskytnutém kontextu.
- */
-function quoteAnswerIsGrounded(answer, contextBlock) {
-  // vybereme texty v uvozovkách (české i běžné)
-  const quotes = [];
-  const re = /[„"]([^“"]{10,500})[“"]/g;
-  let m;
-  while ((m = re.exec(answer))) {
-    const q = (m[1] || "").trim();
-    if (q) quotes.push(q);
-  }
-  if (!quotes.length) return false;
+async function generateAnswer({ userMessage, contextBlock, history, temperature }, apiKey) {
+  const safeHistory = Array.isArray(history) ? history.slice(-10) : []; // posledních 10 výměn max
 
-  const ctx = String(contextBlock || "");
-  // každá citovaná věta (nebo její začátek) musí být v kontextu
-  for (const q of quotes) {
-    const needle = q.length > 120 ? q.slice(0, 120) : q;
-    if (!ctx.includes(needle)) return false;
-  }
-  return true;
-}
+  const input = [
+    { role: "system", content: systemPrompt(userMessage) },
+    ...safeHistory.map((m) => ({
+      role: m.role === "assistant" ? "assistant" : "user",
+      content: String(m.content || "").slice(0, 2000),
+    })),
+    { role: "user", content: `${contextBlock}\n\nDOTAZ:\n${userMessage}` },
+  ];
 
-async function generateAnswer({ userMessage, contextBlock, temperature = 0.15 }, apiKey) {
   const resp = await oaiFetch(
     `/responses`,
     {
       method: "POST",
       body: JSON.stringify({
-        model: MODEL,
+        model: "gpt-4.1-mini",
         temperature,
-        input: [
-          { role: "system", content: systemPrompt() },
-          { role: "user", content: `${contextBlock}\n\nDOTAZ UŽIVATELE:\n${userMessage}` },
-        ],
+        input,
       }),
     },
     apiKey
@@ -414,7 +333,27 @@ async function generateAnswer({ userMessage, contextBlock, temperature = 0.15 },
   return extractResponseText(resp);
 }
 
-// ---------- Handler ----------
+// Query expansion: vysvětlíme dotaz a přidáme “klíčová slova”
+function buildQueries(userQ) {
+  const it = intent(userQ);
+  const q = userQ.trim();
+  const qNorm = normalizeCzech(q);
+
+  const base = [q, qNorm];
+
+  // dovysvětlení dotazu: “Radim obec …”
+  base.push(`${q} obec ${OBEC_NAZEV}`);
+
+  // “pdfish” dotazy pomáhají najít článek/odstavec/částky
+  if (it.pdfish) base.push(`${q} vyhláška článek odstavec sazba splatnost částka Kč`);
+
+  // “latest” dotazy pomáhají vytáhnout datum vyvěšení/účinnost
+  if (it.latest) base.push(`${q} vyvěšeno datum účinnost`);
+
+  // uniq
+  return Array.from(new Set(base)).slice(0, 4);
+}
+
 export default async function handler(req) {
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders });
 
@@ -436,115 +375,53 @@ export default async function handler(req) {
 
     const userQ = message.trim();
     const threadId = (body?.thread_id && String(body.thread_id)) || `thread_local_${Date.now()}`;
+    const history = Array.isArray(body?.history) ? body.history : null;
 
-    // ---- history support (front-end posílá posledních pár zpráv) ----
-    const hist = compactHistory(body?.history, 6);
-    const historyBlock = buildHistoryBlock(hist);
+    const it = intent(userQ);
 
-    // “navázání”: poslední user message (když user píše třeba "tohle je staré")
-    const lastUser = [...hist].reverse().find((m) => m.role === "user" && m.content && m.content !== userQ)?.content || "";
+    // 1) SEARCH – jedna call, ale s několika queries
+    const queries = buildQueries(userQ);
 
-    const wantsQuote = isQuoteRequest(userQ);
-    const latestIntent = isLatestIntent(userQ);
-    const peopleIntent = isPeopleIntent(userQ);
-    const pdfIntent = isPdfHeavyIntent(userQ);
-    const docAsk = isDocAsk(userQ);
-
-    // ---- Queries do Vector Store (lepší recall) ----
-    const q1 = userQ;
-    const q2 = normalizeCzech(userQ);
-    const q3 = lastUser ? `${lastUser}\n${userQ}` : null;
-
-    // hinty (zvyšují recall pro specifické dokumenty)
-    const hints = [];
-    if (pdfIntent) hints.push(`${userQ} vyhláška článek sazba splatnost PDF`);
-    if (latestIntent) hints.push(`${userQ} vyvěšeno účinnost poslední`);
-    if (peopleIntent) hints.push(`${userQ} kontakty starostka telefon email`);
-    if (docAsk) hints.push(`${userQ} e_download.php evt_file.php`);
-    // super důležitý: poplatky
-    const tnorm = normalizeCzech(userQ);
-    if (/(poplatek).*(pes|psu|psy)/i.test(tnorm)) hints.push(`místní poplatek ze psů obec Radim vyhláška sazba poplatku`);
-    if (/(poplatek).*(odpad)/i.test(tnorm)) hints.push(`místní poplatek za obecní systém odpadového hospodářství obec Radim vyhláška výše poplatku`);
-
-    const queries = [q1, q2, q3, ...hints].filter(Boolean);
-
-    // ---- SEARCH ----
-    const maxNumResults = wantsQuote ? 60 : (pdfIntent ? 45 : 28);
-    const scoreThreshold = wantsQuote ? 0.06 : (pdfIntent ? 0.09 : 0.11);
+    const maxNumResults = it.quote ? 48 : it.pdfish ? 40 : 28;
+    const scoreThreshold = it.quote ? 0.06 : 0.10;
 
     const search = await vectorSearch(
-      {
-        vectorStoreId,
-        query: queries,
-        maxNumResults,
-        rewriteQuery: true,
-        scoreThreshold,
-      },
+      { vectorStoreId, query: queries, maxNumResults, scoreThreshold },
       apiKey
     );
 
-    // ---- Pick chunks ----
-    const chunkLimit = wantsQuote ? 26 : (pdfIntent ? 20 : 16);
+    // 2) výběr chunků – nabombíme kontext
+    const chunkLimit = it.quote ? 26 : it.pdfish ? 22 : 18;
     const chunks = pickTopChunks(search, userQ, chunkLimit);
 
     if (!chunks.length) {
       return jsonResponse(200, { ok: true, answer: HARD_FALLBACK, thread_id: threadId, links: [] });
     }
 
-    // ---- Build context ----
-    const contextBlock = buildContextBlock(chunks, userQ, historyBlock);
+    const contextBlock = buildBigContext(chunks, userQ);
 
-    // ---- Generate answer ----
-    const temperature = wantsQuote ? 0.0 : 0.12;
-    let answer = await generateAnswer({ userMessage: userQ, contextBlock, temperature }, apiKey);
+    // 3) Generace – low temp
+    const temperature = it.quote ? 0.0 : 0.1;
+    let answer = await generateAnswer({ userMessage: userQ, contextBlock, history, temperature }, apiKey);
     answer = cleanAnswer(answer);
 
-    // ---- Quote enforcement ----
-    if (wantsQuote) {
-      // musí to být grounded v kontextu
-      if (!quoteAnswerIsGrounded(answer, contextBlock)) {
-        // retry s tvrdším instrukčním doplněním
-        const retryBlock =
-          contextBlock +
-          `\n\nPOZOR: U citace MUSÍŠ kopírovat věty DOSLOVA z kontextu výše. Pokud je nenajdeš, vrať pouze: "${HARD_FALLBACK}"`;
-
-        let retry = await generateAnswer({ userMessage: userQ, contextBlock: retryBlock, temperature: 0.0 }, apiKey);
-        retry = cleanAnswer(retry);
-
-        if (!quoteAnswerIsGrounded(retry, retryBlock)) {
-          answer = HARD_FALLBACK;
-        } else {
-          answer = retry;
-        }
-      }
-    } else {
-      // ---- Soft fallback ----
-      if (shouldFallback(answer)) {
-        const retryBlock =
-          contextBlock +
-          `\n\nPOZOR: Odpověz prosím konkrétně.\n` +
-          `- Pokud jde o částku, uveď přesnou částku + splatnost/účinnost a přímý odkaz (pokud je v kontextu).\n` +
-          `- Pokud jde o osobu, uveď jméno + telefon + email (pokud je v kontextu).\n` +
-          `- Pokud data nejsou v kontextu, vrať přesně: "${HARD_FALLBACK}"`;
-
-        let retry = await generateAnswer({ userMessage: userQ, contextBlock: retryBlock, temperature }, apiKey);
-        retry = cleanAnswer(retry);
-
-        if (!retry || shouldFallback(retry)) {
-          answer = HARD_FALLBACK;
-        } else {
-          answer = retry;
-        }
-      }
+    // 4) Retry guard
+    if (isBadAnswer(answer)) {
+      const retryCtx =
+        contextBlock +
+        `\n\nDODATEK: Odpověz konkrétně. Pokud je v kontextu odkaz, přilož ho. Pokud údaj chybí, vrať fallback větu doslova.`;
+      let retry = await generateAnswer({ userMessage: userQ, contextBlock: retryCtx, history, temperature }, apiKey);
+      retry = cleanAnswer(retry);
+      answer = isBadAnswer(retry) ? HARD_FALLBACK : retry;
     }
 
-    // ---- Links: z kontextu + z odpovědi ----
+    // 5) Links: z kontextu + odpovědi
     const links = Array.from(
       new Set([
         ...chunks.flatMap((c) => extractLinks(c.text)),
         ...extractLinks(answer),
       ])
-    ).slice(0, 14);
+    ).slice(0, 12);
 
     return jsonResponse(200, { ok: true, answer, thread_id: threadId, links });
   } catch (err) {
