@@ -1,285 +1,405 @@
 // netlify/functions/search.mjs
-// Stable + deterministic fee extraction (odpad/psi)
-// ENV: OPENAI_API_KEY, VECTOR_STORE_ID
+// Node 18+, ESM
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "content-type",
-  "Access-Control-Allow-Methods": "POST,OPTIONS",
-};
+import fs from "node:fs";
+import path from "node:path";
 
-const OPENAI_BASE_URL = "https://api.openai.com/v1";
-const OBEC = "Radim";
-const FALLBACK = "Tato informace není v dostupných podkladech obce Radim uvedena.";
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+const VECTOR_STORE_ID = process.env.VECTOR_STORE_ID;
 
-function jsonResponse(status, data) {
-  return new Response(JSON.stringify(data), {
+// (volitelně) omez CORS na svůj web, jinak nech "*"
+const ALLOW_ORIGIN = process.env.ALLOW_ORIGIN || "*";
+
+function jsonResponse(status, obj) {
+  return new Response(JSON.stringify(obj, null, 2), {
     status,
-    headers: { ...corsHeaders, "Content-Type": "application/json; charset=utf-8" },
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+      "access-control-allow-origin": ALLOW_ORIGIN,
+      "access-control-allow-headers": "content-type",
+      "access-control-allow-methods": "POST,OPTIONS",
+    },
   });
 }
 
-async function oaiFetch(path, body, apiKey) {
-  const res = await fetch(`${OPENAI_BASE_URL}${path}`, {
+function readLocalFile(relPath) {
+  const p = path.join(process.cwd(), relPath);
+  if (!fs.existsSync(p)) return "";
+  return fs.readFileSync(p, "utf8");
+}
+
+/**
+ * Najde celý "PAGE" blok v 99_FULL podle URL
+ * FULL formát:
+ * ==============================
+ * === PAGE
+ * URL: https://...
+ * TITLE: ...
+ * PUBLISHED: ...
+ * DOWNLOADS:
+ * ...
+ * CONTENT:
+ * ...
+ */
+function extractPageBlock(fullText, url) {
+  if (!fullText || !url) return null;
+
+  const marker = `=== PAGE\nURL: ${url}\n`;
+  const start = fullText.indexOf(marker);
+  if (start === -1) return null;
+
+  const next = fullText.indexOf("\n==============================\n=== PAGE", start + 10);
+  const end = next === -1 ? fullText.length : next;
+  return fullText.slice(start, end).trim();
+}
+
+function extractPageUrlFromSnippet(snippet) {
+  const s = String(snippet || "");
+
+  // 1) preferuj "=== PAGE URL: ..."
+  const m = s.match(/===\s*PAGE\s*URL:\s*(https?:\/\/[^\s]+)\s*/i);
+  if (m?.[1]) return cleanupUrl(m[1]);
+
+  // 2) jinak první URL v textu
+  const u = s.match(/https?:\/\/[^\s]+/);
+  if (u?.[0]) return cleanupUrl(u[0]);
+
+  return null;
+}
+
+function cleanupUrl(u) {
+  return String(u || "").replace(/[)\],.]+$/, "");
+}
+
+function isDebugMessage(message) {
+  return String(message || "").trim().toLowerCase().startsWith("#debug");
+}
+
+function stripDebugPrefix(message) {
+  return String(message || "").replace(/^#debug\s*/i, "").trim();
+}
+
+function normalizeWhitespace(t) {
+  return String(t || "")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function safeSnippet(text, max = 900) {
+  const t = normalizeWhitespace(text);
+  if (t.length <= max) return t;
+  return t.slice(0, max) + "…";
+}
+
+function scoreBonusForQuery(chunkText, query) {
+  // jednoduchá heuristika: bonus za shodu slov + bonus za "Čl. 4 / Sazba / poplatek / Kč / parcela / bioodpad"
+  const t = String(chunkText || "").toLowerCase();
+  const q = String(query || "").toLowerCase();
+
+  let bonus = 0;
+
+  const keywords = [
+    "poplatek",
+    "sazba",
+    "kč",
+    "čl.",
+    "vyhláška",
+    "účinnost",
+    "parcela",
+    "kn",
+    "bioodpad",
+    "skládka",
+    "hřbit",
+    "sběr",
+    "svoz",
+    "odpad",
+  ];
+
+  for (const k of keywords) {
+    if (q.includes(k) && t.includes(k)) bonus += 0.03;
+  }
+
+  // bonus za novější roky, pokud jde o poplatky
+  if (q.includes("poplatek") || q.includes("vyhláš")) {
+    if (t.includes("2026")) bonus += 0.06;
+    if (t.includes("2025")) bonus += 0.04;
+    if (t.includes("2024")) bonus += 0.02;
+  }
+
+  return bonus;
+}
+
+async function oaiFetch(pathname, body) {
+  const r = await fetch(`https://api.openai.com${pathname}`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
+      authorization: `Bearer ${OPENAI_API_KEY}`,
+      "content-type": "application/json",
+      "openai-beta": "assistants=v2",
     },
     body: JSON.stringify(body),
   });
 
-  const text = await res.text().catch(() => "");
-  let json = {};
-  try { json = text ? JSON.parse(text) : {}; } catch {}
-
-  if (!res.ok) {
-    throw new Error(json?.error?.message || text || `HTTP ${res.status}`);
+  const text = await r.text().catch(() => "");
+  let json = null;
+  try {
+    json = text ? JSON.parse(text) : null;
+  } catch {
+    // ignore
   }
+
+  if (!r.ok) {
+    const msg =
+      (json && (json.error?.message || json.message)) ||
+      `OpenAI error ${r.status}`;
+    throw new Error(msg);
+  }
+
   return json;
 }
 
-function extractChunks(data) {
-  if (!Array.isArray(data?.data)) return [];
+async function vectorSearch(query, maxNumResults = 12) {
+  // IMPORTANT: OpenAI limit max_num_results <= 50
+  const n = Math.max(1, Math.min(Number(maxNumResults) || 12, 50));
 
-  return data.data
-    .map(item => {
-      const text = (item?.content || [])
-        .filter(c => c.type === "text")
-        .map(c => c.text)
-        .join("\n")
-        .trim();
+  const res = await oaiFetch(`/v1/vector_stores/${VECTOR_STORE_ID}/search`, {
+    query,
+    max_num_results: n,
+  });
 
-      return {
-        score: typeof item?.score === "number" ? item.score : 0,
-        text,
-        filename: item?.filename || item?.file?.filename || ""
-      };
+  // res.data[]: { file_id, filename, score, content:[{type:"text", text:"..."}] }
+  return Array.isArray(res?.data) ? res.data : [];
+}
+
+function buildContextFromResults(results, userQuery, fullText) {
+  // 1) seřaď s malým bonusem heuristiky
+  const ranked = results
+    .map((r) => {
+      const chunkText = r?.content?.[0]?.text || "";
+      const bonus = scoreBonusForQuery(chunkText, userQuery);
+      return { ...r, _score2: (r?.score || 0) + bonus };
     })
-    .filter(x => x.text && x.text.length > 50)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 30);
-}
+    .sort((a, b) => (b._score2 || 0) - (a._score2 || 0));
 
-function extractLinks(text) {
-  const re = /(https?:\/\/[^\s<>()"]+)/g;
-  const out = new Set();
-  let m;
-  while ((m = re.exec(String(text || "")))) out.add(m[1]);
-  return Array.from(out);
-}
+  // 2) vyber krátké úryvky
+  const topSnippets = ranked.slice(0, 10).map((r) => {
+    const text = r?.content?.[0]?.text || "";
+    return {
+      filename: r?.filename || "",
+      score: r?._score2 ?? r?.score ?? 0,
+      text,
+    };
+  });
 
-function pickBestUrl(allText, preferRegexList) {
-  const urls = extractLinks(allText);
-  for (const re of preferRegexList) {
-    const hit = urls.find(u => re.test(u));
-    if (hit) return hit;
-  }
-  return urls[0] || null;
-}
-
-function normalize(s) {
-  return String(s || "")
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
-}
-
-function looksLikeFeeQuery(qNorm) {
-  return /(poplatek|kolik se plati|kolik je|sazba|odvoz odpadu|odpad)/i.test(qNorm);
-}
-function isWasteFee(qNorm) {
-  return /(odpad|odpadoveho|odvoz odpadu|komunalni)/i.test(qNorm);
-}
-function isDogFee(qNorm) {
-  return /(pes|psu|ze psu|poplatek ze psu)/i.test(qNorm);
-}
-
-// Deterministic extraction from chunk texts
-function extractFeeFromText(allText, mode /*"waste"|"dog"*/) {
-  const t = String(allText || "");
-
-  // Sazba: "Sazba poplatku ... činí 750 Kč." nebo "Sazba poplatku za kalendářní rok činí 750 Kč."
-  const sazbaRe = /Sazba\s+poplatku[^.\n]{0,120}činí\s+([0-9][0-9 .]*)\s*Kč/i;
-
-  // Splatnost: "splatný nejpozději do 31. března"
-  const splatRe = /Poplatek\s+je\s+splatn[ýa]\s+nejpozději\s+do\s+([0-9]{1,2}\.\s*[0-9]{1,2}\.|[0-9]{1,2}\.\s*[a-zá-ž]+)\s*([0-9]{4})?/i;
-
-  // U odpadu chceme, aby se to vážilo k odpadovému hospodářství
-  if (mode === "waste") {
-    const mustContain = /(odpadov[ée]ho\s+hospod[áa]řstv[ií]|obecn[ií]\s+syst[ée]m\s+odpad)/i;
-    if (!mustContain.test(t)) {
-      // ale: někdy chunk se sazbou neobsahuje "odpadové hospodářství" – tak povolíme, pokud je v textu zároveň PDF_URL s odpadovym hosp.
-      const hasWastePdfUrl = /PDF_URL:\s*https?:\/\/[^\n]*odpadoveho-hospodarstvi/i.test(t) || /original=.*odpadoveho-hospodarstvi/i.test(t);
-      if (!hasWastePdfUrl) return null;
+  // 3) pokud snippet ukazuje na PAGE URL, vytáhni celý PAGE blok (max 3)
+  const pageBlocks = [];
+  const pageLinks = [];
+  for (const sn of topSnippets) {
+    const url = extractPageUrlFromSnippet(sn.text);
+    if (!url) continue;
+    const block = extractPageBlock(fullText, url);
+    if (block) {
+      pageBlocks.push(block);
+      pageLinks.push(url);
     }
   }
 
-  // U psů to může být víc verzí (100 Kč staré, 150 Kč nové).
-  // Zkusíme nejdřív chytit blok, kde se v okolí objevuje 2025/2026 (novější).
-  const blocks = t.split(/={10,}|\n-{3,}\n/g); // hrubé bloky
-  const scored = blocks
-    .map(b => {
-      const mS = b.match(sazbaRe);
-      if (!mS) return null;
-      const amount = mS[1].replace(/\s+/g, "").replace(/\./g, "");
-      const yearScore = /2026/.test(b) ? 3 : /2025/.test(b) ? 2 : /2024/.test(b) ? 1 : 0;
-      const modeScore =
-        mode === "waste"
-          ? (/odpadov/i.test(b) || /odpadov[ée]ho\s+hospod/i.test(b) ? 3 : 0)
-          : (/ps[ůu]/i.test(b) || /ze\s+ps/i.test(b) ? 3 : 0);
-      return { amount, block: b, score: yearScore + modeScore };
+  // unikátní page blocks (podle URL řádku)
+  const uniqBlocks = [];
+  const seen = new Set();
+  for (const b of pageBlocks) {
+    const m = b.match(/^=== PAGE\nURL:\s*(https?:\/\/[^\s]+)\s*$/m);
+    const key = m?.[1] || b.slice(0, 120);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    uniqBlocks.push(b);
+  }
+
+  const pageContext = uniqBlocks.slice(0, 3).join("\n\n---\n\n");
+
+  const snippetContext = topSnippets
+    .slice(0, 8)
+    .map((sn, i) => {
+      return `[#${i + 1}] FILE: ${sn.filename}\nSCORE: ${sn.score.toFixed(
+        3
+      )}\nTEXT:\n${safeSnippet(sn.text, 1200)}`;
     })
-    .filter(Boolean)
-    .sort((a, b) => b.score - a.score);
-
-  const best = scored[0];
-  if (!best) return null;
-
-  const spl = best.block.match(splatRe);
-  const splatnost = spl ? `${spl[1]}${spl[2] ? " " + spl[2] : ""}` : null;
-
-  // Link: preferujeme konkrétní PDF, pak stránku úřední desky
-  const url = pickBestUrl(best.block + "\n" + t, mode === "waste"
-    ? [
-        /original=.*odpadoveho-hospodarstvi/i,
-        /obsah521_1\.pdf/i,
-        /\/urad\/uredni-deska\/.*odpadoveho-hospodarstvi/i
-      ]
-    : [
-        /original=.*poplatek-ze-psu/i,
-        /\/urad\/uredni-deska\/.*poplatku-ze-psu/i
-      ]
-  );
+    .join("\n\n---\n\n");
 
   return {
-    amount: best.amount,
-    splatnost,
-    url
+    pageContext: pageContext ? `DŮLEŽITÉ (celé stránky z webu obce):\n${pageContext}` : "",
+    snippetContext: snippetContext ? `DALŠÍ NÁLEZY (úryvky):\n${snippetContext}` : "",
+    pageLinks: Array.from(new Set(pageLinks)).slice(0, 10),
+    usedSnippets: topSnippets,
   };
 }
 
-function buildContext(chunks) {
-  let ctx = `OFICIÁLNÍ PODKLADY OBCE ${OBEC}\n\n`;
-  chunks.forEach((c, i) => {
-    ctx += `--- ZDROJ ${i + 1}: ${c.filename} (score ${c.score.toFixed(3)})\n`;
-    // omez chunk, ať to není gigant a model se neztratí
-    ctx += c.text.slice(0, 3500);
-    ctx += "\n\n";
-  });
-  return ctx;
-}
-
-export default async function handler(req) {
-  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders });
-
-  try {
-    if (req.method !== "POST") return jsonResponse(405, { ok: false, error: "Method not allowed" });
-
-    const apiKey = process.env.OPENAI_API_KEY;
-    const vectorStoreId = process.env.VECTOR_STORE_ID;
-    if (!apiKey || !vectorStoreId) return jsonResponse(500, { ok: false, error: "Missing env vars" });
-
-    const body = await req.json().catch(() => ({}));
-    const rawMessage = body?.message?.trim();
-    if (!rawMessage) return jsonResponse(400, { ok: false, error: "Missing message" });
-
-    const debug = rawMessage.toLowerCase().startsWith("#debug");
-    const message = rawMessage.replace(/^#debug\s*/i, "").trim();
-    const qNorm = normalize(message);
-
-    // 1) search
-    const search = await oaiFetch(
-      `/vector_stores/${vectorStoreId}/search`,
+async function answerWithModel(userQuery, contextText) {
+  // Použijeme Responses API (jednoduché). Když bys chtěl Assistants, dá se přepnout.
+  const body = {
+    model: "gpt-4o-mini",
+    input: [
       {
-        query: message,
-        max_num_results: 50, // ✅ hard limit
-        rewrite_query: true,
-      },
-      apiKey
-    );
-
-    const chunks = extractChunks(search);
-    if (!chunks.length) {
-      return jsonResponse(200, { ok: true, answer: FALLBACK, thread_id: null, links: [], debug: debug ? { chunks } : undefined });
-    }
-
-    const allText = chunks.map(c => c.text).join("\n\n---\n\n");
-
-    // ✅ 2) deterministic path for poplatky (odpad/psi)
-    if (looksLikeFeeQuery(qNorm)) {
-      if (isWasteFee(qNorm)) {
-        const fee = extractFeeFromText(allText, "waste");
-        if (fee?.amount) {
-          const lines = [];
-          lines.push(`Poplatek za obecní systém odpadového hospodářství činí **${fee.amount} Kč** za kalendářní rok.`);
-          if (fee.splatnost) lines.push(`Splatnost: nejpozději do **${fee.splatnost}**.`);
-          if (fee.url) lines.push(`Zdroj: ${fee.url}`);
-          return jsonResponse(200, {
-            ok: true,
-            answer: lines.join("\n"),
-            thread_id: null,
-            links: Array.from(new Set([...(fee.url ? [fee.url] : []), ...extractLinks(allText)])).slice(0, 10),
-            debug: debug ? { chunks } : undefined
-          });
-        }
-      }
-
-      if (isDogFee(qNorm)) {
-        const fee = extractFeeFromText(allText, "dog");
-        if (fee?.amount) {
-          const lines = [];
-          lines.push(`Poplatek ze psů činí **${fee.amount} Kč** za kalendářní rok (za 1 psa).`);
-          if (fee.splatnost) lines.push(`Splatnost: nejpozději do **${fee.splatnost}**.`);
-          if (fee.url) lines.push(`Zdroj: ${fee.url}`);
-          return jsonResponse(200, {
-            ok: true,
-            answer: lines.join("\n"),
-            thread_id: null,
-            links: Array.from(new Set([...(fee.url ? [fee.url] : []), ...extractLinks(allText)])).slice(0, 10),
-            debug: debug ? { chunks } : undefined
-          });
-        }
-      }
-    }
-
-    // 3) model fallback for everything else
-    const context = buildContext(chunks);
-    const resp = await oaiFetch(
-      `/responses`,
-      {
-        model: "gpt-4.1-mini",
-        temperature: 0.1,
-        input: [
+        role: "system",
+        content: [
           {
-            role: "system",
-            content:
-              `Jsi AI asistent obce ${OBEC}. Odpovídej pouze podle poskytnutého kontextu. ` +
-              `Nevymýšlej. Pokud údaj není uveden, napiš přesně: "${FALLBACK}". ` +
-              `Pokud je v kontextu odkaz (URL), přilož ho.`
+            type: "input_text",
+            text:
+              "Jsi AI asistent obce Radim. Odpovídej česky, stručně a věcně.\n" +
+              "Pravidla:\n" +
+              "1) Odpovídej VÝHRADNĚ z poskytnutého kontextu. Neimprovizuj.\n" +
+              "2) Pokud jsou v kontextu různé verze vyhlášek/poplatků, preferuj nejnovější (novější rok, novější účinnost, novější vyvěšení).\n" +
+              "3) Když odpověď v kontextu není, napiš přesně: „Tato informace není v dostupných podkladech obce Radim uvedena.“\n" +
+              "4) Když odpověď je, uveď i relevantní odkaz (URL), ideálně na konkrétní stránku nebo stažení dokumentu.\n" +
+              "5) Nezmiňuj interní technické věci (vector store, file_search, chunk apod.).\n",
           },
-          { role: "user", content: `${context}\nDOTAZ:\n${message}` }
         ],
       },
-      apiKey
-    );
+      {
+        role: "user",
+        content: [
+          {
+            type: "input_text",
+            text:
+              `DOTAZ:\n${userQuery}\n\n` +
+              `KONTEXT:\n${contextText}\n`,
+          },
+        ],
+      },
+    ],
+    temperature: 0.2,
+  };
 
-    const answer = (resp?.output_text || "").trim() || FALLBACK;
+  const r = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${OPENAI_API_KEY}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
 
-    const links = Array.from(new Set([
-      ...extractLinks(answer),
-      ...extractLinks(allText),
-    ])).slice(0, 10);
+  const text = await r.text().catch(() => "");
+  let json = null;
+  try {
+    json = text ? JSON.parse(text) : null;
+  } catch {
+    // ignore
+  }
+  if (!r.ok) {
+    const msg =
+      (json && (json.error?.message || json.message)) ||
+      `OpenAI error ${r.status}`;
+    throw new Error(msg);
+  }
 
-    return jsonResponse(200, {
+  // responses output parsing
+  const out = json?.output || [];
+  let answer = "";
+  for (const item of out) {
+    const content = item?.content || [];
+    for (const c of content) {
+      if (c?.type === "output_text" && c?.text) answer += c.text;
+    }
+  }
+  return normalizeWhitespace(answer);
+}
+
+function extractLinksFromText(t) {
+  const s = String(t || "");
+  const links = s.match(/https?:\/\/[^\s)]+/g) || [];
+  return Array.from(new Set(links.map(cleanupUrl))).slice(0, 12);
+}
+
+export default async (req) => {
+  try {
+    if (req.method === "OPTIONS") {
+      return jsonResponse(200, { ok: true });
+    }
+    if (req.method !== "POST") {
+      return jsonResponse(405, { ok: false, error: "Method not allowed" });
+    }
+
+    if (!OPENAI_API_KEY) {
+      return jsonResponse(500, {
+        ok: false,
+        error: "Missing OPENAI_API_KEY",
+      });
+    }
+    if (!VECTOR_STORE_ID) {
+      return jsonResponse(500, {
+        ok: false,
+        error: "Missing VECTOR_STORE_ID",
+      });
+    }
+
+    const body = await req.json().catch(() => ({}));
+    const rawMessage = body?.message ?? "";
+    const debug = isDebugMessage(rawMessage);
+
+    const userQuery = debug ? stripDebugPrefix(rawMessage) : String(rawMessage || "").trim();
+    if (!userQuery) {
+      return jsonResponse(200, { ok: true, answer: "", thread_id: null });
+    }
+
+    // načti FULL lokálně (pro page block extraction)
+    // cesta odpovídá tvému repu: /knowledge/99_FULL_obec_radim.txt
+    const fullText = readLocalFile("knowledge/99_FULL_obec_radim.txt");
+
+    // 1) Vector search (top N)
+    const results = await vectorSearch(userQuery, 14);
+
+    // 2) postprocess + page-block extraction
+    const ctx = buildContextFromResults(results, userQuery, fullText);
+
+    const finalContext = [
+      ctx.pageContext,
+      ctx.snippetContext,
+    ]
+      .filter(Boolean)
+      .join("\n\n====================\n\n");
+
+    // 3) odpověď modelem
+    const answer = await answerWithModel(userQuery, finalContext);
+
+    // links: kombinace (a) linky z answer (b) pageLinks z FULL
+    const links = Array.from(
+      new Set([...(ctx.pageLinks || []), ...extractLinksFromText(answer)])
+    ).slice(0, 12);
+
+    // pokud je odpověď prázdná (někdy model vrátí nic), vrať "Bez odpovědi"
+    const safeAnswer = answer || "Bez odpovědi";
+
+    const payload = {
       ok: true,
-      answer,
+      answer: safeAnswer,
       thread_id: null,
       links,
-      debug: debug ? { chunks } : undefined,
-    });
+    };
 
-  } catch (err) {
-    return jsonResponse(500, { ok: false, error: "Server error", details: err?.message || String(err) });
+    if (debug) {
+      payload.debug = {
+        top_files: results.slice(0, 10).map((r) => ({
+          filename: r.filename,
+          score: r.score,
+        })),
+        used_page_links: ctx.pageLinks,
+        used_snippets: ctx.usedSnippets.slice(0, 6).map((s) => ({
+          filename: s.filename,
+          score: s.score,
+          text: safeSnippet(s.text, 500),
+        })),
+        page_context_preview: safeSnippet(ctx.pageContext, 1200),
+      };
+    }
+
+    return jsonResponse(200, payload);
+  } catch (e) {
+    return jsonResponse(500, {
+      ok: false,
+      error: "Server error",
+      details: String(e?.message || e),
+    });
   }
-}
+};
