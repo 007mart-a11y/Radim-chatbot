@@ -1,4 +1,4 @@
-// netlify/functions/search.mjs (v6 - SIMPLE + STABLE NETLIFY HANDLER)
+// netlify/functions/search.mjs (v7 - SIMPLE + NEWEST-YEAR FILTER)
 // Node 18+
 // ENV: OPENAI_API_KEY, VECTOR_STORE_ID
 // Request: { message: string }
@@ -49,20 +49,82 @@ function extractLinks(text) {
 
 function cleanAnswer(t) {
   let s = String(t || "");
-
-  // pryč citace typu 【…†…】
   s = s.replace(/【\s*\d+\s*:\s*\d+\s*†[^】]*】/g, "");
   s = s.replace(/【[^】]*†[^】]*】/g, "");
-
-  // seniors odkazy pryč
   s = s.replace(/https:\/\/www\.obec-radim\.cz\/seniori\//g, "https://www.obec-radim.cz/");
-
-  // whitespace
   s = s.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
-
   return s;
 }
 
+function normalizeCz(s) {
+  return String(s || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+function intent(q) {
+  const t = normalizeCz(q);
+  return {
+    pdfish: /(vyhlask|narizen|poplatek|odpad|psy|psu|castka|sazba|splatnost|ucinnost|cl\.|clanek|odstavec|kč|kc|pdf)/i.test(t),
+    dog: /(poplatek.*(psu|psy)|za\s+psa|pes\b)/i.test(t),
+    waste: /(odpad|odpadu|popelnic|komunal)/i.test(t),
+  };
+}
+
+function isDebugQuestion(q) {
+  return String(q || "").trim().toLowerCase().startsWith("#debug");
+}
+function stripDebugPrefix(q) {
+  return String(q || "").trim().replace(/^#debug\s*/i, "").trim();
+}
+
+// ---------- year extraction (deterministic newest) ----------
+function extractYearFromTextOrUrl(s) {
+  const txt = String(s || "");
+  // prefer "original=2026..." or "/2026" etc
+  let m = txt.match(/original=.*?(20\d{2})/i);
+  if (m) return parseInt(m[1], 10);
+
+  // "účinnost ... 2026", "ze dne 1. prosince 2025" etc
+  m = txt.match(/\b(20\d{2})\b/g);
+  if (!m) return null;
+
+  // vezmi nejvyšší rok z výskytů
+  const years = m.map((x) => parseInt(x, 10)).filter((n) => n >= 2000 && n <= 2099);
+  if (!years.length) return null;
+  return Math.max(...years);
+}
+
+function filterNewestByYear(chunks) {
+  // vrátí: { pickedYear, filteredChunks, candidateYears }
+  const years = chunks
+    .map((c) => extractYearFromTextOrUrl(`${c.filename}\n${c.text}`))
+    .filter((y) => Number.isFinite(y));
+
+  const candidateYears = Array.from(new Set(years)).sort((a, b) => b - a);
+  if (!candidateYears.length) {
+    return { pickedYear: null, filteredChunks: chunks, candidateYears: [] };
+  }
+
+  const pickedYear = candidateYears[0];
+
+  // nech jen chunky, které ten pickedYear obsahují (nebo aspoň nemají žádný rok)
+  const filtered = chunks.filter((c) => {
+    const y = extractYearFromTextOrUrl(`${c.filename}\n${c.text}`);
+    if (!y) return true;          // bez roku necháme jako doplněk
+    return y === pickedYear;      // starší pryč
+  });
+
+  // bezpečnost: kdyby filtr osekal moc, vrať radši původní
+  if (filtered.length < 5 && chunks.length >= 5) {
+    return { pickedYear, filteredChunks: chunks, candidateYears };
+  }
+
+  return { pickedYear, filteredChunks: filtered, candidateYears };
+}
+
+// ---------- OpenAI ----------
 async function oaiFetch(path, { method = "GET", headers = {}, body } = {}, apiKey) {
   const res = await fetch(`${OPENAI_BASE_URL}${path}`, {
     method,
@@ -92,7 +154,6 @@ async function oaiFetch(path, { method = "GET", headers = {}, body } = {}, apiKe
 }
 
 async function vectorSearch(vectorStoreId, query, apiKey) {
-  // IMPORTANT: query musí být string (ne pole) – pro stabilitu
   return await oaiFetch(
     `/vector_stores/${vectorStoreId}/search`,
     {
@@ -100,8 +161,8 @@ async function vectorSearch(vectorStoreId, query, apiKey) {
       body: JSON.stringify({
         query,
         rewrite_query: true,
-        max_num_results: 30,
-        ranking_options: { ranker: "auto", score_threshold: 0.08 },
+        max_num_results: 40,
+        ranking_options: { ranker: "auto", score_threshold: 0.06 },
       }),
     },
     apiKey
@@ -121,7 +182,7 @@ function flattenChunkText(it) {
     .trim();
 }
 
-function pickTopChunks(searchJson, limit = 14) {
+function pickTopChunks(searchJson, limit = 18) {
   const items = Array.isArray(searchJson?.data) ? searchJson.data : [];
   const ranked = items
     .map((it) => {
@@ -136,7 +197,7 @@ function pickTopChunks(searchJson, limit = 14) {
   const out = [];
   const seen = new Set();
   for (const r of ranked) {
-    const key = (r.filename || "") + "::" + r.text.slice(0, 220);
+    const key = (r.filename || "") + "::" + r.text.slice(0, 240);
     if (seen.has(key)) continue;
     seen.add(key);
     out.push(r);
@@ -145,11 +206,11 @@ function pickTopChunks(searchJson, limit = 14) {
   return out;
 }
 
-function buildContext(chunks) {
-  // jednoduchý kontext, žádná magie
+function buildContext(chunks, pickedYear) {
   let ctx = `KONTEXT (oficiální podklady obce ${OBEC})\n`;
   ctx += `Pravidla: odpovídej jen z kontextu. Když tam údaj není, napiš přesně: "${HARD_FALLBACK}".\n`;
   ctx += `Vždy přidej odkaz, pokud je v kontextu.\n`;
+  if (pickedYear) ctx += `DŮLEŽITÉ: V kontextu existuje více verzí. Preferuj nejnovější rok: ${pickedYear}.\n`;
   ctx += `---\n\n`;
 
   const cap = 5200;
@@ -160,15 +221,6 @@ function buildContext(chunks) {
   });
 
   return ctx.trim();
-}
-
-function isDebugQuestion(q) {
-  return String(q || "").trim().toLowerCase().startsWith("#debug");
-}
-
-function stripDebugPrefix(q) {
-  const s = String(q || "").trim();
-  return s.replace(/^#debug\s*/i, "").trim();
 }
 
 async function generateAnswer(userQ, contextBlock, apiKey) {
@@ -239,27 +291,39 @@ export const handler = async (event) => {
     const userQ = debug ? stripDebugPrefix(rawMessage) : rawMessage.trim();
     if (!userQ) return json(200, { ok: true, answer: HARD_FALLBACK });
 
-    // jednoduché query expansion (string)
+    const it = intent(userQ);
+
+    // jednoduché rozšíření dotazu (string) – hlavně pro vyhlášky
     const expandedQuery =
       `${userQ}\n` +
       `obec Radim\n` +
-      `vyhláška poplatek sazba splatnost Kč\n` +
-      `odpad psy bioodpad úřední hodiny kontakty\n`;
+      (it.pdfish ? `vyhláška účinnost sazba splatnost částka Kč článek odstavec\n` : ``) +
+      (it.dog ? `místní poplatek ze psů vyhláška original=2026\n` : ``) +
+      (it.waste ? `odpadové hospodářství místní poplatek original=2026\n` : ``);
 
     const search = await vectorSearch(vectorStoreId, expandedQuery, apiKey);
-    const chunks = pickTopChunks(search, 16);
+    let chunks = pickTopChunks(search, it.pdfish ? 22 : 16);
 
     if (!chunks.length) {
       return json(200, { ok: true, answer: HARD_FALLBACK, links: [] });
     }
 
-    const contextBlock = buildContext(chunks);
+    // ✅ KLÍČ: když jde o poplatky/vyhlášky, drž jen nejnovější rok
+    let pickedYear = null;
+    let candidateYears = [];
+    if (it.pdfish) {
+      const filtered = filterNewestByYear(chunks);
+      pickedYear = filtered.pickedYear;
+      candidateYears = filtered.candidateYears;
+      chunks = filtered.filteredChunks;
+    }
+
+    const contextBlock = buildContext(chunks, pickedYear);
     let answer = await generateAnswer(userQ, contextBlock, apiKey);
     answer = cleanAnswer(answer);
 
     if (!answer || answer === "Bez odpovědi") answer = HARD_FALLBACK;
 
-    // odkazy: z odpovědi + chunků
     const links = Array.from(
       new Set([
         ...chunks.flatMap((c) => extractLinks(c.text)),
@@ -271,16 +335,19 @@ export const handler = async (event) => {
       const filenames = chunks.map((c) => c.filename || "").filter(Boolean);
       const dbg = {
         q: userQ,
+        pdfish: it.pdfish,
+        picked_year: pickedYear,
+        candidate_years: candidateYears.slice(0, 6),
         chunks: chunks.length,
-        top_files: Array.from(new Set(filenames)).slice(0, 8),
-        top_links: links.slice(0, 8),
+        top_files: Array.from(new Set(filenames)).slice(0, 10),
+        top_links: links.slice(0, 10),
       };
       return json(200, { ok: true, answer, links, debug: dbg });
     }
 
     return json(200, { ok: true, answer, links });
   } catch (err) {
-    // DŮLEŽITÉ: i při chybě vrať answer, aby frontend neskončil "Bez odpovědi"
+    // i při chybě vrať answer, ať frontend nepadá do "Bez odpovědi"
     return json(200, {
       ok: false,
       answer: HARD_FALLBACK,
