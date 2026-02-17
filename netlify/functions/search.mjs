@@ -1,4 +1,4 @@
-// netlify/functions/search.mjs (v10 - two-stage retrieval + big context + debug)
+// netlify/functions/search.mjs (v11 - robust retrieval, no array query, never crashes)
 // Node 18+
 // ENV: OPENAI_API_KEY, VECTOR_STORE_ID
 // Request: { message: string, thread_id?: string, history?: {role:"user"|"assistant", content:string}[] }
@@ -53,14 +53,18 @@ function extractLinks(text) {
   return Array.from(out);
 }
 
-function parseIntent(q) {
+function parseIntent(raw) {
+  const debug = /^\s*#debug\b/i.test(raw);
+  const q = raw.replace(/^\s*#debug\b/i, "").trim();
   const t = normalizeCzech(q);
   return {
-    debug: /^\s*#debug\b/i.test(q),
+    debug,
+    q,
     quote: /(odcituj|cituj|zkopiruj|max\s*2\s*vety|max\s*dve\s*vety|presnou vetu|citace)/i.test(t),
     latest: /(nejnovejs|posledn|aktualn|dnes|k\s*datu|uredni\s*desce|vyvesen|ucinn|platn)/i.test(t),
     pdfish: /(vyhlask|narizen|poplatek|odpad|psy|psu|sazba|splatnost|ucinnost|cl\.|clanek|odstavec|kč|kc|pdf)/i.test(t),
     people: /(kdo\s*je|starost|mistostarost|kontakt|telefon|email|e-mail|predsed|tajemnik)/i.test(t),
+    bio: /(bioodpad|skladka)/i.test(t),
   };
 }
 
@@ -92,18 +96,16 @@ async function oaiFetch(path, { method = "GET", headers = {}, body } = {}, apiKe
   return json ?? {};
 }
 
-async function vectorSearch({ vectorStoreId, query, maxNumResults, scoreThreshold, rewriteQuery }, apiKey) {
+async function vectorSearchOne({ vectorStoreId, query, maxNumResults, scoreThreshold }, apiKey) {
   return await oaiFetch(
     `/vector_stores/${vectorStoreId}/search`,
     {
       method: "POST",
       body: JSON.stringify({
-        query,
+        query, // !!! vždy STRING
         max_num_results: maxNumResults,
-        rewrite_query: !!rewriteQuery,
-        ranking_options: scoreThreshold != null
-          ? { ranker: "auto", score_threshold: scoreThreshold }
-          : undefined,
+        rewrite_query: true,
+        ranking_options: { ranker: "auto", score_threshold: scoreThreshold },
       }),
     },
     apiKey
@@ -123,111 +125,13 @@ function flattenChunkText(it) {
     .trim();
 }
 
-// účetní bordel – nechceme ho cpát do top kontextu pro běžné dotazy
 function isAccountingNoise(text) {
-  const t = normalizeCzech(text).slice(0, 6000);
-  return /(rozvaha|pasiva|aktiva|synteticky ucet|uctetni obdobi|brutto|netto|korekce|vykaz|zaverecny ucet|rozpoctove opatreni|rozpis rozpoctu)/i.test(t);
+  const t = normalizeCzech(text).slice(0, 7000);
+  return /(rozvaha|pasiva|aktiva|synteticky ucet|uctetni obdobi|brutto|netto|korekce|vykaz|zaverecny ucet|rozpoctove opatreni|rozpis rozpoctu)/i.test(
+    t
+  );
 }
 
-// === PRE-ANSWER HEURISTICS (lokální “předvyhledání”) ===
-function preExtractSignals(chunksText, userQ) {
-  const it = parseIntent(userQ);
-
-  const joined = chunksText.join("\n\n");
-  const norm = normalizeCzech(joined);
-
-  // částky (Kč)
-  const money = [];
-  for (const m of joined.matchAll(/\b(\d{1,4}(?:[ \u00a0]?\d{3})*)\s*(Kč|kc)\b/gi)) {
-    money.push(m[0].replace(/\s+/g, " ").trim());
-    if (money.length >= 8) break;
-  }
-
-  // články / odstavce
-  const articles = [];
-  for (const m of joined.matchAll(/\bčl\.?\s*\d+\b/gi)) {
-    articles.push(m[0].replace(/\s+/g, " ").trim());
-    if (articles.length >= 6) break;
-  }
-
-  // splatnost / účinnost / vyvěšeno (zachytíme “31. března” apod.)
-  const dates = [];
-  for (const m of joined.matchAll(/\b(\d{1,2}\.\s*\d{1,2}\.\s*\d{4})\b/g)) {
-    dates.push(m[1]);
-    if (dates.length >= 6) break;
-  }
-
-  // kategorie z dotazu (pomůže focusu)
-  const keywords = new Set();
-  if (/bioodpad|skladka/i.test(norm + " " + normalizeCzech(userQ))) {
-    keywords.add("skládka bioodpadu");
-    keywords.add("parcela");
-    keywords.add("otevřeno");
-  }
-  if (it.pdfish) {
-    keywords.add("vyhláška");
-    keywords.add("sazba poplatku");
-    keywords.add("splatnost");
-    keywords.add("účinnost");
-  }
-  if (it.people) {
-    keywords.add("telefon");
-    keywords.add("e-mail");
-    keywords.add("kontakt");
-    keywords.add("starosta");
-    keywords.add("starostka");
-  }
-
-  // odkazové signály
-  const urls = extractLinks(joined).slice(0, 8);
-
-  return {
-    money,
-    articles,
-    dates,
-    keywords: Array.from(keywords),
-    urls,
-  };
-}
-
-// build focused queries for 2nd pass
-function buildFocusedQueries(userQ, signals) {
-  const it = parseIntent(userQ);
-  const base = [];
-
-  // 1) původní dotaz
-  base.push(userQ);
-
-  // 2) když jsou peníze/články, přidáme je do dotazu
-  if (it.pdfish) {
-    const a = signals.articles?.[0] ? ` ${signals.articles[0]}` : "";
-    const m = signals.money?.[0] ? ` ${signals.money[0]}` : "";
-    base.push(`${userQ} ${OBEC_NAZEV} vyhláška${a}${m} sazba splatnost účinnost`);
-    base.push(`${OBEC_NAZEV} ${userQ} Čl. 4 Sazba poplatku Kč`);
-  }
-
-  // 3) people intent
-  if (it.people) {
-    base.push(`${OBEC_NAZEV} ${userQ} telefon email kontakt`);
-  }
-
-  // 4) bioodpad intent (zachytí konkrétní stránku)
-  const uqN = normalizeCzech(userQ);
-  if (uqN.includes("bioodpad") || uqN.includes("skladka")) {
-    base.push(`${OBEC_NAZEV} skládka bioodpadu parcela otevřeno`);
-    base.push(`skládka bioodpadu Radim hřbitov`);
-  }
-
-  // 5) přidáme pár keywordů z pre-extractu
-  for (const kw of (signals.keywords || []).slice(0, 4)) {
-    base.push(`${userQ} ${kw}`);
-  }
-
-  // uniq + limit
-  return Array.from(new Set(base)).slice(0, 4);
-}
-
-// simple boost & select
 function scoreBoost(filename, userQ, chunkText) {
   const f = (filename || "").toLowerCase();
   const it = parseIntent(userQ);
@@ -238,15 +142,13 @@ function scoreBoost(filename, userQ, chunkText) {
   if (it.people && f.includes("people")) b += 0.25;
   if (f.includes("99_full")) b += 0.08;
 
-  // penalizace účetnictví pokud dotaz není účetní
-  const qn = normalizeCzech(userQ);
-  const askingAccounting = /(rozvaha|ucetni|vykaz|zaverecny ucet|rozpocet|rozpoctove opatreni)/i.test(qn);
-  if (!askingAccounting && isAccountingNoise(chunkText)) b -= 0.45;
+  const askingAccounting = /(rozvaha|ucetni|vykaz|zaverecny ucet|rozpocet|rozpoctove opatreni)/i.test(normalizeCzech(userQ));
+  if (!askingAccounting && isAccountingNoise(chunkText)) b -= 0.5;
 
   return b;
 }
 
-function pickTopChunksFromSearch(searchJson, userQ, limit) {
+function pickTop(searchJson, userQ, limit) {
   const items = Array.isArray(searchJson?.data) ? searchJson.data : [];
   const ranked = items
     .map((it) => {
@@ -262,17 +164,75 @@ function pickTopChunksFromSearch(searchJson, userQ, limit) {
   const out = [];
   const seen = new Set();
   for (const r of ranked) {
-    const key = `${r.filename}::${r.text.slice(0, 240)}`;
+    const key = `${r.filename}::${r.text.slice(0, 260)}`;
     if (seen.has(key)) continue;
     seen.add(key);
-    out.push({
-      filename: r.filename,
-      score: Number.isFinite(r.score) ? Number(r.score.toFixed(3)) : null,
-      text: r.text,
-    });
+    out.push({ filename: r.filename, score: Number(r.score.toFixed(3)), text: r.text });
     if (out.length >= limit) break;
   }
   return out;
+}
+
+// pošleme více dotazů po jednom a sloučíme data
+async function searchMany({ vectorStoreId, queries, maxNumResults, scoreThreshold }, apiKey) {
+  const merged = [];
+  const errors = [];
+
+  for (const q of queries) {
+    try {
+      const res = await vectorSearchOne({ vectorStoreId, query: q, maxNumResults, scoreThreshold }, apiKey);
+      const data = Array.isArray(res?.data) ? res.data : [];
+      merged.push(...data);
+    } catch (e) {
+      errors.push({ q, err: e?.message || String(e) });
+    }
+  }
+
+  // vrátíme jako “fake searchJson”
+  return { data: merged, _errors: errors };
+}
+
+// ===== PRE-EXTRACT (rychlá heuristika) =====
+function preExtractSignals(texts, userQ) {
+  const joined = texts.join("\n\n");
+
+  const money = [];
+  for (const m of joined.matchAll(/\b(\d{1,4}(?:[ \u00a0]?\d{3})*)\s*(Kč|kc)\b/gi)) {
+    money.push(m[0].replace(/\s+/g, " ").trim());
+    if (money.length >= 6) break;
+  }
+
+  const articles = [];
+  for (const m of joined.matchAll(/\bčl\.?\s*\d+\b/gi)) {
+    articles.push(m[0].trim());
+    if (articles.length >= 4) break;
+  }
+
+  const urls = extractLinks(joined).slice(0, 8);
+
+  return { money, articles, urls };
+}
+
+function buildBroadQueries(userQ) {
+  const q = userQ.trim();
+  const n = normalizeCzech(q);
+  return Array.from(new Set([q, n, `${q} obec ${OBEC_NAZEV}`])).slice(0, 3);
+}
+
+function buildFocusedQueries(userQ, signals) {
+  const it = parseIntent(userQ);
+  const out = [userQ];
+
+  if (it.bio) out.push(`${OBEC_NAZEV} skládka bioodpadu parcela otevřeno hřbitov`);
+  if (it.pdfish) {
+    const a = signals.articles?.[0] ? ` ${signals.articles[0]}` : "";
+    const m = signals.money?.[0] ? ` ${signals.money[0]}` : "";
+    out.push(`${OBEC_NAZEV} ${userQ} vyhláška${a}${m} sazba splatnost účinnost Kč`);
+    out.push(`${OBEC_NAZEV} ${userQ} Čl. 4 sazba poplatku`);
+  }
+  if (it.people) out.push(`${OBEC_NAZEV} ${userQ} telefon e-mail kontakt`);
+
+  return Array.from(new Set(out)).slice(0, 4);
 }
 
 function systemPrompt(userQ) {
@@ -281,33 +241,24 @@ function systemPrompt(userQ) {
     `Jsi AI asistent obce ${OBEC_NAZEV}. Odpovídej pouze podle poskytnutého KONTEXTU.\n` +
     `Nevymýšlej fakta. Pokud údaj není v kontextu, napiš přesně: "${HARD_FALLBACK}".\n\n` +
     `Pravidla:\n` +
-    `- Stručně, prakticky (1–8 bodů).\n` +
+    `- Stručně a prakticky.\n` +
     `- Pokud je v kontextu odkaz na stránku nebo PDF, vždy ho uveď.\n` +
     `- Nikdy nepoužívej odkazy se "/seniori/".\n` +
-    (it.quote
-      ? `- Uživatel chce citaci: zkopíruj max 2 věty přesně z kontextu (bez parafráze) a připiš zdroj.\n`
-      : ``)
+    (it.quote ? `- U citace: max 2 věty přesně z kontextu.\n` : ``)
   );
 }
 
 function buildContext(chunks, userQ) {
   const it = parseIntent(userQ);
-
-  // větší cap, ale pořád bezpečný
   const cap = it.quote ? 7000 : it.pdfish ? 5200 : 4200;
 
-  let header = `KONTEXT – OFICIÁLNÍ PODKLADY OBCE ${OBEC_NAZEV}\n`;
-  header += `Pozn.: odkazy uváděj bez "/seniori/".\n`;
-  header += `---\n`;
-
-  let body = "";
+  let body = `KONTEXT – PODKLADY OBCE ${OBEC_NAZEV}\n---\n`;
   chunks.forEach((c, i) => {
     let t = c.text || "";
     if (t.length > cap) t = t.slice(0, cap) + "\n[ZKRÁCENO]";
-    body += `[#${i + 1}] ${c.filename || "soubor"} (score: ${c.score ?? "?"})\n${t}\n---\n`;
+    body += `[#${i + 1}] ${c.filename} (score:${c.score})\n${t}\n---\n`;
   });
-
-  return (header + body).trim();
+  return body.trim();
 }
 
 function extractResponseText(resp) {
@@ -373,11 +324,11 @@ async function generateAnswer({ userMessage, contextBlock, history, temperature 
 export default async function handler(req) {
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders });
 
+  const apiKey = process.env.OPENAI_API_KEY;
+  const vectorStoreId = process.env.VECTOR_STORE_ID;
+
   try {
     if (req.method !== "POST") return jsonResponse(405, { ok: false, error: "Method not allowed" });
-
-    const apiKey = process.env.OPENAI_API_KEY;
-    const vectorStoreId = process.env.VECTOR_STORE_ID;
     if (!apiKey) return jsonResponse(500, { ok: false, error: "Missing OPENAI_API_KEY" });
     if (!vectorStoreId) return jsonResponse(500, { ok: false, error: "Missing VECTOR_STORE_ID" });
 
@@ -386,48 +337,34 @@ export default async function handler(req) {
     if (!raw || typeof raw !== "string") return jsonResponse(400, { ok: false, error: "Missing message" });
 
     const it = parseIntent(raw);
-    const userQ = raw.replace(/^\s*#debug\b/i, "").trim();
-    const threadId = (body?.thread_id && String(body.thread_id)) || `thread_local_${Date.now()}`;
+    const userQ = it.q;
     const history = Array.isArray(body?.history) ? body.history : null;
+    const threadId = (body?.thread_id && String(body.thread_id)) || `thread_local_${Date.now()}`;
 
-    // ===== PASS 1 (broad) =====
-    const broad = await vectorSearch(
-      {
-        vectorStoreId,
-        query: userQ,
-        maxNumResults: it.pdfish ? 70 : 40,
-        scoreThreshold: it.pdfish ? 0.06 : 0.08,
-        rewriteQuery: true,
-      },
+    // ===== BROAD =====
+    const broadQueries = buildBroadQueries(userQ);
+    const broadRes = await searchMany(
+      { vectorStoreId, queries: broadQueries, maxNumResults: it.pdfish ? 60 : 35, scoreThreshold: it.pdfish ? 0.06 : 0.08 },
       apiKey
     );
-
-    const broadTop = pickTopChunksFromSearch(broad, userQ, it.pdfish ? 20 : 14);
+    const broadTop = pickTop(broadRes, userQ, it.pdfish ? 18 : 12);
 
     if (!broadTop.length) {
-      return jsonResponse(200, { ok: true, answer: HARD_FALLBACK, thread_id: threadId, links: [] });
+      return jsonResponse(200, { ok: true, answer: HARD_FALLBACK, thread_id: threadId, links: [], ...(it.debug ? { debug: { broadQueries, broadErrors: broadRes._errors } } : {}) });
     }
 
-    // ===== PRE-EXTRACT (signals) =====
+    // ===== PRE-EXTRACT =====
     const signals = preExtractSignals(broadTop.map((c) => c.text), userQ);
 
-    // ===== PASS 2 (focused) =====
+    // ===== FOCUSED =====
     const focusedQueries = buildFocusedQueries(userQ, signals);
-
-    const focused = await vectorSearch(
-      {
-        vectorStoreId,
-        query: focusedQueries,
-        maxNumResults: it.pdfish ? 80 : 45,
-        scoreThreshold: it.pdfish ? 0.05 : 0.07,
-        rewriteQuery: true,
-      },
+    const focusedRes = await searchMany(
+      { vectorStoreId, queries: focusedQueries, maxNumResults: it.pdfish ? 80 : 45, scoreThreshold: it.pdfish ? 0.05 : 0.07 },
       apiKey
     );
+    const focusedTop = pickTop(focusedRes, userQ, it.quote ? 24 : it.pdfish ? 22 : 16);
 
-    const focusedTop = pickTopChunksFromSearch(focused, userQ, it.quote ? 26 : it.pdfish ? 24 : 18);
-
-    // merge: focused first, then a bit of broad (dedupe)
+    // merge (focused first) + dedupe
     const merged = [];
     const seen = new Set();
     for (const c of [...focusedTop, ...broadTop]) {
@@ -435,41 +372,41 @@ export default async function handler(req) {
       if (seen.has(key)) continue;
       seen.add(key);
       merged.push(c);
-      if (merged.length >= (it.quote ? 28 : it.pdfish ? 26 : 20)) break;
+      if (merged.length >= (it.quote ? 26 : it.pdfish ? 24 : 18)) break;
     }
 
     const contextBlock = buildContext(merged, userQ);
 
-    // ===== GENERATE =====
+    // ===== ANSWER =====
     const temperature = it.quote ? 0.0 : 0.1;
     let answer = await generateAnswer({ userMessage: userQ, contextBlock, history, temperature }, apiKey);
     answer = cleanAnswer(answer);
 
-    // retry once if bad
     if (isBadAnswer(answer)) {
-      const retryCtx =
-        contextBlock +
-        `\n\nDODATEK: Odpověz konkrétně. Pokud je v kontextu odkaz, přilož ho. Pokud údaj chybí, vrať fallback větu doslova.`;
+      // retry 1× a pak fallback
+      const retryCtx = contextBlock + `\n\nDODATEK: Odpověz konkrétně a přilož odkaz, pokud existuje v kontextu.`;
       let retry = await generateAnswer({ userMessage: userQ, contextBlock: retryCtx, history, temperature }, apiKey);
       retry = cleanAnswer(retry);
       answer = isBadAnswer(retry) ? HARD_FALLBACK : retry;
     }
 
-    // links from context + answer
     const links = Array.from(new Set([...merged.flatMap((c) => extractLinks(c.text)), ...extractLinks(answer)])).slice(0, 12);
 
-    // debug payload (only when #debug)
     const debug = it.debug
       ? {
-          intent: it,
+          broadQueries,
           focusedQueries,
           signals,
+          broadErrors: broadRes._errors,
+          focusedErrors: focusedRes._errors,
           picked: merged.map((c) => ({ file: c.filename, score: c.score })),
         }
       : undefined;
 
     return jsonResponse(200, { ok: true, answer, thread_id: threadId, links, ...(debug ? { debug } : {}) });
   } catch (err) {
-    return jsonResponse(500, { ok: false, error: "Server error", details: err?.message || String(err) });
+    // !!! nikdy nevracej "Bez odpovědi" – vždy fallback text
+    const details = err?.message || String(err);
+    return jsonResponse(200, { ok: true, answer: HARD_FALLBACK, thread_id: `thread_local_${Date.now()}`, links: [], debug: { error: details } });
   }
 }
