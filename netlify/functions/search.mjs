@@ -1,3 +1,6 @@
+// netlify/functions/search.mjs
+// Node 18+, ESM format
+
 import fs from "node:fs";
 import path from "node:path";
 
@@ -18,15 +21,18 @@ function jsonResponse(status, obj) {
 }
 
 function readLocalFile(relPath) {
-  const p = path.join(process.cwd(), relPath);
-  if (!fs.existsSync(p)) return "";
-  return fs.readFileSync(p, "utf8");
+  try {
+    const p = path.join(process.cwd(), relPath);
+    if (!fs.existsSync(p)) return "";
+    return fs.readFileSync(p, "utf8");
+  } catch (e) {
+    return "";
+  }
 }
 
 function extractPageBlock(fullText, url) {
   if (!fullText || !url) return null;
   const cleanUrl = url.replace(/\/$/, ""); 
-  // Hledá blok, který začíná URL (ignoruje koncové lomítko)
   const lines = fullText.split('\n');
   let startIdx = -1;
   
@@ -48,19 +54,19 @@ function scoreBonusForQuery(chunkText, query) {
   const q = String(query || "").toLowerCase();
   let bonus = 0;
 
-  // Klíčová slova - mírný bonus
-  const keywords = ["poplatek", "sazba", "kč", "vyhláška", "účinnost", "odpad", "pes", "hřbitov"];
+  // Bonus za shodu klíčových slov
+  const keywords = ["poplatek", "sazba", "kč", "vyhláška", "účinnost", "odpad", "pes", "hřbitov", "bioodpad"];
   for (const k of keywords) {
-    if (q.includes(k) && t.includes(k)) bonus += 0.05;
+    if (q.includes(k) && t.includes(k)) bonus += 0.1;
   }
 
-  // MASIVNÍ BONUS ZA ROKY (Prioritizace novinek)
+  // MASIVNÍ PRIORITA PRO NOVÁ DATA (aby vyhrála nad starými vyhláškami)
   if (t.includes("2026")) bonus += 2.0;
   if (t.includes("2025")) bonus += 1.5;
-  if (t.includes("2024")) bonus += 0.8;
+  if (t.includes("2024")) bonus += 0.7;
   
-  // Penalizace neplatných dokumentů
-  if (t.includes("pozbývá platnosti") || t.includes("zrušená vyhláška")) bonus -= 1.0;
+  // Penalizace zrušených věcí
+  if (t.includes("pozbývá platnosti") || t.includes("zrušuje se")) bonus -= 1.0;
 
   return bonus;
 }
@@ -81,20 +87,22 @@ async function vectorSearch(query, n = 12) {
 
 async function answerWithModel(userQuery, contextText) {
   const body = {
-    model: "gpt-4o", // Změna na gpt-4o pro vyšší přesnost v datech
+    model: "gpt-4o", 
     messages: [
       {
         role: "system",
-        content: "Jsi AI asistent obce Radim. Odpovídej česky a věcně.\n" +
-                 "DŮLEŽITÉ: V kontextu mohou být staré i nové vyhlášky. Vždy hledej tu s nejnovějším datem (2025/2026 má přednost před 2022).\n" +
-                 "Pokud v kontextu odpověď není, napiš: „Tato informace není v dostupných podkladech obce Radim uvedena.“"
+        content: "Jsi AI asistent obce Radim. Odpovídej česky, stručně a věcně.\n" +
+                 "PRAVIDLA:\n" +
+                 "1) Používej POUZE dodaný KONTEXT.\n" +
+                 "2) Pokud jsou v kontextu různé verze vyhlášek, VŽDY preferuj tu NEJNOVĚJŠÍ (např. rok 2025/2026 má přednost před staršími).\n" +
+                 "3) Pokud odpověď v kontextu není, napiš: „Tato informace není v dostupných podkladech obce Radim uvedena.“"
       },
       {
         role: "user",
-        content: `KONTEXT:\n${contextText}\n\nDOTAZ:\n${userQuery}`
+        content: `KONTEXT:\n${contextText}\n\nDOTAZ OD OBČANA:\n${userQuery}`
       }
     ],
-    temperature: 0.1, // Snížení náhody
+    temperature: 0.1,
   };
 
   const r = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -107,7 +115,8 @@ async function answerWithModel(userQuery, contextText) {
   });
 
   const json = await r.json();
-  return json.choices?.[0]?.message?.content || "Omlouvám se, nepodařilo se vygenerovat odpověď.";
+  if (!r.ok) throw new Error(json.error?.message || "OpenAI error");
+  return json.choices?.[0]?.message?.content || "";
 }
 
 export default async (req) => {
@@ -117,17 +126,25 @@ export default async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const userQuery = String(body?.message || "").trim();
-    if (!userQuery) return jsonResponse(200, { answer: "" });
+    if (!userQuery) return jsonResponse(200, { ok: true, answer: "" });
 
+    // Načtení FULL textu pro dohledání celých stránek
     const fullText = readLocalFile("knowledge/99_FULL_obec_radim.txt");
+    
+    // 1) Vyhledávání ve vektorech
     const results = await vectorSearch(userQuery, 15);
 
-    // Scoring a extrakce kontextu
+    // 2) Seřazení podle skóre a časového bonusu
     const ranked = results
-      .map(r => ({ ...r, _score2: (r.score || 0) + scoreBonusForQuery(r.content?.[0]?.text, userQuery) }))
+      .map(r => ({ 
+        ...r, 
+        _score2: (r.score || 0) + scoreBonusForQuery(r.content?.[0]?.text, userQuery) 
+      }))
       .sort((a, b) => b._score2 - a._score2);
 
-    const topSnippets = ranked.slice(0, 8);
+    const topSnippets = ranked.slice(0, 10);
+    
+    // 3) Extrakce celých bloků (PAGE) z FULL textu
     const pageBlocks = [];
     for (const sn of topSnippets) {
       const text = sn.content?.[0]?.text || "";
@@ -143,10 +160,17 @@ export default async (req) => {
       ...topSnippets.map(s => s.content[0].text)
     ].join("\n\n---\n\n");
 
+    // 4) Generování odpovědi
     const answer = await answerWithModel(userQuery, finalContext);
 
-    return jsonResponse(200, { ok: true, answer, links: [] });
+    return jsonResponse(200, { 
+      ok: true, 
+      answer: answer || "Bez odpovědi",
+      links: [] // Zde se dají případně vytáhnout linky z textu
+    });
+
   } catch (e) {
+    console.error("Function error:", e);
     return jsonResponse(500, { error: "Server error", details: e.message });
   }
 };
