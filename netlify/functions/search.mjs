@@ -1,6 +1,4 @@
 // netlify/functions/search.mjs
-// Node 18+, ESM format
-
 import fs from "node:fs";
 import path from "node:path";
 
@@ -54,24 +52,15 @@ function scoreBonusForQuery(chunkText, query) {
   const q = String(query || "").toLowerCase();
   let bonus = 0;
 
-  // Bonus za shodu klíčových slov
-  const keywords = ["poplatek", "sazba", "kč", "vyhláška", "účinnost", "odpad", "pes", "hřbitov", "bioodpad"];
-  for (const k of keywords) {
-    if (q.includes(k) && t.includes(k)) bonus += 0.1;
-  }
-
-  // MASIVNÍ PRIORITA PRO NOVÁ DATA (aby vyhrála nad starými vyhláškami)
   if (t.includes("2026")) bonus += 2.0;
   if (t.includes("2025")) bonus += 1.5;
   if (t.includes("2024")) bonus += 0.7;
-  
-  // Penalizace zrušených věcí
   if (t.includes("pozbývá platnosti") || t.includes("zrušuje se")) bonus -= 1.0;
 
   return bonus;
 }
 
-async function vectorSearch(query, n = 12) {
+async function vectorSearch(query, n = 15) {
   const r = await fetch(`https://api.openai.com/v1/vector_stores/${VECTOR_STORE_ID}/search`, {
     method: "POST",
     headers: {
@@ -91,15 +80,16 @@ async function answerWithModel(userQuery, contextText) {
     messages: [
       {
         role: "system",
-        content: "Jsi AI asistent obce Radim. Odpovídej česky, stručně a věcně.\n" +
+        content: "Jsi AI asistent obce Radim. Odpovídej česky a věcně.\n" +
                  "PRAVIDLA:\n" +
-                 "1) Používej POUZE dodaný KONTEXT.\n" +
-                 "2) Pokud jsou v kontextu různé verze vyhlášek, VŽDY preferuj tu NEJNOVĚJŠÍ (např. rok 2025/2026 má přednost před staršími).\n" +
-                 "3) Pokud odpověď v kontextu není, napiš: „Tato informace není v dostupných podkladech obce Radim uvedena.“"
+                 "1) Používej POUZE dodaný KONTEXT. Pokud jsou tam různé roky, vyber NEJNOVĚJŠÍ.\n" +
+                 "2) Ke každé informaci VŽDY doplň URL odkaz, který najdeš v kontextu u daného textu.\n" +
+                 "3) Odkazy vypisuj ve formátu: (Zdroj: https://...).\n" +
+                 "4) Pokud odpověď neznáš, napiš: „Tato informace není v dostupných podkladech obce Radim uvedena.“"
       },
       {
         role: "user",
-        content: `KONTEXT:\n${contextText}\n\nDOTAZ OD OBČANA:\n${userQuery}`
+        content: `KONTEXT (obsahuje texty a URL):\n${contextText}\n\nDOTAZ:\n${userQuery}`
       }
     ],
     temperature: 0.1,
@@ -115,8 +105,14 @@ async function answerWithModel(userQuery, contextText) {
   });
 
   const json = await r.json();
-  if (!r.ok) throw new Error(json.error?.message || "OpenAI error");
   return json.choices?.[0]?.message?.content || "";
+}
+
+// Funkce pro vytažení odkazů z textu odpovědi
+function extractLinks(text) {
+  const urlRegex = /(https?:\/\/[^\s)]+)/g;
+  const matches = text.match(urlRegex) || [];
+  return [...new Set(matches)];
 }
 
 export default async (req) => {
@@ -128,24 +124,16 @@ export default async (req) => {
     const userQuery = String(body?.message || "").trim();
     if (!userQuery) return jsonResponse(200, { ok: true, answer: "" });
 
-    // Načtení FULL textu pro dohledání celých stránek
     const fullText = readLocalFile("knowledge/99_FULL_obec_radim.txt");
-    
-    // 1) Vyhledávání ve vektorech
     const results = await vectorSearch(userQuery, 15);
 
-    // 2) Seřazení podle skóre a časového bonusu
     const ranked = results
-      .map(r => ({ 
-        ...r, 
-        _score2: (r.score || 0) + scoreBonusForQuery(r.content?.[0]?.text, userQuery) 
-      }))
+      .map(r => ({ ...r, _score2: (r.score || 0) + scoreBonusForQuery(r.content?.[0]?.text, userQuery) }))
       .sort((a, b) => b._score2 - a._score2);
 
     const topSnippets = ranked.slice(0, 10);
-    
-    // 3) Extrakce celých bloků (PAGE) z FULL textu
     const pageBlocks = [];
+    
     for (const sn of topSnippets) {
       const text = sn.content?.[0]?.text || "";
       const urlMatch = text.match(/https?:\/\/[^\s]+/);
@@ -155,22 +143,22 @@ export default async (req) => {
       }
     }
 
+    // Kombinujeme bloky z FULL a snippety (aby fungovaly i PDF bez FULL záznamu)
     const finalContext = [
       ...new Set(pageBlocks.slice(0, 3)),
-      ...topSnippets.map(s => s.content[0].text)
+      ...topSnippets.map(s => `SOUBOR: ${s.filename}\nTEXT: ${s.content[0].text}`)
     ].join("\n\n---\n\n");
 
-    // 4) Generování odpovědi
     const answer = await answerWithModel(userQuery, finalContext);
+    const links = extractLinks(answer);
 
     return jsonResponse(200, { 
       ok: true, 
-      answer: answer || "Bez odpovědi",
-      links: [] // Zde se dají případně vytáhnout linky z textu
+      answer, 
+      links 
     });
 
   } catch (e) {
-    console.error("Function error:", e);
     return jsonResponse(500, { error: "Server error", details: e.message });
   }
 };
