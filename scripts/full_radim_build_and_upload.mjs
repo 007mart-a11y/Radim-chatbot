@@ -1,448 +1,746 @@
-// scripts/radim_crawl_build_and_upload.mjs
+// scripts/full_radim_build_and_upload.mjs
+// CURRENT-first knowledge build for Radim
+// - crawls web -> pages + documents index
+// - builds ONE main "current" file: knowledge/10_CURRENT_obec_radim.txt
+// - builds archive index only (no full old text): knowledge/90_ARCHIVE_INDEX_obec_radim.txt
+// - extracts text from selected PDFs into the CURRENT file (only recent / important PDFs)
+//
+// Requirements: Node 18+, deps: jsdom, pdf-parse
+//   npm i jsdom pdf-parse
+//
+// Env:
+//   SITE_BASE_URL=https://www.obec-radim.cz
+//   OPENAI_API_KEY=...
+//   VECTOR_STORE_ID=...
+//
+// Crawl:
+//   MAX_PAGES=450 (default)
+//   CONCURRENCY=3 (default)
+//   REQUEST_TIMEOUT_MS=25000 (default)
+//
+// Current/Archive logic:
+//   CURRENT_CUTOFF_DAYS=730 (default)  // 2 roky "aktuální"
+//   CURRENT_MAX_PDF_TEXT=40 (default)  // kolik PDF vytáhnout textem do CURRENT
+//   PDFTEXT_MAX_BYTES=8000000 (default) // 8 MB
+//   PDFTEXT_MAX_CHARS_PER_PDF=60000 (default)
+//
+// Upload/Cleanup:
+//   CLEANUP_OLD=1 (default) | 0
+//   KEEP_LATEST=3 (default) // keep last N "10_CURRENT" builds in vector store (safety)
+
 import fs from "fs/promises";
 import path from "path";
+import crypto from "node:crypto";
 import { JSDOM } from "jsdom";
 import { createRequire } from "module";
-
 const require = createRequire(import.meta.url);
 const pdfParse = require("pdf-parse");
-const mammoth = require("mammoth");
 
 const SITE_BASE_URL = (process.env.SITE_BASE_URL ?? "https://www.obec-radim.cz").replace(/\/+$/, "");
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const VECTOR_STORE_ID = process.env.VECTOR_STORE_ID;
-const OUT_DIR = process.env.OUT_DIR ?? "knowledge";
 
-const FILE_WEB_CURRENT   = "01_WEB_TEXT_CURRENT.txt";
-const FILE_INDEX_ALL     = "02_DOWNLOADS_INDEX_ALL.txt";
-const FILE_DOCS_CURRENT  = "03_DOCS_CONTENT_CURRENT.txt";
+const MAX_PAGES = parseInt(process.env.MAX_PAGES ?? "450", 10);
+const CONCURRENCY = Math.max(1, parseInt(process.env.CONCURRENCY ?? "3", 10));
+const REQUEST_TIMEOUT_MS = parseInt(process.env.REQUEST_TIMEOUT_MS ?? "25000", 10);
 
-const MAX_PAGES = Number(process.env.MAX_PAGES ?? 250);
-const MAX_DOCS_FULLTEXT = Number(process.env.MAX_DOCS_FULLTEXT ?? 80);
-const RECENT_MONTHS = Number(process.env.RECENT_MONTHS ?? 18);
+const CURRENT_CUTOFF_DAYS = parseInt(process.env.CURRENT_CUTOFF_DAYS ?? "730", 10);
+const CURRENT_MAX_PDF_TEXT = parseInt(process.env.CURRENT_MAX_PDF_TEXT ?? "40", 10);
+const PDFTEXT_MAX_BYTES = parseInt(process.env.PDFTEXT_MAX_BYTES ?? "8000000", 10);
+const PDFTEXT_MAX_CHARS_PER_PDF = parseInt(process.env.PDFTEXT_MAX_CHARS_PER_PDF ?? "60000", 10);
 
-// Pokud chceš natvrdo roky: "2025,2026" (prázdné = AUTO)
-const INCLUDE_YEARS = (process.env.INCLUDE_YEARS ?? "")
-  .split(",")
-  .map(s => s.trim())
-  .filter(Boolean)
-  .map(Number)
-  .filter(n => Number.isFinite(n));
+const CLEANUP_OLD = (process.env.CLEANUP_OLD ?? "1") !== "0";
+const KEEP_LATEST = parseInt(process.env.KEEP_LATEST ?? "3", 10);
 
+// Output
+const OUT_DIR = "knowledge";
+const CURRENT_PREFIX = "10_CURRENT_obec_radim";
+const ARCHIVE_PREFIX = "90_ARCHIVE_INDEX_obec_radim";
+const CURRENT_FILE = `${CURRENT_PREFIX}.txt`;
+const ARCHIVE_FILE = `${ARCHIVE_PREFIX}.txt`;
+
+// OpenAI headers (vector stores)
 const OPENAI_BETA_HEADER = { "OpenAI-Beta": "assistants=v2" };
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-const now = new Date();
-const cutoff = new Date(now);
-cutoff.setMonth(cutoff.getMonth() - RECENT_MONTHS);
+function sha1(s) {
+  return crypto.createHash("sha1").update(String(s || "")).digest("hex");
+}
 
-const clean = (t) =>
-  (t ?? "")
-    .replace(/\u00a0/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-
-function normalizeUrl(u) {
+function absUrl(u, base = SITE_BASE_URL) {
   try {
-    const url = new URL(u);
-    url.hash = "";
-    if (!url.pathname.includes(".") && !url.pathname.endsWith("/")) {
-      url.pathname = url.pathname + "/";
-    }
-    return url.toString();
+    return new URL(u, base).toString();
   } catch {
-    return u;
+    return null;
+  }
+}
+function sameOrigin(url) {
+  try {
+    const a = new URL(url);
+    const b = new URL(SITE_BASE_URL);
+    return a.origin === b.origin;
+  } catch {
+    return false;
+  }
+}
+function normalizeUrl(url) {
+  try {
+    const u = new URL(url);
+    u.hash = "";
+    // prefer canonical (no /seniori/)
+    u.pathname = u.pathname.replace(/^\/seniori\//, "/");
+    // drop tracking
+    const drop = ["utm_source","utm_medium","utm_campaign","utm_term","utm_content","fbclid","gclid","kshow"];
+    for (const k of drop) u.searchParams.delete(k);
+    u.pathname = u.pathname.replace(/\/{2,}/g, "/");
+    return u.toString();
+  } catch {
+    return url;
   }
 }
 
-function extractDateFromText(text) {
-  const t = (text ?? "").toString();
+function isProbablyBinary(url) {
+  return /\.(jpg|jpeg|png|webp|gif|svg|mp4|webm|avi|mov|mp3|wav|zip|rar|7z|tar|gz|bz2|exe|dmg)$/i.test(url);
+}
+function isMailtoOrTel(url) {
+  return /^mailto:/i.test(url) || /^tel:/i.test(url);
+}
+function looksLikeLoginOrAdmin(url) {
+  return /\/admin\/?$/i.test(url) || /\/(wp-admin|administrator)\b/i.test(url);
+}
+function looksLikeGalleryHeavy(url) {
+  return /\/fotogalerie\b/i.test(url);
+}
 
-  // 4. 12. 2025 / 04.12.2025
-  const m1 = t.match(/(\d{1,2})\.\s*(\d{1,2})\.\s*(\d{4})/);
-  if (m1) {
-    const d = Number(m1[1]), mo = Number(m1[2]) - 1, y = Number(m1[3]);
-    const dt = new Date(y, mo, d);
-    if (!isNaN(dt.getTime())) return dt;
+function isDownloadDoc(url) {
+  const u = String(url || "");
+  return /\.(pdf|doc|docx|xls|xlsx|odt|ods|ppt|pptx|rtf|txt|csv|zip)(\?.*)?$/i.test(u) || /e_download\.php/i.test(u);
+}
+function isPdfUrl(u) {
+  const s = String(u || "");
+  return /\.pdf(\?.*)?$/i.test(s) || (/e_download\.php/i.test(s) && /original=.*\.pdf/i.test(s));
+}
+
+function stripWeirdWhitespace(s) {
+  return String(s || "")
+    .replace(/\u00a0/g, " ")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .replace(/[ \t]{2,}/g, " ")
+    .trim();
+}
+
+function findDateInText(s) {
+  if (!s) return null;
+  let m = s.match(/\b(\d{1,2})\.\s*(\d{1,2})\.\s*(\d{4})\b/);
+  if (m) {
+    const dd = String(m[1]).padStart(2, "0");
+    const mm = String(m[2]).padStart(2, "0");
+    const yyyy = m[3];
+    return `${yyyy}-${mm}-${dd}`;
   }
-
-  // ISO 2025-12-04
-  const m2 = t.match(/(\d{4})-(\d{2})-(\d{2})/);
-  if (m2) {
-    const dt = new Date(`${m2[1]}-${m2[2]}-${m2[3]}T00:00:00`);
-    if (!isNaN(dt.getTime())) return dt;
-  }
-
+  m = s.match(/\b(\d{4})-(\d{2})-(\d{2})\b/);
+  if (m) return `${m[1]}-${m[2]}-${m[3]}`;
   return null;
 }
 
-function extractYearHints(text) {
-  const years = new Set();
-  const m = (text ?? "").match(/\b(20\d{2})\b/g);
-  if (m) m.forEach(y => years.add(Number(y)));
-  return [...years].filter(n => Number.isFinite(n));
+function isoToCz(iso) {
+  if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return "";
+  const [y,m,d] = iso.split("-");
+  return `${d}. ${m}. ${y}`;
 }
 
-function isRecentByDate(dt) {
-  if (!dt) return false;
-  if (INCLUDE_YEARS.length) return INCLUDE_YEARS.includes(dt.getFullYear());
-  return dt >= cutoff;
+function classifyDocType(titleOrUrl) {
+  const s = (titleOrUrl || "").toLowerCase();
+  if (s.includes("vyhláška") || s.includes("obecně závazná vyhláška") || s.includes("ozv")) return "VYHLÁŠKA";
+  if (s.includes("nařízení")) return "NAŘÍZENÍ";
+  if (s.includes("zpravodaj")) return "ZPRAVODAJ";
+  if (s.includes("úřední deska") || s.includes("uredni-deska") || s.includes("záměr") || s.includes("zamer")) return "ÚŘEDNÍ_DESKA";
+  if (s.includes("rozpočet") || s.includes("rozpočt") || s.includes("rozpoct")) return "ROZPOČET";
+  if (s.includes("poplatek") || s.includes("odpad") || s.includes("psů") || s.includes("psu")) return "POPLATKY_ODPADY";
+  return "DOKUMENT";
 }
 
-function isRecentByHints(hintsYears) {
-  if (!hintsYears?.length) return false;
-  if (INCLUDE_YEARS.length) return hintsYears.some(y => INCLUDE_YEARS.includes(y));
-
-  const y = now.getFullYear();
-  return hintsYears.some(yy => yy === y || yy === y - 1);
+function pickTitle(doc) {
+  const h1 = doc.querySelector("h1")?.textContent?.trim();
+  if (h1) return h1;
+  const t = doc.querySelector("title")?.textContent?.trim();
+  return t || "";
 }
 
-// Heuristika “archiv / historie”
-function looksHistorical(url, text) {
-  const u = String(url || "").toLowerCase();
-  const t = String(text || "").toLowerCase();
-
-  const badUrl = [
-    "/archiv",
-    "archiv",
-    "kronika",
-    "histor",
-    "zpravodaj",
-    "fotogalerie",
-    "galerie",
-    "minulé",
-    "rok-20", // často archivní ročníky
-  ].some(p => u.includes(p));
-
-  const badText = [
-    "archiv",
-    "starší",
-    "minulé ročníky",
-    "proběhlo",
-    "proběhla",
-    "konalo se",
-    "v roce 201",
-    "v roce 2020",
-    "v roce 2021",
-    "v roce 2022",
-    "v roce 2023",
-  ].some(p => t.includes(p));
-
-  return badUrl || badText;
+function cleanText(text) {
+  let t = stripWeirdWhitespace(text);
+  // remove very short noisy lines
+  const lines = t.split("\n").map((x) => x.trim());
+  const out = [];
+  for (const ln of lines) {
+    if (!ln) { if (out[out.length-1] !== "") out.push(""); continue; }
+    if (ln.length === 1) continue;
+    out.push(ln);
+  }
+  return out.join("\n").replace(/\n{3,}/g, "\n\n").trim();
 }
 
-function undatedButOkAsCurrent(url, text) {
-  // pokud je stránka bez data a bez roků, chceme ji brát jako CURRENT,
-  // ale ne pokud zjevně vypadá historicky/archivně
-  if (looksHistorical(url, text)) return false;
-  return true;
+function extractMainTextFromHtml(html) {
+  const dom = new JSDOM(html);
+  const doc = dom.window.document;
+
+  // remove noise
+  for (const sel of ["script","style","noscript","svg","form","nav","header","footer","aside",".navbar",".menu",".breadcrumbs",".breadcrumb",".search",".vyhledavani",".cookie",".gdpr",".pagination",".pager",".sidebar",".right",".left",".gallery",".fotogalerie"]) {
+    doc.querySelectorAll(sel).forEach((n) => n.remove());
+  }
+
+  const candidates = ["main","#content",".content",".page-content",".text",".article",".article-text",".detail",".detail-text",".module-content"];
+  let node = null;
+  for (const sel of candidates) {
+    const n = doc.querySelector(sel);
+    if (n && (n.textContent || "").trim().length > 250) { node = n; break; }
+  }
+  if (!node) node = doc.body;
+
+  const title = pickTitle(doc);
+
+  const bodyText = doc.body?.textContent || "";
+  const published =
+    bodyText.match(/Vyvěšeno:\s*\d{1,2}\.\s*\d{1,2}\.\s*\d{4}/i)?.[0]?.trim() ||
+    bodyText.match(/Vytvořeno:\s*\d{1,2}\.\s*\d{1,2}\.\s*\d{4}/i)?.[0]?.trim() ||
+    "";
+
+  return { title, published, cleaned: cleanText(node?.textContent || "") };
 }
 
-function isDocUrl(fullUrl) {
-  const u = String(fullUrl || "").toLowerCase();
-  return (
-    /\.(pdf|docx|doc|rtf)$/i.test(u) ||
-    u.includes("download.php") ||
-    u.includes("e_download.php") ||
-    u.includes("evt_file.php") ||
-    u.includes("file.php")
-  );
-}
+function extractLinksAndDownloads(html, currentUrl) {
+  const dom = new JSDOM(html);
+  const doc = dom.window.document;
 
-// ------------------------------------------------------------------
-// SAFE DETACH (nechává CORE/PEOPLE a cokoliv dalšího, maže jen 01/02/03)
-// ------------------------------------------------------------------
+  const urls = new Set();
+  const downloads = [];
 
-async function listVectorStoreFiles(limit = 100) {
-  const url = `https://api.openai.com/v1/vector_stores/${VECTOR_STORE_ID}/files?limit=${limit}`;
-  const res = await fetch(url, {
-    headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, ...OPENAI_BETA_HEADER },
+  doc.querySelectorAll("a[href]").forEach((a) => {
+    const href = a.getAttribute("href")?.trim();
+    if (!href) return;
+    if (href.startsWith("#")) return;
+    if (isMailtoOrTel(href)) return;
+
+    const u = absUrl(href, currentUrl);
+    if (!u) return;
+    const nu = normalizeUrl(u);
+
+    if (!sameOrigin(nu)) return;
+    if (looksLikeLoginOrAdmin(nu)) return;
+
+    const text = (a.textContent || "").trim();
+    const titleAttr = (a.getAttribute("title") || "").trim();
+
+    if (isDownloadDoc(nu)) {
+      const guessDate = findDateInText(`${text} ${titleAttr} ${nu}`) || null;
+      const type = classifyDocType(`${text} ${titleAttr} ${nu}`);
+      downloads.push({
+        url: nu,
+        title: text || titleAttr || path.basename(new URL(nu).pathname),
+        date: guessDate,
+        type,
+        foundOn: currentUrl,
+      });
+      return;
+    }
+
+    if (isProbablyBinary(nu) && !isPdfUrl(nu)) return;
+    urls.add(nu);
   });
-  const json = await res.json().catch(() => ({}));
-  return Array.isArray(json.data) ? json.data : [];
+
+  return { links: Array.from(urls), downloads };
 }
 
-async function getFilenameFromItem(item) {
-  const fileId = item?.file_id || item?.file?.id;
-  const directName = item?.file?.filename || item?.filename;
-
-  if (directName) return { filename: directName, fileId };
-
-  if (!fileId) return { filename: "", fileId };
-
-  const r = await fetch(`https://api.openai.com/v1/files/${fileId}`, {
-    headers: { Authorization: `Bearer ${OPENAI_API_KEY}` },
-  });
-  const j = await r.json().catch(() => ({}));
-  return { filename: j?.filename || "", fileId };
-}
-
-function shouldDetach(filename) {
-  return (
-    filename === FILE_WEB_CURRENT ||
-    filename === FILE_INDEX_ALL ||
-    filename === FILE_DOCS_CURRENT
-  );
-}
-
-async function detachManagedFromVectorStore() {
-  console.log("🧹 Detachuji jen spravované soubory (01/02/03)...");
-  const items = await listVectorStoreFiles(100);
-
-  for (const item of items) {
-    const { filename } = await getFilenameFromItem(item);
-    if (!filename) continue;
-    if (!shouldDetach(filename)) continue;
-
-    await fetch(`https://api.openai.com/v1/vector_stores/${VECTOR_STORE_ID}/files/${item.id}`, {
-      method: "DELETE",
-      headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, ...OPENAI_BETA_HEADER },
-    });
-
-    console.log(`  🗑️ detached: ${filename}`);
+async function fetchWithTimeout(url, opts = {}) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    return await fetch(url, { ...opts, signal: ctrl.signal });
+  } finally {
+    clearTimeout(t);
   }
 }
-
-async function uploadToVectorStore(filename) {
-  const filePath = path.join(OUT_DIR, filename);
-  const form = new FormData();
-  form.append("purpose", "assistants");
-  form.append("file", new Blob([await fs.readFile(filePath)]), filename);
-
-  const up = await fetch("https://api.openai.com/v1/files", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${OPENAI_API_KEY}` },
-    body: form,
-  });
-
-  const file = await up.json();
-  if (!file?.id) throw new Error(`Upload failed: ${filename} => ${JSON.stringify(file)}`);
-
-  const attach = await fetch(`https://api.openai.com/v1/vector_stores/${VECTOR_STORE_ID}/files`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${OPENAI_API_KEY}`,
-      "Content-Type": "application/json",
-      ...OPENAI_BETA_HEADER,
-    },
-    body: JSON.stringify({ file_id: file.id }),
-  });
-
-  const attached = await attach.json().catch(() => ({}));
-  if (!attached?.id) throw new Error(`Attach failed: ${filename} => ${JSON.stringify(attached)}`);
-
-  console.log(`✅ Uploaded+attached: ${filename}`);
+function isHtmlResponse(r) {
+  const ct = r.headers.get("content-type") || "";
+  return ct.includes("text/html") || ct.includes("application/xhtml+xml");
 }
 
-// ------------------------------------------------------------------
-// CRAWL
-// ------------------------------------------------------------------
+function nowIso() {
+  return new Date().toISOString();
+}
+function cutoffDateIso() {
+  const ms = Date.now() - CURRENT_CUTOFF_DAYS * 24 * 60 * 60 * 1000;
+  const d = new Date(ms);
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+function isRecentIsoDate(iso) {
+  const c = cutoffDateIso();
+  if (!iso) return false;
+  return iso >= c;
+}
+function guessItemDate({ url, title, published, content }) {
+  return (
+    findDateInText(published || "") ||
+    findDateInText(url || "") ||
+    findDateInText(title || "") ||
+    findDateInText((content || "").slice(0, 1200)) ||
+    null
+  );
+}
 
-const FORBIDDEN_URL_PARTS = [
-  "rajce.idnes",
-  "zmena-vzhledu",
-  "month=",
-  "year=",
-  "date=",
-  "login",
-  "/admin",
-  "mapa-webu",
-];
+function isImportantPageUrl(url) {
+  return /\/(urad|aktualne|aktuality|uredni-deska|kalendar-akci|povinne-informace|czech-point|skladka-bioodpadu|poplatky|odpady|kontakty)\b/i.test(url || "");
+}
 
-async function crawl() {
-  const queue = [normalizeUrl(SITE_BASE_URL + "/")];
-  const visited = new Set();
-  const docLinks = new Map();
+function isImportantDoc(d) {
+  const t = String(d?.type || "");
+  const s = `${d?.title || ""} ${d?.url || ""} ${d?.foundOn || ""}`.toLowerCase();
+  if (t.includes("VYHLÁŠKA") || t.includes("NAŘÍZENÍ")) return true;
+  if (t.includes("POPLATKY_ODPADY") || t.includes("ROZPOČET") || t.includes("ÚŘEDNÍ_DESKA")) return true;
+  if (s.includes("poplatek") || s.includes("odpad") || s.includes("psů") || s.includes("psu")) return true;
+  return false;
+}
 
-  let webCurrent =
-    `WEB OBCE RADIM – AKTUÁLNÍ + NEDATOVANÉ STRÁNKY\n` +
-    `GENEROVÁNO: ${now.toISOString()}\n` +
-    `RECENT_MONTHS=${RECENT_MONTHS} INCLUDE_YEARS=${INCLUDE_YEARS.join(",") || "AUTO"}\n` +
-    `CUTOFF=${cutoff.toISOString()}\n`;
+async function buildCrawl() {
+  await fs.mkdir(OUT_DIR, { recursive: true });
 
-  console.log("🚀 Crawl webu: aktuální + nedatované stránky, index dokumentů...");
+  const startUrl = normalizeUrl(SITE_BASE_URL + "/");
+  const queue = [startUrl];
+  const seen = new Set();
 
-  while (queue.length && visited.size < MAX_PAGES) {
-    const url = queue.shift();
-    if (!url) break;
+  const pages = [];
+  const pageHashSeen = new Set();
+  const documents = new Map();
 
-    const uLower = url.toLowerCase();
-    if (visited.has(url)) continue;
-    if (FORBIDDEN_URL_PARTS.some(p => uLower.includes(p))) continue;
+  let processed = 0;
 
-    visited.add(url);
+  async function worker() {
+    while (true) {
+      const next = queue.shift();
+      if (!next) return;
+      if (pages.length >= MAX_PAGES) return;
 
-    try {
-      const res = await fetch(url);
-      const ct = res.headers.get("content-type") || "";
-      if (!ct.includes("text/html")) continue;
+      const url = next;
+      if (seen.has(url)) continue;
+      seen.add(url);
 
-      const html = await res.text();
-      if (html.length > 350_000) continue;
+      if (looksLikeLoginOrAdmin(url)) continue;
+      if (looksLikeGalleryHeavy(url)) continue;
+      if (isProbablyBinary(url) && !isPdfUrl(url)) continue;
 
-      const dom = new JSDOM(html);
-      const doc = dom.window.document;
+      try {
+        const r = await fetchWithTimeout(url, {
+          redirect: "follow",
+          headers: { "User-Agent": "RadimCrawler/CURRENT-1.0" },
+        });
 
-      doc.querySelectorAll("script, style, nav, footer, header, #header, #footer, .noprint, .sidebar")
-        .forEach(el => el.remove());
+        if (!r.ok) { processed++; continue; }
 
-      const main = doc.querySelector("#content, #main, article, .content") || doc.body;
-      const mainText = clean(main.textContent);
-
-      const wholeText = doc.body.textContent || "";
-      const dt = extractDateFromText(wholeText);
-      const yearHints = extractYearHints(wholeText);
-
-      const hasAnyDateOrYear = Boolean(dt) || (yearHints && yearHints.length > 0);
-
-      // NOVÁ LOGIKA:
-      // - recent podle data/hints
-      // - NEBO nedatované (bez dt i bez years) bereme jako current, pokud to nevypadá historicky
-      const pageIsCurrent =
-        isRecentByDate(dt) ||
-        isRecentByHints(yearHints) ||
-        (!hasAnyDateOrYear && undatedButOkAsCurrent(url, mainText));
-
-      if (pageIsCurrent && mainText.length > 120) {
-        webCurrent +=
-          `\n\n=== PAGE\n` +
-          `URL: ${url}\n` +
-          `DATE: ${dt ? dt.toISOString().slice(0,10) : ""}\n` +
-          `YEARS: ${yearHints.join(",")}\n` +
-          `CONTENT:\n${mainText}\n`;
-        console.log(`  📄 current: ${url.replace(SITE_BASE_URL, "") || "/"}`);
-      }
-
-      // odkazy
-      doc.querySelectorAll("a[href]").forEach(a => {
-        const href = a.getAttribute("href");
-        if (!href) return;
-
-        let fullUrl;
-        try {
-          fullUrl = normalizeUrl(new URL(href, url).toString());
-        } catch {
-          return;
-        }
-
-        if (!fullUrl.startsWith(SITE_BASE_URL)) return;
-
-        const linkText = clean(a.textContent);
-        const around = clean(a.closest("tr, li, .item, .box, .row")?.textContent || "");
-        const meta = clean(around.replace(linkText, ""));
-
-        if (isDocUrl(fullUrl)) {
-          const dt2 = extractDateFromText(meta) || extractDateFromText(around) || dt;
-          const yearHints2 = extractYearHints(meta + " " + around);
-          if (!docLinks.has(fullUrl)) {
-            docLinks.set(fullUrl, {
-              title: linkText || "(bez názvu)",
-              meta,
-              source: url,
-              date: dt2,
-              yearHints: yearHints2,
+        if (isPdfUrl(url)) {
+          if (!documents.has(url)) {
+            documents.set(url, {
+              url,
+              title: path.basename(new URL(url).pathname),
+              date: findDateInText(url),
+              type: classifyDocType(url),
+              foundOn: "",
             });
           }
-        } else {
-          if (!visited.has(fullUrl)) queue.push(fullUrl);
+          processed++;
+          continue;
         }
-      });
-    } catch (e) {
-      console.log(`  ⚠️ fetch fail: ${url}`);
-    }
-  }
 
-  // INDEX všech dokumentů
-  let indexAll =
-    `INDEX DOKUMENTŮ (VŠE)\n` +
-    `GENEROVÁNO: ${now.toISOString()}\n` +
-    `RECENT_MONTHS=${RECENT_MONTHS} INCLUDE_YEARS=${INCLUDE_YEARS.join(",") || "AUTO"}\n\n`;
+        if (!isHtmlResponse(r)) { processed++; continue; }
 
-  const docsSorted = [...docLinks.entries()].sort((a, b) => {
-    const da = a[1].date?.getTime?.() ?? 0;
-    const db = b[1].date?.getTime?.() ?? 0;
-    return db - da;
-  });
+        const html = await r.text();
+        processed++;
 
-  for (const [u, m] of docsSorted) {
-    const d = m.date ? m.date.toISOString().slice(0,10) : "";
-    const years = (m.yearHints || []).join(",");
-    const recent = isRecentByDate(m.date) || isRecentByHints(m.yearHints);
+        const { links, downloads } = extractLinksAndDownloads(html, url);
+        for (const u of links) if (!seen.has(u)) queue.push(u);
 
-    indexAll +=
-      `=== DOC\nTITLE: ${m.title}\nDATE: ${d}\nRECENT: ${recent ? "yes" : "no"}\nYEARS: ${years}\nMETA: ${m.meta}\nURL: ${u}\nFOUND_ON: ${m.source}\n\n`;
-  }
+        for (const d of downloads) {
+          const prev = documents.get(d.url);
+          if (!prev) documents.set(d.url, d);
+          else {
+            const betterTitle = (prev.title || "").length >= (d.title || "").length ? prev.title : d.title;
+            const betterDate = prev.date || d.date || null;
+            const betterType = prev.type !== "DOKUMENT" ? prev.type : d.type;
+            documents.set(d.url, {
+              url: d.url,
+              title: betterTitle,
+              date: betterDate,
+              type: betterType,
+              foundOn: prev.foundOn || d.foundOn || "",
+            });
+          }
+        }
 
-  // FULLTEXT jen pro aktuální dokumenty
-  console.log(`📎 Dokumentů celkem: ${docLinks.size}. FULLTEXT jen pro aktuální (limit ${MAX_DOCS_FULLTEXT})...`);
+        const { title, published, cleaned } = extractMainTextFromHtml(html);
+        const important = isImportantPageUrl(url) || cleaned.length > 600;
 
-  let docsCurrent =
-    `FULLTEXT DOKUMENTŮ – POUZE AKTUÁLNÍ\n` +
-    `GENEROVÁNO: ${now.toISOString()}\n` +
-    `CUTOFF: ${cutoff.toISOString()}\n` +
-    `RECENT_MONTHS=${RECENT_MONTHS} INCLUDE_YEARS=${INCLUDE_YEARS.join(",") || "AUTO"}\n\n`;
+        if (!important && cleaned.length < 250) continue;
 
-  let countFull = 0;
+        const contentKey = sha1(`${title}\n${cleaned}`.slice(0, 20000));
+        if (pageHashSeen.has(contentKey)) continue;
+        pageHashSeen.add(contentKey);
 
-  for (const [u, m] of docsSorted) {
-    if (countFull >= MAX_DOCS_FULLTEXT) break;
+        pages.push({
+          url,
+          title: title || "",
+          published: published || "",
+          content: cleaned,
+        });
 
-    const recent = isRecentByDate(m.date) || isRecentByHints(m.yearHints);
-    if (!recent) continue;
-
-    try {
-      const res = await fetch(u);
-      const buf = Buffer.from(await res.arrayBuffer());
-      const cType = (res.headers.get("content-type") || "").toLowerCase();
-
-      let txt = "";
-
-      if (cType.includes("pdf") || u.toLowerCase().includes(".pdf")) {
-        txt = (await pdfParse(buf)).text;
-      } else if (cType.includes("officedocument") || u.toLowerCase().includes(".docx")) {
-        txt = (await mammoth.extractRawText({ buffer: buf })).value;
-      } else {
-        // fallback podle URL
-        if (u.toLowerCase().includes(".pdf")) txt = (await pdfParse(buf)).text;
-        if (u.toLowerCase().includes(".docx")) txt = (await mammoth.extractRawText({ buffer: buf })).value;
+        if (processed % 40 === 0) await sleep(120);
+      } catch {
+        // ignore
       }
-
-      txt = clean(txt);
-      if (txt.length < 50) continue;
-
-      const d = m.date ? m.date.toISOString().slice(0,10) : "";
-      docsCurrent +=
-        `=== DOC\nTITLE: ${m.title}\nDATE: ${d}\nURL: ${u}\nFOUND_ON: ${m.source}\nMETA: ${m.meta}\nCONTENT:\n${txt}\n\n`;
-
-      countFull++;
-      console.log(`  ✅ fulltext: ${m.title.slice(0, 70)}`);
-    } catch (e) {
-      console.log(`  ❌ fail doc: ${m.title} (${e?.message || e})`);
     }
   }
 
-  await fs.mkdir(OUT_DIR, { recursive: true });
-  await fs.writeFile(path.join(OUT_DIR, FILE_WEB_CURRENT), webCurrent, "utf8");
-  await fs.writeFile(path.join(OUT_DIR, FILE_INDEX_ALL), indexAll, "utf8");
-  await fs.writeFile(path.join(OUT_DIR, FILE_DOCS_CURRENT), docsCurrent, "utf8");
+  await Promise.all(Array.from({ length: CONCURRENCY }, () => worker()));
 
-  console.log("📝 Hotovo: vygenerované 3 soubory do knowledge/.");
+  const docs = Array.from(documents.values()).map((d) => ({
+    ...d,
+    url: normalizeUrl(d.url),
+    foundOn: normalizeUrl(d.foundOn || ""),
+  }));
+
+  return { pages, docs, seenCount: seen.size, processed };
 }
 
-async function main() {
+/* ============================
+   PDF text extraction (CURRENT)
+   ============================ */
+
+async function fetchPdfBuffer(url) {
+  const r = await fetchWithTimeout(url, {
+    redirect: "follow",
+    headers: { "User-Agent": "RadimCrawler/PDFTEXT-1.0" },
+  });
+  if (!r.ok) throw new Error(`PDF fetch failed ${r.status}`);
+  const ab = await r.arrayBuffer();
+  return Buffer.from(ab);
+}
+
+async function extractPdfText(url) {
+  const buf = await fetchPdfBuffer(url);
+  if (buf.length > PDFTEXT_MAX_BYTES) throw new Error(`PDF too large: ${buf.length} bytes`);
+  const parsed = await pdfParse(buf);
+  let text = stripWeirdWhitespace(parsed?.text || "");
+  if (text.length < 200) throw new Error("PDF has no extractable text (likely scanned)");
+  if (text.length > PDFTEXT_MAX_CHARS_PER_PDF) text = text.slice(0, PDFTEXT_MAX_CHARS_PER_PDF) + "\n\n[ZKRÁCENO]";
+  return text;
+}
+
+/* ============================
+   Build CURRENT + ARCHIVE
+   ============================ */
+
+function sortByDateDesc(a, b) {
+  const da = a.date || "";
+  const db = b.date || "";
+  if (da && db) return db.localeCompare(da);
+  if (da && !db) return -1;
+  if (!da && db) return 1;
+  return (a.title || "").localeCompare(b.title || "");
+}
+
+async function buildCurrentAndArchive({ pages, docs }) {
+  const cutoff = cutoffDateIso();
+
+  // Enrich page dates
+  const pagesEnriched = pages.map((p) => ({
+    ...p,
+    date: guessItemDate(p),
+  }));
+
+  // Recent pages = date >= cutoff OR very important evergreen pages (kontakty, povinné info, bioodpad)
+  const evergreen = (url) =>
+    /\/(urad\/kontakty|urad\/povinne-informace|urad\/czech-point|urad\/skladka-bioodpadu)\b/i.test(url || "");
+
+  const currentPages = pagesEnriched
+    .filter((p) => evergreen(p.url) || (p.date && isRecentIsoDate(p.date)))
+    .sort((a, b) => (b.date || "").localeCompare(a.date || "") || a.url.localeCompare(b.url));
+
+  const archivePages = pagesEnriched
+    .filter((p) => !evergreen(p.url) && p.date && !isRecentIsoDate(p.date))
+    .sort((a, b) => (b.date || "").localeCompare(a.date || "") || a.url.localeCompare(b.url));
+
+  // Docs dates
+  const docsEnriched = docs.map((d) => ({
+    ...d,
+    date: d.date || findDateInText(d.title || "") || findDateInText(d.url || "") || null,
+    type: d.type || classifyDocType(`${d.title} ${d.url}`),
+  }));
+
+  const importantDocs = docsEnriched.filter(isImportantDoc);
+
+  const currentDocs = importantDocs
+    .filter((d) => (d.date && isRecentIsoDate(d.date)) || (!d.date && /vyhl|poplat|odpad|ps/i.test((d.title || "") + " " + d.url)))
+    .sort(sortByDateDesc);
+
+  const archiveDocs = importantDocs
+    .filter((d) => d.date && !isRecentIsoDate(d.date))
+    .sort(sortByDateDesc);
+
+  // Pick PDFs for text extraction (CURRENT only)
+  const pdfCandidates = currentDocs.filter((d) => d.url && isPdfUrl(d.url)).slice(0, CURRENT_MAX_PDF_TEXT);
+
+  const pdfTextBlocks = [];
+  for (const d of pdfCandidates) {
+    const meta = [
+      `------------------------------`,
+      `PDF_TITLE: ${(d.title || "").replace(/\s+/g, " ").trim()}`,
+      `PDF_TYPE: ${d.type || ""}`,
+      `PDF_DATE: ${d.date || ""} (${isoToCz(d.date)})`,
+      `PDF_URL: ${d.url}`,
+      `FOUND_ON: ${d.foundOn || ""}`,
+      `TEXT:`,
+    ].join("\n");
+
+    try {
+      const txt = await extractPdfText(d.url);
+      pdfTextBlocks.push(`${meta}\n${txt}\n`);
+    } catch (e) {
+      pdfTextBlocks.push(`${meta}\n[NELZE EXTRAHOVAT TEXT] ${e?.message || String(e)}\n`);
+    }
+    await sleep(40);
+  }
+
+  const currentHeader = [
+    `${CURRENT_PREFIX}`,
+    `Vygenerováno: ${nowIso()}`,
+    `Zdroj: ${SITE_BASE_URL}`,
+    `CUT_OFF (aktuální od): ${cutoff} (${isoToCz(cutoff)})`,
+    ``,
+    `Tento soubor je určen pro odpovědi na AKTUÁLNÍ dotazy (2026 a poslední ~2 roky) + důležité evergreen stránky (kontakty, Czech POINT, bioodpad).`,
+    `Starší věci jsou v ARCHIVE INDEX (90_ARCHIVE_INDEX...).`,
+    ``,
+    `==============================`,
+    `=== CURRENT DOCUMENTS (vyhlášky / poplatky / odpady / úřední deska)`,
+    `Formát: TYPE | DATE | TITLE | URL | FOUND_ON`,
+    ``,
+  ].join("\n");
+
+  let currentDocsBlock = "";
+  for (const d of currentDocs) {
+    currentDocsBlock += `${d.type} | ${d.date || ""} | ${(d.title || "").replace(/\s+/g, " ").trim()} | ${d.url} | ${d.foundOn || ""}\n`;
+  }
+
+  const currentPagesHeader = [
+    ``,
+    `==============================`,
+    `=== CURRENT PAGES (${currentPages.length})`,
+    `Formát: DATE | TITLE | URL`,
+    ``,
+  ].join("\n");
+
+  let currentPagesBlock = "";
+  for (const p of currentPages) {
+    currentPagesBlock += `${p.date || ""} | ${(p.title || "").replace(/\s+/g, " ").trim()} | ${p.url}\n`;
+  }
+
+  const pdfHeader = [
+    ``,
+    `==============================`,
+    `=== PDF TEXT (aktuální vybrané PDF: ${pdfTextBlocks.length})`,
+    `Pozn.: Pokud je PDF sken bez textové vrstvy, bude zde hláška.`,
+    ``,
+  ].join("\n");
+
+  const currentFinal =
+    currentHeader +
+    currentDocsBlock.trim() +
+    "\n" +
+    currentPagesHeader +
+    currentPagesBlock.trim() +
+    "\n" +
+    pdfHeader +
+    pdfTextBlocks.join("\n");
+
+  const archiveHeader = [
+    `${ARCHIVE_PREFIX}`,
+    `Vygenerováno: ${nowIso()}`,
+    `Zdroj: ${SITE_BASE_URL}`,
+    `CUT_OFF (aktuální od): ${cutoff} (${isoToCz(cutoff)})`,
+    ``,
+    `ARCHIVNÍ INDEX – starší položky (bez plného obsahu). Používej jen když se uživatel ptá na historii/staré vyhlášky.`,
+    ``,
+    `==============================`,
+    `=== ARCHIVE DOCUMENTS`,
+    `Formát: TYPE | DATE | TITLE | URL | FOUND_ON`,
+    ``,
+  ].join("\n");
+
+  let archiveDocsBlock = "";
+  for (const d of archiveDocs) {
+    archiveDocsBlock += `${d.type} | ${d.date || ""} | ${(d.title || "").replace(/\s+/g, " ").trim()} | ${d.url} | ${d.foundOn || ""}\n`;
+  }
+
+  const archivePagesHeader = [
+    ``,
+    `==============================`,
+    `=== ARCHIVE PAGES`,
+    `Formát: DATE | TITLE | URL`,
+    ``,
+  ].join("\n");
+
+  let archivePagesBlock = "";
+  for (const p of archivePages.slice(0, 500)) {
+    archivePagesBlock += `${p.date || ""} | ${(p.title || "").replace(/\s+/g, " ").trim()} | ${p.url}\n`;
+  }
+
+  const archiveFinal = archiveHeader + archiveDocsBlock.trim() + "\n" + archivePagesHeader + archivePagesBlock.trim() + "\n";
+
+  const currentPath = path.join(OUT_DIR, CURRENT_FILE);
+  const archivePath = path.join(OUT_DIR, ARCHIVE_FILE);
+
+  await fs.writeFile(currentPath, currentFinal, "utf-8");
+  await fs.writeFile(archivePath, archiveFinal, "utf-8");
+
+  console.log("CURRENT written:", currentPath);
+  console.log("ARCHIVE written:", archivePath);
+
+  return { currentPath, archivePath };
+}
+
+/* ============================
+   OpenAI upload + cleanup
+   ============================ */
+
+async function oaiFetch(url, options = {}) {
+  const headers = {
+    Authorization: `Bearer ${OPENAI_API_KEY}`,
+    ...OPENAI_BETA_HEADER,
+    ...(options.headers || {}),
+  };
+  const r = await fetch(url, { ...options, headers });
+  const txt = await r.text();
+  let json = null;
+  try { json = JSON.parse(txt); } catch {}
+  if (!r.ok) {
+    const msg = json?.error?.message || txt;
+    throw new Error(`OpenAI error ${r.status}: ${msg}`);
+  }
+  return json ?? txt;
+}
+
+async function uploadFileToOpenAI(filepath) {
+  const data = await fs.readFile(filepath);
+  const form = new FormData();
+  form.append("purpose", "assistants");
+  form.append("file", new Blob([data]), path.basename(filepath));
+  const file = await oaiFetch("https://api.openai.com/v1/files", { method: "POST", body: form });
+  return file.id;
+}
+
+async function attachToVectorStore(fileId) {
+  return await oaiFetch(`https://api.openai.com/v1/vector_stores/${VECTOR_STORE_ID}/files`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ file_id: fileId }),
+  });
+}
+
+async function listAllVectorStoreFiles(limit = 100) {
+  const all = [];
+  let after = null;
+  while (true) {
+    const url =
+      `https://api.openai.com/v1/vector_stores/${VECTOR_STORE_ID}/files?limit=${limit}` + (after ? `&after=${after}` : "");
+    const page = await oaiFetch(url, { method: "GET" });
+    const data = page?.data || [];
+    all.push(...data);
+    if (!page?.has_more) break;
+    const last = data[data.length - 1];
+    if (!last?.id) break;
+    after = last.id;
+  }
+  return all;
+}
+
+async function getFileMeta(fileId) {
+  return await oaiFetch(`https://api.openai.com/v1/files/${fileId}`, { method: "GET" });
+}
+
+async function deleteVectorStoreFile(vsFileId) {
+  return await oaiFetch(`https://api.openai.com/v1/vector_stores/${VECTOR_STORE_ID}/files/${vsFileId}`, { method: "DELETE" });
+}
+
+async function cleanupCurrentBuilds() {
+  const items = await listAllVectorStoreFiles(100);
+  const indexed = [];
+  for (const it of items) {
+    const vsId = it?.id;
+    const fileId = it?.file_id || it?.file?.id;
+    if (!vsId || !fileId) continue;
+    let filename = it?.file?.filename || it?.file?.name || "";
+    if (!filename) {
+      try {
+        const meta = await getFileMeta(fileId);
+        filename = meta?.filename || "";
+      } catch {}
+    }
+    const created_at = it?.created_at || 0;
+    indexed.push({ vsId, fileId, filename, created_at });
+  }
+
+  const matched = indexed.filter((x) => x.filename.startsWith(CURRENT_PREFIX));
+  matched.sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
+
+  const toDelete = matched.slice(Math.max(KEEP_LATEST, 0));
+  console.log(`CURRENT builds in store: ${matched.length}, keep: ${Math.min(KEEP_LATEST, matched.length)}, delete: ${toDelete.length}`);
+
+  for (const d of toDelete) {
+    console.log("Deleting old CURRENT:", d.filename, d.vsId);
+    await deleteVectorStoreFile(d.vsId);
+  }
+}
+
+export async function main() {
   if (!OPENAI_API_KEY) throw new Error("Missing OPENAI_API_KEY");
   if (!VECTOR_STORE_ID) throw new Error("Missing VECTOR_STORE_ID");
 
-  await crawl();
+  console.log("== RADIM CURRENT BUILD ==");
+  console.log("SITE:", SITE_BASE_URL);
+  console.log("VECTOR_STORE_ID:", VECTOR_STORE_ID);
 
-  await detachManagedFromVectorStore();
-  await uploadToVectorStore(FILE_WEB_CURRENT);
-  await uploadToVectorStore(FILE_INDEX_ALL);
-  await uploadToVectorStore(FILE_DOCS_CURRENT);
+  const { pages, docs, seenCount, processed } = await buildCrawl();
+  console.log("Crawl done. Pages:", pages.length, "Docs:", docs.length, "Seen:", seenCount, "Processed:", processed);
 
-  console.log("✨ MISE SPLNĚNA: aktuální + nedatované stránky jsou ve 01_WEB_TEXT_CURRENT.txt, PEOPLE/CORE zůstávají.");
+  const { currentPath, archivePath } = await buildCurrentAndArchive({ pages, docs });
+
+  // sanity
+  const st1 = await fs.stat(currentPath);
+  if (st1.size < 10_000) throw new Error(`CURRENT file too small (${st1.size} bytes)`);
+  const st2 = await fs.stat(archivePath);
+  if (st2.size < 2_000) console.log("WARN: ARCHIVE small, ok.");
+
+  console.log("Uploading CURRENT...");
+  const currentFileId = await uploadFileToOpenAI(currentPath);
+  console.log("Uploaded CURRENT file_id:", currentFileId);
+  const vsA = await attachToVectorStore(currentFileId);
+  console.log("Attached CURRENT vs_file_id:", vsA?.id || "(no id)");
+
+  console.log("Uploading ARCHIVE INDEX...");
+  const archiveFileId = await uploadFileToOpenAI(archivePath);
+  console.log("Uploaded ARCHIVE file_id:", archiveFileId);
+  const vsB = await attachToVectorStore(archiveFileId);
+  console.log("Attached ARCHIVE vs_file_id:", vsB?.id || "(no id)");
+
+  if (CLEANUP_OLD) await cleanupCurrentBuilds();
+
+  console.log("DONE ✅");
 }
 
-main().catch((e) => {
-  console.error("FATAL:", e);
-  process.exit(1);
-});
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main().catch((e) => {
+    console.error("Build failed:", e);
+    process.exit(1);
+  });
+}
