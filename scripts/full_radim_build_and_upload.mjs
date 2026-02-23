@@ -1,6 +1,5 @@
 import fs from "fs/promises";
 import path from "path";
-import crypto from "node:crypto";
 import { JSDOM } from "jsdom";
 import { createRequire } from "module";
 
@@ -82,6 +81,9 @@ async function startCrawl() {
                 const fullUrl = normalizeUrl(href);
                 if (!fullUrl.startsWith(SITE_BASE_URL)) return;
 
+                // Ignoruj generátory obrázků a fotogalerie, které nemají text
+                if (fullUrl.includes('evt_image.php') || fullUrl.includes('fotogalerie')) return;
+
                 if (fullUrl.toLowerCase().endsWith(".pdf")) {
                     docs.set(fullUrl, { url: fullUrl, title: a.textContent.trim() || path.basename(fullUrl) });
                 } else if (!seen.has(fullUrl)) {
@@ -101,39 +103,64 @@ async function startCrawl() {
 }
 
 async function syncWithOpenAI(currentPath, archivePath) {
-    if (!OPENAI_API_KEY || !VECTOR_STORE_ID) return;
-    const headers = { 
-        "Authorization": `Bearer ${OPENAI_API_KEY}`, 
-        "OpenAI-Beta": "assistants=v2" 
-    };
+    if (!OPENAI_API_KEY || !VECTOR_STORE_ID) {
+        console.log("⚠️ Chybí OPENAI_API_KEY nebo VECTOR_STORE_ID.");
+        return;
+    }
+    const headers = { "Authorization": `Bearer ${OPENAI_API_KEY}`, "OpenAI-Beta": "assistants=v2" };
 
-    const filesResponse = await fetch(`https://api.openai.com/v1/vector_stores/${VECTOR_STORE_ID}/files`, { headers });
-    const storeFiles = await filesResponse.json();
+    console.log("🔍 Kontroluji Vector Store...");
+    const vsRes = await fetch(`https://api.openai.com/v1/vector_stores/${VECTOR_STORE_ID}/files`, { headers });
+    if (!vsRes.ok) {
+        console.error("❌ Nelze načíst Vector Store:", await vsRes.text());
+        return;
+    }
+    const storeFiles = await vsRes.json();
+    console.log(`📂 Nalezeno ${storeFiles.data?.length || 0} starých souborů ve Vector Store. Jdu je smazat...`);
 
+    // Tvrdé smazání starých souborů (z Vectoru i z OpenAI Files)
     for (const f of storeFiles.data || []) {
-        const meta = await fetch(`https://api.openai.com/v1/files/${f.id}`, { headers }).then(r => r.json());
-        if (meta.filename?.includes("10_CURRENT") || meta.filename?.includes("90_ARCHIVE")) {
-            await fetch(`https://api.openai.com/v1/vector_stores/${VECTOR_STORE_ID}/files/${f.id}`, { method: "DELETE", headers });
-        }
+        console.log(`🗑️ Odstraňuji soubor ${f.id}...`);
+        await fetch(`https://api.openai.com/v1/vector_stores/${VECTOR_STORE_ID}/files/${f.id}`, { method: "DELETE", headers });
+        await fetch(`https://api.openai.com/v1/files/${f.id}`, { method: "DELETE", headers }); // Smaže i z cloudu
     }
 
+    // Funkce pro bezpečný upload
     const upload = async (filePath) => {
+        console.log(`📤 Nahrávám nový soubor: ${path.basename(filePath)}...`);
         const formData = new FormData();
         formData.append("purpose", "assistants");
-        const fileData = await fs.readFile(filePath);
-        formData.append("file", new Blob([fileData]), path.basename(filePath));
+        
+        const fileContent = await fs.readFile(filePath);
+        // Musíme specifikovat type, jinak to OpenAI občas potichu zahodí
+        const fileBlob = new Blob([fileContent], { type: "text/plain" }); 
+        formData.append("file", fileBlob, path.basename(filePath));
 
-        const fileObj = await fetch("https://api.openai.com/v1/files", { 
-            method: "POST", 
-            headers: { "Authorization": `Bearer ${OPENAI_API_KEY}` }, 
-            body: formData 
-        }).then(r => r.json());
-
-        await fetch(`https://api.openai.com/v1/vector_stores/${VECTOR_STORE_ID}/files`, { 
-            method: "POST", 
-            headers: { ...headers, "Content-Type": "application/json" }, 
-            body: JSON.stringify({ file_id: fileObj.id }) 
+        const uploadRes = await fetch("https://api.openai.com/v1/files", {
+            method: "POST",
+            headers: { "Authorization": `Bearer ${OPENAI_API_KEY}` },
+            body: formData
         });
+
+        if (!uploadRes.ok) {
+            console.error(`❌ Chyba při nahrávání do OpenAI:`, await uploadRes.text());
+            return;
+        }
+        
+        const fileObj = await uploadRes.json();
+        console.log(`✅ Soubor nahrán (ID: ${fileObj.id}). Připojuji ho do Vector Store...`);
+
+        const attachRes = await fetch(`https://api.openai.com/v1/vector_stores/${VECTOR_STORE_ID}/files`, {
+            method: "POST",
+            headers: { ...headers, "Content-Type": "application/json" },
+            body: JSON.stringify({ file_id: fileObj.id })
+        });
+
+        if (!attachRes.ok) {
+            console.error(`❌ Chyba při připojování do Vector Store:`, await attachRes.text());
+        } else {
+            console.log(`🎯 ${path.basename(filePath)} byl ÚSPĚŠNĚ připojen do Vector Store!`);
+        }
     };
 
     await upload(currentPath);
@@ -168,7 +195,7 @@ async function main() {
     await fs.writeFile(path.join(OUT_DIR, ARCHIVE_FILE), docs.map(d => `${d.title}: ${d.url}`).join("\n"));
 
     await syncWithOpenAI(path.join(OUT_DIR, CURRENT_FILE), path.join(OUT_DIR, ARCHIVE_FILE));
-    console.log("🎯 HOTOVO. ASISTENT JE AKTUALIZOVÁN.");
+    console.log("🚀 HOTOVO. ASISTENT JE AKTUALIZOVÁN A PŘIPOJEN.");
 }
 
 main().catch(console.error);
