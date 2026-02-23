@@ -17,6 +17,12 @@ function jsonResponse(status, data) {
 
 // POMOCNÁ FUNKCE PRO VÝBĚR NEJLEPŠÍCH DAT
 function pickTopChunks(searchJson) {
+  // Ochrana, pokud OpenAI vrátí chybu místo dat
+  if (searchJson?.error) {
+    console.error("❌ OpenAI Vector Search Error:", searchJson.error);
+    return [];
+  }
+
   const items = searchJson?.data || [];
   return items
     .map(it => ({
@@ -24,7 +30,7 @@ function pickTopChunks(searchJson) {
       score: it.score || 0,
       text: (it.content || []).map(c => c.text).join("\n"),
       // KLÍČ: Soubory s lidmi a aktuálními daty mají přednost před archivem
-      prio: it.filename.includes("people") || it.filename.includes("CORE") ? 0 : 
+      prio: (it.filename.includes("people") || it.filename.includes("CORE")) ? 0 : 
             it.filename.includes("CURRENT") ? 1 : 5
     }))
     .sort((a, b) => a.prio - b.prio || b.score - a.score)
@@ -47,39 +53,75 @@ async function generateAnswer({ userMessage, contextBlock, history = [] }, apiKe
 
   const res = await fetch(`${OPENAI_BASE_URL}/chat/completions`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
-    body: JSON.stringify({ model: "gpt-4o-mini", messages, temperature: 0.1 })
+    headers: { 
+      "Content-Type": "application/json", 
+      "Authorization": `Bearer ${apiKey}` 
+    },
+    body: JSON.stringify({ 
+      model: "gpt-4o-mini", 
+      messages, 
+      temperature: 0.1 
+    })
   });
 
   const json = await res.json();
+  
+  if (json.error) {
+    console.error("❌ OpenAI Chat Completions Error:", json.error);
+    return HARD_FALLBACK;
+  }
+
   return json.choices?.[0]?.message?.content || HARD_FALLBACK;
 }
 
 export default async function handler(req) {
-  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders });
+  // CORS Preflight
+  if (req.method === "OPTIONS") {
+    return new Response(null, { status: 204, headers: corsHeaders });
+  }
   
   try {
     const body = await req.json();
     const userQ = body.message;
     const history = body.history || []; // Tady musí tvůj frontend posílat historii!
 
-    // Hledáme v OpenAI Vector Storu
+    if (!userQ) {
+      return jsonResponse(400, { ok: false, error: "Chybí dotaz uživatele." });
+    }
+
     const apiKey = process.env.OPENAI_API_KEY;
     const vectorStoreId = process.env.VECTOR_STORE_ID;
 
-    const searchResult = await fetch(`${OPENAI_BASE_URL}/vector_stores/${vectorStoreId}/search`, {
+    if (!apiKey || !vectorStoreId) {
+      console.error("⚠️ Chybí OPENAI_API_KEY nebo VECTOR_STORE_ID v nastavení prostředí.");
+      return jsonResponse(500, { ok: false, error: "Chyba konfigurace serveru." });
+    }
+
+    // 1. Hledáme v OpenAI Vector Storu
+    const searchRes = await fetch(`${OPENAI_BASE_URL}/vector_stores/${vectorStoreId}/search`, {
       method: "POST",
-      headers: { "Authorization": `Bearer ${apiKey}`, "OpenAI-Beta": "assistants=v2", "Content-Type": "application/json" },
+      headers: { 
+        "Authorization": `Bearer ${apiKey}`, 
+        "OpenAI-Beta": "assistants=v2", 
+        "Content-Type": "application/json" 
+      },
       body: JSON.stringify({ query: userQ, max_num_results: 20 })
-    }).then(r => r.json());
-
+    });
+    
+    const searchResult = await searchRes.json();
     const chunks = pickTopChunks(searchResult);
-    const contextBlock = chunks.map(c => `[Zdroj: ${c.filename}]\n${c.text}`).join("\n---\n");
+    
+    // Sestavíme textový kontext, nebo vložíme defaultní hlášku
+    const contextBlock = chunks.length > 0 
+      ? chunks.map(c => `[Zdroj: ${c.filename}]\n${c.text}`).join("\n---\n")
+      : "Žádná relevantní data nebyla nalezena ve Vector Storu.";
 
+    // 2. Generujeme odpověď
     const answer = await generateAnswer({ userMessage: userQ, contextBlock, history }, apiKey);
 
     return jsonResponse(200, { ok: true, answer });
   } catch (err) {
+    console.error("❌ Kritická chyba v handleru:", err);
     return jsonResponse(500, { ok: false, error: err.message });
   }
 }
