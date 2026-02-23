@@ -112,7 +112,6 @@ body{
 }
 .hdr-close:hover{ background: rgba(255,255,255,.22); }
 
-/* klikatelné zavření i na levé části headeru (mimo tlačítka) */
 .header-clickzone{
   cursor:pointer;
   display:flex; align-items:center; gap:10px;
@@ -148,7 +147,7 @@ body{
 .msg a{color:var(--brand2);word-break:break-word;text-decoration:none}
 .msg a:hover{text-decoration:underline}
 
-/* ===== Quick buttons (jen 3) ===== */
+/* ===== Quick buttons ===== */
 .quickbar{
   margin:8px 12px 10px 12px;
   display:flex;
@@ -168,7 +167,7 @@ body{
 }
 .quickbar .qb:hover{ background: rgba(29,78,216,.40); }
 
-/* ===== FEEDBACK (výraznější) ===== */
+/* ===== FEEDBACK ===== */
 .feedback{
   margin:6px 12px 10px 12px;
   padding:10px 12px;
@@ -263,7 +262,7 @@ button.send{
 }
 button.send:disabled{opacity:.55;cursor:not-allowed}
 
-/* FLOATING TAB (slabší blink, bez “šíleného” scale) */
+/* FLOATING TAB */
 .radim-fab{
   position:fixed;
   right:20px;
@@ -314,7 +313,7 @@ button.send:disabled{opacity:.55;cursor:not-allowed}
 .fabText .a{font-weight:950;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:240px}
 .fabText .b{font-size:11px;color:rgba(255,255,255,.78);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:240px}
 
-/* Onboarding “šipka + rámeček” nad lištou */
+/* COACHING BOX */
 .coach{
   position:fixed;
   right:20px;
@@ -378,12 +377,6 @@ button.send:disabled{opacity:.55;cursor:not-allowed}
   .coach{right:12px;bottom:84px;width:240px}
   .coach:after{ right:28px; }
 }
-
-/* Reduce motion */
-@media (prefers-reduced-motion: reduce){
-  .typing span{animation:none}
-  .radim-fab.blink{animation:none}
-}
 </style>
 </head>
 
@@ -393,7 +386,6 @@ button.send:disabled{opacity:.55;cursor:not-allowed}
   <div class="bgVignette"></div>
 </div>
 
-<!-- Onboarding box -->
 <div id="coach" class="coach" hidden>
   <div class="top">
     <div>
@@ -404,7 +396,6 @@ button.send:disabled{opacity:.55;cursor:not-allowed}
   </div>
 </div>
 
-<!-- CHAT -->
 <div id="widget" class="chat-widget" role="dialog" aria-label="Chat – Asistent obce Radim">
   <div class="chat-header">
     <div class="header-clickzone" id="headerClick" title="Zavřít chat">
@@ -422,14 +413,12 @@ button.send:disabled{opacity:.55;cursor:not-allowed}
 
   <div id="chat" class="chat"></div>
 
-  <!-- Quick buttons (jen 3, krátké dotazy) -->
   <div class="quickbar" id="quickbar">
     <button class="qb" type="button" data-q="Kontakty úřadu.">Kontakty úřadu</button>
     <button class="qb" type="button" data-q="Úřední hodiny úřadu.">Úřední hodiny</button>
     <button class="qb" type="button" data-q="Kde je skládka bioodpadu v Radimi?">Bioodpad</button>
   </div>
 
-  <!-- Loading -->
   <div id="loadingBar" class="loading-bar" hidden>
     <span class="typing" aria-label="Generuje se odpověď">
       <span></span><span></span><span></span>
@@ -437,7 +426,6 @@ button.send:disabled{opacity:.55;cursor:not-allowed}
     <span>Generuje se odpověď…</span>
   </div>
 
-  <!-- Feedback mount -->
   <div id="feedbackMount"></div>
 
   <div class="row">
@@ -446,7 +434,6 @@ button.send:disabled{opacity:.55;cursor:not-allowed}
   </div>
 </div>
 
-<!-- Floating tab -->
 <button id="fab" class="radim-fab blink" type="button" aria-label="Otevřít chat">
   <div class="fabIcon" id="fabIcon"><span id="fabFallback" style="font-size:12px;font-weight:900;">AI</span></div>
   <div class="fabText">
@@ -461,7 +448,6 @@ const input=document.getElementById("q");
 const send=document.getElementById("send");
 const widget=document.getElementById("widget");
 const fab=document.getElementById("fab");
-
 const loadingBar=document.getElementById("loadingBar");
 const bgImg = document.getElementById("bgImg");
 const brandmark = document.getElementById("brandmark");
@@ -469,28 +455,24 @@ const brandFallback = document.getElementById("brandFallback");
 const fabIcon = document.getElementById("fabIcon");
 const fabFallback = document.getElementById("fabFallback");
 const quickbar = document.getElementById("quickbar");
-
 const headerClick = document.getElementById("headerClick");
 const closeBtn = document.getElementById("closeBtn");
 const feedbackMount = document.getElementById("feedbackMount");
-
 const coach = document.getElementById("coach");
 const coachClose = document.getElementById("coachClose");
 
-// --- Assets
+// Assets
 const BG_URL = "/skins/radim/bg.jpg";
 const ERB_URL = "/skins/radim/erb.png";
 
-// ✅ Thread persistence key (Variant A)
+// ✅ THREAD & HISTORY (PAMĚŤ)
 const THREAD_KEY = "radim_thread_id_v1";
+let chatHistory = []; // Sem se ukládají zprávy pro zachování kontextu
 
-// onboarding
+// Onboarding logic
 const COACH_KEY = "radim_coach_dismissed_v1";
 function showCoach(){
-  if(!coach) return;
-  if(localStorage.getItem(COACH_KEY)==="1") return;
-  // jen když je chat zavřený
-  if(widget.style.display === "flex") return;
+  if(!coach || localStorage.getItem(COACH_KEY)==="1" || widget.style.display === "flex") return;
   coach.hidden = false;
 }
 function hideCoach(save){
@@ -500,249 +482,155 @@ function hideCoach(save){
 }
 coachClose?.addEventListener("click",(e)=>{ e.preventDefault(); hideCoach(true); });
 
-function setFabBlink(on){
-  fab.classList.toggle("blink", !!on);
-}
-
 function openChat(){
   widget.style.display="flex";
   fab.style.display="none";
-  setFabBlink(false);
+  fab.classList.remove("blink");
   hideCoach(false);
   setTimeout(()=>input.focus(),100);
 }
 function closeChat(){
   widget.style.display="none";
   fab.style.display="flex";
-  setFabBlink(true);
+  fab.classList.add("blink");
   showCoach();
 }
 
-// header close handlers
 headerClick.addEventListener("click", (e)=>{ e.preventDefault(); closeChat(); });
 closeBtn.addEventListener("click", (e)=>{ e.preventDefault(); closeChat(); });
-
-// open button
 fab.addEventListener("click", (e)=>{ e.preventDefault(); openChat(); });
 
 function escapeHtml(s){
   return String(s).replace(/[&<>"']/g,m=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;" }[m]));
 }
 
-/* ✅ RESET: skutečně resetne thread + UI */
-function doHardReset(){
-  try { localStorage.removeItem(THREAD_KEY); } catch {}
-  // vyčisti chat UI
-  chatEl.innerHTML = "";
-  // reset feedback počítadel
-  userQuestionsCount = 0;
-  feedbackShown = false;
-  removeFeedback();
-
-  // úvodní zprávy znovu
-  addMessage(
-    "Radim",
-    "Upozornění:\nOdpovědi tohoto asistenta jsou generovány umělou inteligencí na základě dostupných informací.\nPrávně závazné a oficiální informace si vždy ověřte na oficiálním webu obce Radim nebo přímo na obecním úřadě.",
-    "bot"
-  );
-  addMessage("Radim","Konverzace byla resetována. Zeptejte se prosím znovu.","bot");
-}
-
-/* ---- ČIŠTĚNÍ ODPOVĚDI: JEN bezpečné věci (bez agresivního mazání řádků) ---- */
-function cleanAnswerText(input){
-  if(!input) return "";
-  let t = String(input);
-
-  // File Search citace: 【...†...】
-  t = t.replace(/【[^】]*†[^】]*】/g, "");
-
-  // markdown tučné **text**
-  t = t.replace(/\*\*(.*?)\*\*/g, "$1");
-
-  // velmi mírné odstranění “meta” vět (jen pokud jsou to evidentně technické věty)
-  // — nepoužívat agresivní regex, který může sežrat normální odpověď
-  const badLines = [
-    /použív(á|a)m vyhledávací nástroj/i,
-    /pracuji na principu vyhledávání/i,
-    /odpovídám výhradně na základě dokumentu/i,
-    /99[_ ]?FULL_obec_radim\.txt/i,
-    /vector\s*store/i,
-    /file[_\s-]?search/i,
-    /\bOpenAI\b/i
-  ];
-  t = t
-    .split("\n")
-    .filter(line => !badLines.some(re => re.test(line.trim())))
-    .join("\n");
-
-  // zbytečné mezery / prázdné řádky
-  t = t.replace(/[ \t]+\n/g, "\n");
-  t = t.replace(/\n{3,}/g, "\n\n");
-
-  return t.trim();
-}
-
-/* linkify */
 function linkify(t){
   const s=escapeHtml(t);
   return s.replace(/(https?:\/\/[^\s]+)/g,u=>`<a href="${u}" target="_blank" rel="noopener noreferrer">${u}</a>`);
 }
 
-function addMessage(who,text,cls){
-  const d=document.createElement("div");
-  d.className="msg "+cls;
+function cleanAnswerText(input){
+  if(!input) return "";
+  let t = String(input);
+  t = t.replace(/【[^】]*】/g, ""); // Odstranění technických značek
+  return t.trim();
+}
+
+function addMessage(who, text, cls) {
+  const d = document.createElement("div");
+  d.className = "msg " + cls;
   const cleaned = cleanAnswerText(text || "");
-  d.innerHTML=`<strong>${who}:</strong> ${linkify(cleaned)}`;
+  d.innerHTML = `<strong>${who}:</strong> ${linkify(cleaned)}`;
   chatEl.appendChild(d);
-  chatEl.scrollTop=chatEl.scrollHeight;
-}
-
-function showLoading(on){
-  loadingBar.hidden = !on;
   chatEl.scrollTop = chatEl.scrollHeight;
+
+  // ✅ UKLÁDÁNÍ DO HISTORIE PRO BACKEND
+  if (who === "Vy") {
+    chatHistory.push({ role: "user", content: text });
+  } else if (who === "Radim" && !text.includes("Upozornění:")) {
+    chatHistory.push({ role: "assistant", content: cleaned });
+  }
+
+  // Udržování historie v rozumné délce
+  if (chatHistory.length > 10) chatHistory.shift();
 }
 
-/* ===== FEEDBACK LOGIKA ===== */
-let userQuestionsCount = 0;
-let feedbackShown = false;
-
-function removeFeedback(){
-  feedbackMount.innerHTML = "";
-}
-
-function showFeedbackOnce(){
-  if (feedbackShown) return;
-  feedbackShown = true;
-
-  const wrap = document.createElement("div");
-  wrap.className = "feedback";
-  wrap.innerHTML = `
-    <div class="q">Dostali jste odpověď?</div>
-    <div class="row">
-      <button class="fbBtn" type="button" data-v="yes">Ano</button>
-      <button class="fbBtn" type="button" data-v="no">Ne</button>
-    </div>
-  `;
-
-  feedbackMount.appendChild(wrap);
-
-  wrap.addEventListener("click", (e)=>{
-    const btn = e.target.closest("button[data-v]");
-    if(!btn) return;
-    const v = btn.getAttribute("data-v");
-
-    removeFeedback();
-    if(v === "yes"){
-      addMessage("Radim","Super, to mě těší. Kdykoliv se zeptejte znovu.","bot");
-    }else{
-      addMessage("Radim","To mě mrzí. Zkuste prosím dotaz napsat jinak, nebo napište, co přesně hledáte.","bot");
-    }
-  });
-}
-
-function isResetCommand(q){
-  const s = String(q || "").trim().toLowerCase();
-  return s === "reset" || s === "/reset" || s === "restart" || s === "/restart" || s === "nový chat" || s === "novy chat";
+function doHardReset(){
+  localStorage.removeItem(THREAD_KEY);
+  chatHistory = [];
+  chatEl.innerHTML = "";
+  userQuestionsCount = 0;
+  feedbackShown = false;
+  removeFeedback();
+  initWelcome();
 }
 
 async function ask(qOverride){
   const q=(qOverride ?? input.value).trim();
   if(!q) return;
 
-  // ✅ local reset
-  if (isResetCommand(q)) {
+  if (["reset", "/reset", "restart"].includes(q.toLowerCase())) {
     addMessage("Vy", q, "me");
     input.value="";
     doHardReset();
     return;
   }
 
-  addMessage("Vy",q,"me");
+  addMessage("Vy", q, "me");
   input.value="";
   send.disabled=true;
-  showLoading(true);
+  loadingBar.hidden = false;
+  chatEl.scrollTop = chatEl.scrollHeight;
 
-  try{
-    // ✅ Variant A: always send thread_id + persist returned thread_id
+  try {
     const thread_id = localStorage.getItem(THREAD_KEY) || null;
 
-    const r=await fetch("/.netlify/functions/search",{
-      method:"POST",
-      headers:{ "content-type":"application/json" },
-      body:JSON.stringify({ message:q, thread_id })
+    const r = await fetch("/.netlify/functions/search", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ 
+        message: q, 
+        thread_id,
+        history: chatHistory // ✅ ODESLÁNÍ HISTORIE PRO PAMĚŤ
+      })
     });
 
-    const j=await r.json().catch(()=>({}));
+    const j = await r.json();
+    if (j?.thread_id) localStorage.setItem(THREAD_KEY, j.thread_id);
 
-    if (j && j.thread_id) {
-      localStorage.setItem(THREAD_KEY, j.thread_id);
-    }
-
-    addMessage("Radim", (j && j.answer) ? j.answer : "Bez odpovědi", "bot");
+    addMessage("Radim", j?.answer || "Omlouvám se, nepodařilo se získat odpověď.", "bot");
 
     userQuestionsCount++;
-    if(userQuestionsCount >= 2){
-      showFeedbackOnce();
-    }
-  }catch(e){
-    addMessage("Radim","Chyba spojení.","bot");
-  }finally{
-    showLoading(false);
+    if(userQuestionsCount >= 2) showFeedbackOnce();
+
+  } catch(e) {
+    addMessage("Radim", "Chyba spojení se serverem.", "bot");
+  } finally {
+    loadingBar.hidden = true;
     send.disabled=false;
   }
 }
 
+// Feedback logic
+let userQuestionsCount = 0;
+let feedbackShown = false;
+function removeFeedback(){ feedbackMount.innerHTML = ""; }
+function showFeedbackOnce(){
+  if (feedbackShown) return;
+  feedbackShown = true;
+  const wrap = document.createElement("div");
+  wrap.className = "feedback";
+  wrap.innerHTML = `<div class="q">Dostali jste odpověď?</div><div class="row"><button class="fbBtn" data-v="yes">Ano</button><button class="fbBtn" data-v="no">Ne</button></div>`;
+  feedbackMount.appendChild(wrap);
+  wrap.addEventListener("click", (e)=>{
+    const btn = e.target.closest("button[data-v]");
+    if(!btn) return;
+    removeFeedback();
+    addMessage("Radim", btn.dataset.v === "yes" ? "To mě těší!" : "To mě mrzí, zkuste dotaz upřesnit.", "bot");
+  });
+}
+
 send.onclick=()=>ask();
 input.addEventListener("keydown",e=>e.key==="Enter"&&ask());
+quickbar.onclick=(e)=>{ const b=e.target.closest("button[data-q]"); if(b) ask(b.dataset.q); };
 
-// quickbar
-quickbar.addEventListener("click",(e)=>{
-  const btn = e.target.closest("button[data-q]");
-  if(!btn) return;
-  ask(btn.getAttribute("data-q"));
-});
+function initWelcome(){
+  addMessage("Radim", "Upozornění:\nOdpovědi jsou generovány AI. Oficiální údaje si ověřte na webu obce.", "bot");
+  addMessage("Radim", "Ahoj! Zeptej se mě na cokoliv ohledně obce Radim.", "bot");
+}
 
-// Load background
-(function loadBg(){
-  const img = new Image();
-  img.onload = () => { bgImg.style.backgroundImage = `url('${BG_URL}')`; };
-  img.onerror = () => { bgImg.style.backgroundImage = ""; };
-  img.src = BG_URL + "?v=" + Date.now();
+// Background & Erb loader
+(function initAssets(){
+  const b=new Image(); b.src=BG_URL; b.onload=()=>bgImg.style.backgroundImage=`url('${BG_URL}')`;
+  const e=new Image(); e.src=ERB_URL; e.onload=()=>{
+    [brandmark, fabIcon].forEach(el => {
+      el.innerHTML = ""; const i=document.createElement("img"); i.src=ERB_URL; el.appendChild(i);
+    });
+  };
 })();
 
-// Load erb into header + floating tab
-(function loadErb(){
-  const img = new Image();
-  img.onload = () => {
-    brandmark.innerHTML = "";
-    const h = document.createElement("img");
-    h.src = ERB_URL; h.alt = "Erb obce Radim";
-    brandmark.appendChild(h);
-
-    fabIcon.innerHTML = "";
-    const f = document.createElement("img");
-    f.src = ERB_URL; f.alt = "Erb obce Radim";
-    fabIcon.appendChild(f);
-  };
-  img.onerror = () => {
-    brandFallback.style.display = "inline";
-    fabFallback.style.display = "inline";
-  };
-  img.src = ERB_URL + "?v=" + Date.now();
-})();
-
-// INIT
-addMessage(
-  "Radim",
-  "Upozornění:\nOdpovědi tohoto asistenta jsou generovány umělou inteligencí na základě dostupných informací.\nPrávně závazné a oficiální informace si vždy ověřte na oficiálním webu obce Radim nebo přímo na obecním úřadě.",
-  "bot"
-);
-addMessage("Radim","Ahoj! Zeptej se mě na cokoliv ohledně obce Radim.","bot");
-
-// default: chat zavřený → fab bliká + onboarding šipka
-setFabBlink(true);
+initWelcome();
 showCoach();
 </script>
-
 </body>
 </html>

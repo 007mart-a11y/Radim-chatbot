@@ -6,8 +6,7 @@ const corsHeaders = {
 };
 
 const OPENAI_BASE_URL = "https://api.openai.com/v1";
-
-const HARD_FALLBACK = "Omlouvám se, ale pro tento dotaz nemám v digitálním archivu obce dostatek podkladů. Zkuste prosím kontaktovat obecní úřad přímo na e-mailu podatelna@obec-radim.cz nebo tel. +420 493 591 123.";
+const HARD_FALLBACK = "Tuto informaci jsem v podkladech obce nenalezl. Zkuste prosím podatelna@obec-radim.cz.";
 
 function jsonResponse(status, data) {
   return new Response(JSON.stringify(data), {
@@ -16,84 +15,40 @@ function jsonResponse(status, data) {
   });
 }
 
-function fixLinksInText(t) {
-  let s = String(t || "");
-  // Odstranění zbytečných parametrů a úprava URL
-  s = s.replace(/https?:\/\/[^\s)]+/g, (m) => {
-    try {
-      const u = new URL(m);
-      u.searchParams.delete("kshow");
-      u.pathname = u.pathname.replace("/seniori/", "/");
-      return u.toString();
-    } catch { return m; }
-  });
-  return s;
-}
-
-async function oaiFetch(path, { method = "GET", headers = {}, body } = {}, apiKey) {
-  const res = await fetch(`${OPENAI_BASE_URL}${path}`, {
-    method,
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "OpenAI-Beta": "assistants=v2",
-      ...(body ? { "Content-Type": "application/json" } : {}),
-      ...headers,
-    },
-    body,
-  });
-  if (!res.ok) throw new Error(`OpenAI API error: ${res.status}`);
-  return await res.json();
-}
-
-// Chytřejší výběr kousků textu
+// POMOCNÁ FUNKCE PRO VÝBĚR NEJLEPŠÍCH DAT
 function pickTopChunks(searchJson) {
   const items = searchJson?.data || [];
-  const flat = items.map(it => ({
-    filename: it.filename || "",
-    score: it.score || 0,
-    text: (it.content || []).map(c => c.text).join("\n"),
-    // Prioritizace: 10_CURRENT a 00_CORE jsou nejvíc, ARCHIVE nejmíň
-    prio: it.filename.includes("00_CORE") ? 0 : 
-          it.filename.includes("10_CURRENT") ? 1 : 
-          it.filename.includes("90_ARCHIVE") ? 5 : 2
-  }));
-
-  // Seřadit podle priority a pak podle shody (score)
-  return flat
+  return items
+    .map(it => ({
+      filename: it.filename || "",
+      score: it.score || 0,
+      text: (it.content || []).map(c => c.text).join("\n"),
+      // KLÍČ: Soubory s lidmi a aktuálními daty mají přednost před archivem
+      prio: it.filename.includes("people") || it.filename.includes("CORE") ? 0 : 
+            it.filename.includes("CURRENT") ? 1 : 5
+    }))
     .sort((a, b) => a.prio - b.prio || b.score - a.score)
-    .slice(0, 10); // Stačí 10 nejlepších pro gpt-4o-mini
+    .slice(0, 12); 
 }
 
-function systemPrompt() {
-  return `Jsi oficiální asistent obce Radim. Aktuální rok je 2026.
-  
-CÍL: Odpovídej občanům jasně, lidsky a věcně.
-ZDROJE: Máš k dispozici úryvky z webu, vyhlášek a interních dokumentů. Některé úryvky obsahují "SHRNUTÍ PRO OBČANY" – to jsou prioritní, ověřené informace z PDF.
-
-PRAVIDLA:
-1. Pokud existuje konkrétní cena (voda, odpady, pes) nebo termín, uveď ho TUČNĚ (např. **150 Kč**).
-2. Neodkazuj na názvy souborů (nepiš "v souboru 10_CURRENT..."). Místo toho piš "Dle aktuálních informací..." nebo "Podle platné vyhlášky...".
-3. Pokud informaci nemáš, neříkej jen "nevím". Nabídni kontakt na podatelnu (podatelna@obec-radim.cz) nebo příslušný spolek (Sokol, Hasiči), pokud se dotaz týká jich.
-4. Odpovídej v češtině, stručně, v odrážkách, pokud je informací více.`;
-}
-
-async function generateAnswer({ userMessage, contextBlock }, apiKey) {
-  const body = {
-    model: "gpt-4o-mini",
-    messages: [
-      { role: "system", content: systemPrompt() },
-      { role: "user", content: `KONTEXT (Oficiální dokumentace):\n${contextBlock}\n\nDOTAZ UŽIVATELE: ${userMessage}` }
-    ],
-    temperature: 0.2, // Nižší teplota = méně vymýšlení
-  };
+async function generateAnswer({ userMessage, contextBlock, history = [] }, apiKey) {
+  // Tady se tvoří "PAMĚŤ" - posíláme historii i kontext z webu
+  const messages = [
+    { 
+        role: "system", 
+        content: `Jsi asistent obce Radim (2026). 
+        TVOJE NEJVYŠŠÍ PRIORITA: Pokud v datech najdeš konkrétní osobu pro konkrétní věc (např. Karban pro Sokol/Halu), uváděj PŘÍMO ji. Neposílej lidi na úřad, pokud existuje přímý kontakt.
+        DRŽ KONTEXT: Pokud se uživatel ptá zájmeny (to, on, kolik to stojí), dívej se na předchozí zprávy v historii.
+        STYL: Piš věcně, tučně zvýrazňuj ceny a jména.` 
+    },
+    ...history.slice(-5), // Posledních 5 zpráv historie pro paměť
+    { role: "user", content: `DATA Z WEBU:\n${contextBlock}\n\nOTÁZKA: ${userMessage}` }
+  ];
 
   const res = await fetch(`${OPENAI_BASE_URL}/chat/completions`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${apiKey}`
-    },
-    body: JSON.stringify(body)
+    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
+    body: JSON.stringify({ model: "gpt-4o-mini", messages, temperature: 0.1 })
   });
 
   const json = await res.json();
@@ -104,44 +59,27 @@ export default async function handler(req) {
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders });
   
   try {
-    const apiKey = process.env.OPENAI_API_KEY;
-    const vectorStoreId = process.env.VECTOR_STORE_ID;
     const body = await req.json();
     const userQ = body.message;
+    const history = body.history || []; // Tady musí tvůj frontend posílat historii!
 
-    if (!userQ) return jsonResponse(400, { error: "No message" });
+    // Hledáme v OpenAI Vector Storu
+    const apiKey = process.env.OPENAI_API_KEY;
+    const vectorStoreId = process.env.VECTOR_STORE_ID;
 
-    // Rozšíření hledání o rok a klíčová slova
-    const searchQuery = `${userQ} 2026 aktuální vyhláška poplatky kontakt`;
-
-    const searchResult = await oaiFetch(
-      `/vector_stores/${vectorStoreId}/search`,
-      {
-        method: "POST",
-        body: JSON.stringify({
-          query: searchQuery,
-          max_num_results: 20,
-        }),
-      },
-      apiKey
-    );
+    const searchResult = await fetch(`${OPENAI_BASE_URL}/vector_stores/${vectorStoreId}/search`, {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${apiKey}`, "OpenAI-Beta": "assistants=v2", "Content-Type": "application/json" },
+      body: JSON.stringify({ query: userQ, max_num_results: 20 })
+    }).then(r => r.json());
 
     const chunks = pickTopChunks(searchResult);
-    const contextBlock = chunks.map(c => `[ZDROJ: ${c.filename}]\n${c.text}`).join("\n---\n");
+    const contextBlock = chunks.map(c => `[Zdroj: ${c.filename}]\n${c.text}`).join("\n---\n");
 
-    let answer = await generateAnswer({ userMessage: userQ, contextBlock }, apiKey);
-    
-    // Finální vyčištění
-    answer = fixLinksInText(answer.replace(/【.*?】/g, ""));
+    const answer = await generateAnswer({ userMessage: userQ, contextBlock, history }, apiKey);
 
-    return jsonResponse(200, { 
-        ok: true, 
-        answer: answer.trim(),
-        thread_id: body.thread_id || `t_${Date.now()}`
-    });
-
+    return jsonResponse(200, { ok: true, answer });
   } catch (err) {
-    console.error(err);
     return jsonResponse(500, { ok: false, error: err.message });
   }
 }
