@@ -27,28 +27,27 @@ function pickTopChunks(searchJson) {
       filename: it.filename || "",
       score: it.score || 0,
       text: (it.content || []).map(c => c.text).join("\n"),
-      // Soubor 10_CURRENT má vždy prioritu před archivem
       prio: it.filename.includes("CURRENT") ? 1 : 5
     }))
     .sort((a, b) => a.prio - b.prio || b.score - a.score)
-    .slice(0, 15); // Zvýšeno na 15, ať má asistent širší kontext z webu i vyhlášek
+    .slice(0, 15);
 }
 
 async function generateAnswer({ userMessage, contextBlock, history = [] }, apiKey) {
   const messages = [
     { 
         role: "system", 
-        content: `Jsi profesionální, lidský a velmi užitečný asistent obce Radim (pro rok 2026). Jsi absolutní expert na to, co se v obci děje, a znáš všechny platné vyhlášky a nařízení.
+        content: `Jsi profesionální, lidský a velmi užitečný asistent obce Radim (pro rok 2026). Jsi absolutní expert na to, co se v obci děje.
         
         TVOJE NEJPŘÍSNĚJŠÍ PRAVIDLA:
         1. FORMÁTOVÁNÍ: Absolutní ZÁKAZ používání hvězdiček (*) a Markdownu. Piš pouze čistý text. Zásadně nepoužívej tučné písmo.
-        2. ODKAZY NA ZDROJ (KRITICKÉ): Data, která dostáváš, jsou v blocích [ZAČÁTEK STRÁNKY] nebo [ZAČÁTEK DOKUMENTU]. Uvnitř je vždy pole "ODKAZ:". Pokud z daného bloku čerpáš odpověď, MUSÍŠ na úplný konec své odpovědi napsat "Zdroj: " a přidat přesně tuto URL adresu.
-        3. VYHLÁŠKY A POPLATKY: Pokud se uživatel ptá na poplatky (psi, odpad, atd.) nebo pravidla, a ty vidíš ve zdrojích více vyhlášek, VŽDY použij tu s nejnovějším rokem (např. 2024, 2025, 2026) a přesně ocituj, co se v ní píše.
-        4. NEVÍŠ = NEVÍŠ: Pokud odpověď ve zdrojích jasně nevidíš, nevymýšlej si jména, funkce ani pravidla. Místo toho slušně odkaž na e-mail urad@obec-radim.cz nebo telefon 731 409 498.
+        2. ODKAZY NA ZDROJ: Data jsou v blocích [ZAČÁTEK...]. Uvnitř je pole "ODKAZ:". Pokud z bloku čerpáš, VŽDY na konec odpovědi napiš "Zdroj: " a přidej tuto URL.
+        3. ŘEŠENÍ ROZPORŮ (AKTUÁLNOST): Pokud v dodaných datech vidíš různé údaje k jedné věci (např. různé ceny za psy, odpad, vodu, nebo dvě různé vyhlášky), VŽDY logicky vyhodnoť kontext a použij to, co je aktuální pro současnost. Zastaralé dokumenty (např. z let 2023, 2024) ignoruj. Pokud vidíš platný text bez roku a starý text s rokem, přednost má ten nový platný text.
+        4. NEVÍŠ = NEVÍŠ: Pokud odpověď jasně nevidíš, nevymýšlej si. Slušně odkaž na urad@obec-radim.cz nebo 731 409 498.
         
         Odpovídej srozumitelně, věcně a přátelsky, jako skutečný profesionál na úřadě.` 
     },
-    ...history.slice(-5), // Udržení kontextu předchozích zpráv
+    ...history.slice(-5),
     { role: "user", content: `DODANÁ DATA Z WEBU A DOKUMENTŮ:\n${contextBlock}\n\nOTÁZKA UŽIVATELE: ${userMessage}` }
   ];
 
@@ -61,41 +60,31 @@ async function generateAnswer({ userMessage, contextBlock, history = [] }, apiKe
     body: JSON.stringify({ 
       model: "gpt-4o-mini", 
       messages, 
-      temperature: 0.1 // Nízká teplota = maximální držení se faktů, žádné halucinace
+      temperature: 0.1 
     })
   });
 
   const json = await res.json();
   
-  if (json.error) {
-    console.error("❌ OpenAI Chat Completions Error:", json.error);
-    return HARD_FALLBACK;
-  }
-
+  if (json.error) return HARD_FALLBACK;
   return json.choices?.[0]?.message?.content || HARD_FALLBACK;
 }
 
 export default async function handler(req) {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { status: 204, headers: corsHeaders });
-  }
+  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders });
   
   try {
     const body = await req.json();
     const userQ = body.message;
     const history = body.history || [];
 
-    if (!userQ) return jsonResponse(400, { ok: false, error: "Chybí dotaz uživatele." });
+    if (!userQ) return jsonResponse(400, { ok: false, error: "Chybí dotaz." });
 
     const apiKey = process.env.OPENAI_API_KEY;
     const vectorStoreId = process.env.VECTOR_STORE_ID;
 
-    if (!apiKey || !vectorStoreId) {
-      console.error("⚠️ Chybí OPENAI_API_KEY nebo VECTOR_STORE_ID.");
-      return jsonResponse(500, { ok: false, error: "Chyba konfigurace serveru." });
-    }
+    if (!apiKey || !vectorStoreId) return jsonResponse(500, { ok: false, error: "Chyba serveru." });
 
-    // 1. Prohledání Vector Storu
     const searchRes = await fetch(`${OPENAI_BASE_URL}/vector_stores/${vectorStoreId}/search`, {
       method: "POST",
       headers: { 
@@ -109,17 +98,14 @@ export default async function handler(req) {
     const searchResult = await searchRes.json();
     const chunks = pickTopChunks(searchResult);
     
-    // 2. Sestavení kontextu pro AI
     const contextBlock = chunks.length > 0 
       ? chunks.map(c => c.text).join("\n---\n")
       : "Žádná relevantní data nebyla nalezena ve Vector Storu.";
 
-    // 3. Generování finální odpovědi
     const answer = await generateAnswer({ userMessage: userQ, contextBlock, history }, apiKey);
 
     return jsonResponse(200, { ok: true, answer });
   } catch (err) {
-    console.error("❌ Kritická chyba v handleru:", err);
     return jsonResponse(500, { ok: false, error: err.message });
   }
 }
