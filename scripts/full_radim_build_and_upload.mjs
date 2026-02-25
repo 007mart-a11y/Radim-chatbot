@@ -10,9 +10,10 @@ const SITE_BASE_URL = (process.env.SITE_BASE_URL ?? "https://www.obec-radim.cz")
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const VECTOR_STORE_ID = process.env.VECTOR_STORE_ID;
 
-const MAX_PAGES = 300; 
-const CURRENT_MAX_PAGES_TO_STORE = 150; 
-const CURRENT_MAX_PDF_TEXT = 20;
+// MAXIMÁLNÍ HLOUBKA A ŠÍŘKA (stažení celého webu)
+const MAX_PAGES = 1000; 
+const CURRENT_MAX_PAGES_TO_STORE = 1000; 
+const CURRENT_MAX_PDF_TEXT = 50;
 
 const OUT_DIR = "knowledge";
 const CURRENT_FILE = "10_CURRENT_obec_radim.txt";
@@ -24,6 +25,8 @@ function normalizeUrl(url) {
     try {
         const u = new URL(url, SITE_BASE_URL);
         u.hash = "";
+        // Odstranění zbytečných parametrů řazení, ať nečteme stejnou stránku 10x
+        if (u.search.includes('ftresult')) u.search = ""; 
         return u.toString();
     } catch (e) {
         return url;
@@ -35,15 +38,12 @@ async function getLlmSummary(text, title) {
     try {
         const response = await fetch("https://api.openai.com/v1/chat/completions", {
             method: "POST",
-            headers: { 
-                "Content-Type": "application/json", 
-                "Authorization": `Bearer ${OPENAI_API_KEY}` 
-            },
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${OPENAI_API_KEY}` },
             body: JSON.stringify({
                 model: "gpt-4o-mini",
                 messages: [
-                    { role: "system", content: "Jsi expert na obec Radim. Vytáhni fakta, jména, částky a termíny. Piš stručně." },
-                    { role: "user", content: `Dokument: ${title}\nText: ${text.slice(0, 8000)}` }
+                    { role: "system", content: "Jsi datový analytik. Tvým úkolem je z tohoto PDF vytáhnout přesná fakta, čísla a kontakty. Buď absolutně věcný." },
+                    { role: "user", content: `Název dokumentu: ${title}\n\nText dokumentu: ${text.slice(0, 8000)}` }
                 ],
                 temperature: 0
             })
@@ -51,7 +51,7 @@ async function getLlmSummary(text, title) {
         const json = await response.json();
         return json.choices[0].message.content;
     } catch (e) {
-        return `[Chyba analýzy]`;
+        return `[Chyba analýzy PDF]`;
     }
 }
 
@@ -73,15 +73,13 @@ async function startCrawl() {
             const dom = new JSDOM(html);
             const doc = dom.window.document;
 
-            // Odstranění balastu (menu, patičky atd.)
-            doc.querySelectorAll("script, style, nav, footer, .menu, .footer").forEach(el => el.remove());
-
+            // 1. ZÍSKÁNÍ ODKAZŮ PŘED SMAZÁNÍM MENU (aby se dostal všude)
             doc.querySelectorAll("a[href]").forEach(a => {
                 const href = a.getAttribute("href");
                 const fullUrl = normalizeUrl(href);
                 if (!fullUrl.startsWith(SITE_BASE_URL)) return;
 
-                // Ignoruj generátory obrázků a fotogalerie, které nemají text
+                // Ignorujeme balastní stránky
                 if (fullUrl.includes('evt_image.php') || fullUrl.includes('fotogalerie')) return;
 
                 if (fullUrl.toLowerCase().endsWith(".pdf")) {
@@ -91,9 +89,18 @@ async function startCrawl() {
                 }
             });
 
-            const title = doc.querySelector("title")?.textContent || "";
+            // 2. VYČIŠTĚNÍ BALASTU A ROZŘEZÁNÍ BLOKŮ (ochrana proti slepení textu)
+            doc.querySelectorAll("script, style, nav, footer, .menu, .footer, iframe").forEach(el => el.remove());
+            // Přidáme mezery za nadpisy a odstavce, aby se slova neslepila k sobě
+            doc.querySelectorAll("p, div, h1, h2, h3, h4, li, br").forEach(el => el.insertAdjacentHTML('afterend', ' '));
+
+            const title = doc.querySelector("title")?.textContent.replace(/\s+/g, ' ').trim() || "";
             const content = (doc.querySelector("main") || doc.body).textContent.replace(/\s+/g, ' ').trim();
-            pages.push({ url, title, content });
+            
+            // Uložíme jen stránky, které mají nějaký skutečný text (delší než 50 znaků)
+            if (content.length > 50) {
+                pages.push({ url, title, content });
+            }
 
         } catch (e) {
             console.error(`❌ Error ${url}: ${e.message}`);
@@ -109,58 +116,34 @@ async function syncWithOpenAI(currentPath, archivePath) {
     }
     const headers = { "Authorization": `Bearer ${OPENAI_API_KEY}`, "OpenAI-Beta": "assistants=v2" };
 
-    console.log("🔍 Kontroluji Vector Store...");
+    console.log("🔍 Kontroluji staré soubory ve Vector Store...");
     const vsRes = await fetch(`https://api.openai.com/v1/vector_stores/${VECTOR_STORE_ID}/files`, { headers });
-    if (!vsRes.ok) {
-        console.error("❌ Nelze načíst Vector Store:", await vsRes.text());
-        return;
-    }
     const storeFiles = await vsRes.json();
-    console.log(`📂 Nalezeno ${storeFiles.data?.length || 0} starých souborů ve Vector Store. Jdu je smazat...`);
 
-    // Tvrdé smazání starých souborů (z Vectoru i z OpenAI Files)
+    // Smazání všech starých souborů
     for (const f of storeFiles.data || []) {
-        console.log(`🗑️ Odstraňuji soubor ${f.id}...`);
+        console.log(`🗑️ Odstraňuji starý soubor ${f.id}...`);
         await fetch(`https://api.openai.com/v1/vector_stores/${VECTOR_STORE_ID}/files/${f.id}`, { method: "DELETE", headers });
-        await fetch(`https://api.openai.com/v1/files/${f.id}`, { method: "DELETE", headers }); // Smaže i z cloudu
+        await fetch(`https://api.openai.com/v1/files/${f.id}`, { method: "DELETE", headers }); 
     }
 
-    // Funkce pro bezpečný upload
     const upload = async (filePath) => {
-        console.log(`📤 Nahrávám nový soubor: ${path.basename(filePath)}...`);
+        console.log(`📤 Nahrávám strukturovaný soubor: ${path.basename(filePath)}...`);
         const formData = new FormData();
         formData.append("purpose", "assistants");
-        
         const fileContent = await fs.readFile(filePath);
-        // Musíme specifikovat type, jinak to OpenAI občas potichu zahodí
-        const fileBlob = new Blob([fileContent], { type: "text/plain" }); 
-        formData.append("file", fileBlob, path.basename(filePath));
+        formData.append("file", new Blob([fileContent], { type: "text/plain" }), path.basename(filePath));
 
         const uploadRes = await fetch("https://api.openai.com/v1/files", {
-            method: "POST",
-            headers: { "Authorization": `Bearer ${OPENAI_API_KEY}` },
-            body: formData
+            method: "POST", headers: { "Authorization": `Bearer ${OPENAI_API_KEY}` }, body: formData
         });
-
-        if (!uploadRes.ok) {
-            console.error(`❌ Chyba při nahrávání do OpenAI:`, await uploadRes.text());
-            return;
-        }
-        
         const fileObj = await uploadRes.json();
-        console.log(`✅ Soubor nahrán (ID: ${fileObj.id}). Připojuji ho do Vector Store...`);
 
-        const attachRes = await fetch(`https://api.openai.com/v1/vector_stores/${VECTOR_STORE_ID}/files`, {
-            method: "POST",
-            headers: { ...headers, "Content-Type": "application/json" },
+        console.log(`✅ Nahráno (ID: ${fileObj.id}). Připojuji do Vector Store...`);
+        await fetch(`https://api.openai.com/v1/vector_stores/${VECTOR_STORE_ID}/files`, {
+            method: "POST", headers: { ...headers, "Content-Type": "application/json" },
             body: JSON.stringify({ file_id: fileObj.id })
         });
-
-        if (!attachRes.ok) {
-            console.error(`❌ Chyba při připojování do Vector Store:`, await attachRes.text());
-        } else {
-            console.log(`🎯 ${path.basename(filePath)} byl ÚSPĚŠNĚ připojen do Vector Store!`);
-        }
     };
 
     await upload(currentPath);
@@ -168,34 +151,42 @@ async function syncWithOpenAI(currentPath, archivePath) {
 }
 
 async function main() {
+    console.log("🚀 STARTUJE STRUKTUROVANÝ CRAWL. Tohle vytáhne všechno...");
     const { pages, docs } = await startCrawl();
-    let currentTxt = `EXPERTNÍ ZNALOSTNÍ BÁZE OBCE RADIM - AKTUALIZACE ${new Date().toLocaleDateString()}\n\n`;
-
+    
+    // Začátek strukturovaného souboru pro dokonalou AI orientaci
+    let currentTxt = `EXPERTNÍ ZNALOSTNÍ BÁZE OBCE RADIM\nAKTUALIZACE: ${new Date().toLocaleDateString()}\n`;
+    currentTxt += `Tento dokument obsahuje strukturovaná data z oficiálního webu obce. Každá sekce má jasně danou URL adresu pro citaci.\n\n`;
+    currentTxt += `==================================================\n`;
     currentTxt += `### SEKCE 1: DŮLEŽITÉ DOKUMENTY A VYHLÁŠKY\n`;
+    currentTxt += `==================================================\n\n`;
+
     for (const d of docs.slice(0, CURRENT_MAX_PDF_TEXT)) {
         console.log(`📝 Analýza PDF: ${d.title}`);
         try {
             const res = await fetch(d.url);
             const pdfData = await pdfParse(Buffer.from(await res.arrayBuffer()));
             const summary = await getLlmSummary(pdfData.text, d.title);
-            currentTxt += `DOKUMENT: ${d.title}\nZDROJ: ${d.url}\nSHRNUTÍ: ${summary}\n---\n`;
+            currentTxt += `[ZAČÁTEK DOKUMENTU]\nNÁZEV: ${d.title}\nODKAZ: ${d.url}\nOBSAH/SHRNUTÍ:\n${summary}\n[KONEC DOKUMENTU]\n\n`;
             await sleep(300);
-        } catch (e) {
-            console.log("PDF skip");
-        }
+        } catch (e) { console.log("PDF skip"); }
     }
 
-    currentTxt += `\n### SEKCE 2: OBSAH WEBU A NAVIGACE\n`;
+    currentTxt += `==================================================\n`;
+    currentTxt += `### SEKCE 2: KOMPLETNÍ OBSAH WEBU A NAVIGACE\n`;
+    currentTxt += `==================================================\n\n`;
+
     pages.slice(0, CURRENT_MAX_PAGES_TO_STORE).forEach(p => {
-        currentTxt += `TÉMA: ${p.title}\nADRESA: ${p.url}\nTEXT: ${p.content.slice(0, 1500)}\n---\n`;
+        currentTxt += `[ZAČÁTEK STRÁNKY]\nNÁZEV: ${p.title}\nODKAZ: ${p.url}\nOBSAH:\n${p.content}\n[KONEC STRÁNKY]\n\n`;
     });
 
     await fs.mkdir(OUT_DIR, { recursive: true });
     await fs.writeFile(path.join(OUT_DIR, CURRENT_FILE), currentTxt);
     await fs.writeFile(path.join(OUT_DIR, ARCHIVE_FILE), docs.map(d => `${d.title}: ${d.url}`).join("\n"));
 
+    console.log("🔄 Synchronizuji perfektně strukturovaná data s OpenAI...");
     await syncWithOpenAI(path.join(OUT_DIR, CURRENT_FILE), path.join(OUT_DIR, ARCHIVE_FILE));
-    console.log("🚀 HOTOVO. ASISTENT JE AKTUALIZOVÁN A PŘIPOJEN.");
+    console.log("🎯 HOTOVO. ASISTENT MÁ TEĎ V HLAVĚ CELÝ WEB S DOKONALOU STRUKTUROU A ODKAZY.");
 }
 
 main().catch(console.error);

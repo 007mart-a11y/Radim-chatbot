@@ -41,12 +41,10 @@ async function generateAnswer({ userMessage, contextBlock, history = [] }, apiKe
         content: `Jsi oficiální, lidský a velmi užitečný asistent obce Radim (pro rok 2026). Jsi expert na to, co se v obci děje.
         
         TVOJE NEJPŘÍSNĚJŠÍ PRAVIDLA:
-        1. FORMÁTOVÁNÍ: Absolutní ZÁKAZ používání hvězdiček (*) a Markdownu. Piš pouze čistý text. Pro zdůraznění můžeš výjimečně použít VELKÁ PÍSMENA. Nepoužívej ani tučné písmo, frontend ho neumí zobrazit.
-        2. BIOODPAD: Sběrné místo pro bioodpad (větve, tráva) se nachází u hřbitova v areálu bývalé cihelny. (Nezaměňuj to s poplatkem 750 Kč za popelnice na komunální odpad!).
-        3. CZECHPOINT A OVĚŘOVÁNÍ PODPISŮ: Tyto služby řeší výhradně Obecní úřad v úředních hodinách (starostka / místostarostka). Nikdy neodkazuj na nikoho ze Sokola (např. Václava Nidrleho).
-        4. HALA A SOKOL: Pronájem sportovní haly řeší Lukáš Karban.
-        5. STARÉ VS. NOVÉ: Pokud ve zdrojích vidíš více vyhlášek nebo dat, VŽDY použij tu s nejnovějším datem a staré ignoruj.
-        6. NEVÍŠ = NEVÍŠ: Pokud odpověď ve zdrojích jasně nevidíš, přiznej to. Nevymýšlej si jména ani funkce. Místo toho slušně odkaž na urad@obec-radim.cz nebo telefon 731 409 498.
+        1. FORMÁTOVÁNÍ: Absolutní ZÁKAZ používání hvězdiček (*) a Markdownu. Piš pouze čistý text. Pro zdůraznění můžeš výjimečně použít VELKÁ PÍSMENA. Nepoužívej tučné písmo.
+        2. ODKAZY: Pokud najdeš odpověď ve zdrojových datech, VŽDY se podívej na pole "ODKAZ:" v daném bloku a přidej tuto URL adresu na konec své odpovědi ve tvaru "Zdroj: [odkaz]".
+        3. STARÉ VS. NOVÉ: Pokud ve zdrojích vidíš více vyhlášek nebo dat (např. o poplatcích), VŽDY použij tu s nejnovějším datem a staré ignoruj.
+        4. NEVÍŠ = NEVÍŠ: Pokud odpověď ve zdrojích jasně nevidíš, nevymýšlej si. Místo toho slušně odkaž na urad@obec-radim.cz nebo telefon 731 409 498.
         
         Odpovídej stručně, srozumitelně a přátelsky, jako místní znalec.` 
     },
@@ -87,17 +85,12 @@ export default async function handler(req) {
     const userQ = body.message;
     const history = body.history || [];
 
-    if (!userQ) {
-      return jsonResponse(400, { ok: false, error: "Chybí dotaz uživatele." });
-    }
+    if (!userQ) return jsonResponse(400, { ok: false, error: "Chybí dotaz." });
 
     const apiKey = process.env.OPENAI_API_KEY;
     const vectorStoreId = process.env.VECTOR_STORE_ID;
 
-    if (!apiKey || !vectorStoreId) {
-      console.error("⚠️ Chybí OPENAI_API_KEY nebo VECTOR_STORE_ID.");
-      return jsonResponse(500, { ok: false, error: "Chyba konfigurace serveru." });
-    }
+    if (!apiKey || !vectorStoreId) return jsonResponse(500, { ok: false, error: "Chyba serveru." });
 
     const searchRes = await fetch(`${OPENAI_BASE_URL}/vector_stores/${vectorStoreId}/search`, {
       method: "POST",
@@ -120,7 +113,7 @@ export default async function handler(req) {
 
     return jsonResponse(200, { ok: true, answer });
   } catch (err) {
-    console.error("❌ Kritická chyba v handleru:", err);
+    console.error("❌ Kritická chyba:", err);
     return jsonResponse(500, { ok: false, error: err.message });
   }
 }
