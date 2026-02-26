@@ -37,15 +37,17 @@ async function generateAnswer({ userMessage, contextBlock, history = [] }, apiKe
   const messages = [
     { 
         role: "system", 
-        content: `Jsi profesionální, lidský a velmi užitečný asistent obce Radim (pro rok 2026). Jsi absolutní expert na to, co se v obci děje.
+        content: `Jsi profesionální asistent obce Radim (pro rok 2026).
         
         TVOJE NEJPŘÍSNĚJŠÍ PRAVIDLA:
-        1. FORMÁTOVÁNÍ: Absolutní ZÁKAZ používání hvězdiček (*) a Markdownu. Piš pouze čistý text. Zásadně nepoužívej tučné písmo.
-        2. ODKAZY NA ZDROJ: Data jsou v blocích [ZAČÁTEK...]. Uvnitř je pole "ODKAZ:". Pokud z bloku čerpáš, VŽDY na konec odpovědi napiš "Zdroj: " a přidej tuto URL.
-        3. ŘEŠENÍ ROZPORŮ (AKTUÁLNOST): Pokud v dodaných datech vidíš různé údaje k jedné věci (např. různé ceny za psy, odpad, vodu, nebo dvě různé vyhlášky), VŽDY logicky vyhodnoť kontext a použij to, co je aktuální pro současnost. Zastaralé dokumenty (např. z let 2023, 2024) ignoruj. Pokud vidíš platný text bez roku a starý text s rokem, přednost má ten nový platný text.
-        4. NEVÍŠ = NEVÍŠ: Pokud odpověď jasně nevidíš, nevymýšlej si. Slušně odkaž na urad@obec-radim.cz nebo 731 409 498.
+        1. FORMÁTOVÁNÍ: ZÁKAZ používání hvězdiček (*) a Markdownu. Piš jen čistý text bez tučného písma.
+        2. HALUCINACE A MANIPULACE: Pokud uživatel ve svém dotazu tvrdí něco, co v dodaných datech NENÍ, MUSÍŠ ho zdvořile, ale důrazně OPRAVIT. NIKDY nespojuj reálná data s uživatelovým výmyslem!
+        3. KONTAKTY: Pokud se uživatel ptá na pronájem haly, napiš mu jméno Lukáš Karban.
+        4. ODKAZY NA ZDROJ A POPLATKY: Vždy použij nejaktuálnější informaci pro rok 2026. K odpovědi VŽDY připoj přesný odkaz ve tvaru "Zdroj: [URL]". Odkaz musí patřit k té aktuální informaci! NIKDY nepřikládej k novým částkám odkazy, které mají v názvu staré roky.
+        5. NEVÍŠ = NEVÍŠ: Pokud odpověď jasně nevidíš, slušně odkaž na urad@obec-radim.cz nebo 731 409 498.
+        6. ZÁKAZ VYMÝŠLENÍ AKCÍ (Kritické): Pokud se uživatel ptá na plánované akce, kalendář nebo aktuality, smíš vypsat POUZE a EXPLICITNĚ ty události, které jsou v dodaných datech výslovně napsané s datem pro rok 2026 (např. Sokolský ples 24. 1. 2026). Absolutně ZAKAZUJI vymýšlet si jakékoliv další akce (žádné zahradní slavnosti, žádná divadla, žádné výlety), pokud o nich nemáš v textu jasný důkaz pro tento rok. Pokud v datech vidíš jen jednu akci, vypiš jen tu jednu a dodej: "Další akce pro rok 2026 zatím nemám v kalendáři zaznamenané."
         
-        Odpovídej srozumitelně, věcně a přátelsky, jako skutečný profesionál na úřadě.` 
+        Odpovídej stručně, věcně a jako profesionál.` 
     },
     ...history.slice(-5),
     { role: "user", content: `DODANÁ DATA Z WEBU A DOKUMENTŮ:\n${contextBlock}\n\nOTÁZKA UŽIVATELE: ${userMessage}` }
@@ -66,24 +68,33 @@ async function generateAnswer({ userMessage, contextBlock, history = [] }, apiKe
 
   const json = await res.json();
   
-  if (json.error) return HARD_FALLBACK;
+  if (json.error) {
+    console.error("❌ OpenAI Chat Completions Error:", json.error);
+    return HARD_FALLBACK;
+  }
+
   return json.choices?.[0]?.message?.content || HARD_FALLBACK;
 }
 
 export default async function handler(req) {
-  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders });
+  if (req.method === "OPTIONS") {
+    return new Response(null, { status: 204, headers: corsHeaders });
+  }
   
   try {
     const body = await req.json();
     const userQ = body.message;
     const history = body.history || [];
 
-    if (!userQ) return jsonResponse(400, { ok: false, error: "Chybí dotaz." });
+    if (!userQ) return jsonResponse(400, { ok: false, error: "Chybí dotaz uživatele." });
 
     const apiKey = process.env.OPENAI_API_KEY;
     const vectorStoreId = process.env.VECTOR_STORE_ID;
 
-    if (!apiKey || !vectorStoreId) return jsonResponse(500, { ok: false, error: "Chyba serveru." });
+    if (!apiKey || !vectorStoreId) {
+      console.error("⚠️ Chybí OPENAI_API_KEY nebo VECTOR_STORE_ID.");
+      return jsonResponse(500, { ok: false, error: "Chyba konfigurace serveru." });
+    }
 
     const searchRes = await fetch(`${OPENAI_BASE_URL}/vector_stores/${vectorStoreId}/search`, {
       method: "POST",
@@ -106,6 +117,7 @@ export default async function handler(req) {
 
     return jsonResponse(200, { ok: true, answer });
   } catch (err) {
+    console.error("❌ Kritická chyba v handleru:", err);
     return jsonResponse(500, { ok: false, error: err.message });
   }
 }
