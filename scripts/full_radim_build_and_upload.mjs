@@ -10,7 +10,6 @@ const SITE_BASE_URL = (process.env.SITE_BASE_URL ?? "https://www.obec-radim.cz")
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const VECTOR_STORE_ID = process.env.VECTOR_STORE_ID;
 
-// BEZPEČNÉ LIMITY
 const MAX_PAGES = 350; 
 const CURRENT_MAX_PAGES_TO_STORE = 350; 
 const CURRENT_MAX_PDF_TEXT = 40;
@@ -26,12 +25,9 @@ function normalizeUrl(url) {
         const u = new URL(url, SITE_BASE_URL);
         u.hash = "";
         if (u.search.includes('ftresult')) u.search = ""; 
-        
-        // ZAKÁZANÉ PŘÍPONY - ochrání před stahováním "bordelu" a obřích souborů
         const ext = u.pathname.split('.').pop().toLowerCase();
         const badExts = ['zip', 'rar', 'doc', 'docx', 'xls', 'xlsx', 'jpg', 'jpeg', 'png', 'gif', 'mp4'];
         if (badExts.includes(ext)) return null; 
-
         return u.toString();
     } catch (e) { return null; }
 }
@@ -45,7 +41,7 @@ async function getLlmSummary(text, title) {
             body: JSON.stringify({
                 model: "gpt-4o-mini",
                 messages: [
-                    { role: "system", content: "Jsi právní a datový analytik obce. Z tohoto dokumentu (zejména pokud jde o vyhlášku či nařízení) vytáhni to hlavní, o čem je, klíčová pravidla, poplatky a roky." },
+                    { role: "system", content: "Jsi analytik. Vytáhni z tohoto dokumentu (pokud jde o vyhlášku) klíčová pravidla, poplatky a roky." },
                     { role: "user", content: `Název: ${title}\nText: ${text.slice(0, 8000)}` }
                 ],
                 temperature: 0
@@ -54,6 +50,41 @@ async function getLlmSummary(text, title) {
         const json = await response.json();
         return json.choices[0].message.content;
     } catch (e) { return `[Chyba analýzy PDF]`; }
+}
+
+// ✨ NOVÁ FUNKCE: Automatická extrakce tvrdých faktů do JSON
+async function extractCoreFacts(pages) {
+    console.log("🧠 PROFI FUNKCE: Extrahuji tvrdá data z webu do rychlé tabulky...");
+    if (!OPENAI_API_KEY) return;
+    
+    // Vezme texty jen ze stránek, kde je největší šance najít kontakty a úřední věci
+    const relevantText = pages
+        .filter(p => p.url.includes('kontakt') || p.url.includes('urad') || p.url.includes('poplat') || p.url === SITE_BASE_URL)
+        .map(p => p.content)
+        .join(" ").slice(0, 20000); // Dáme AI to nejlepší maso
+
+    try {
+        const response = await fetch("https://api.openai.com/v1/chat/completions", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${OPENAI_API_KEY}` },
+            body: JSON.stringify({
+                model: "gpt-4o-mini",
+                response_format: { type: "json_object" },
+                messages: [
+                    { role: "system", content: "Jsi datový těžař. Vytáhni z textu absolutně přesná data pro obec Radim. Vrať striktně JSON s klíči: 'starosta' (jméno), 'telefon_urad', 'email_urad', 'uredni_hodiny', 'poplatek_pes', 'poplatek_odpad'. Pokud tam něco není, dej 'Nenalezeno'." },
+                    { role: "user", content: relevantText }
+                ],
+                temperature: 0
+            })
+        });
+        const json = await response.json();
+        const facts = json.choices[0].message.content;
+        
+        // Uložíme to do složky netlify/functions, aby si to chat mohl okamžitě přečíst
+        await fs.mkdir("netlify/functions", { recursive: true });
+        await fs.writeFile("netlify/functions/core_facts.json", facts);
+        console.log("✅ Tvrdá data úspěšně vytěžena a uložena do core_facts.json:\n", facts);
+    } catch (e) { console.error("❌ Chyba extrakce faktů:", e.message); }
 }
 
 async function startCrawl() {
@@ -69,12 +100,8 @@ async function startCrawl() {
 
         try {
             const res = await fetch(url);
-            
-            // TVRDÝ MANTINEL: Zpracujeme jen to, co je skutečně HTML stránka (nebo PDF přeskočíme k pozdější analýze)
             const contentType = res.headers.get("content-type") || "";
-            if (!contentType.includes("text/html")) {
-                continue;
-            }
+            if (!contentType.includes("text/html")) continue;
 
             console.log(`🔍 Crawl: ${url}`);
             const html = await res.text();
@@ -101,11 +128,7 @@ async function startCrawl() {
             const title = doc.querySelector("title")?.textContent.replace(/\s+/g, ' ').trim() || "";
             let content = (doc.querySelector("main") || doc.body).textContent.replace(/\s+/g, ' ').trim();
             
-            // MANTINEL: Oříznutí extrémně dlouhých textů (zabrání obřím souborům)
-            if (content.length > 20000) {
-                content = content.slice(0, 20000) + " ... [ZBYTEK STRÁNKY ZKRÁCEN]";
-            }
-
+            if (content.length > 20000) content = content.slice(0, 20000) + " ... [ZBYTEK STRÁNKY ZKRÁCEN]";
             if (content.length > 50) pages.push({ url, title, content });
 
         } catch (e) { console.error(`❌ Error ${url}: ${e.message}`); }
@@ -142,24 +165,20 @@ async function syncWithOpenAI(currentPath, archivePath) {
 }
 
 async function main() {
-    console.log("🚀 STARTUJE CHYTRÝ CRAWL S OCHRANOU PROTI BORDELU...");
+    console.log("🚀 STARTUJE HYBRIDNÍ CRAWL...");
     let { pages, docs } = await startCrawl();
     
-    // 🧠 CHYTRÉ ŘAZENÍ PDF: VYHLÁŠKY A ROKY 2023-2026 MAJÍ ABSOLUTNÍ PŘEDNOST
+    // Vytěžení rychlé vizitky (profi funkce)
+    await extractCoreFacts(pages);
+
     docs.sort((a, b) => {
         const getYear = (str) => { const m = str.match(/(20\d{2})/); return m ? parseInt(m[1]) : 0; };
         const yearA = Math.max(getYear(a.title), getYear(a.url));
         const yearB = Math.max(getYear(b.title), getYear(b.url));
-        
         const isVyhlaskaA = a.title.toLowerCase().includes('vyhl') || a.title.toLowerCase().includes('narizeni');
         const isVyhlaskaB = b.title.toLowerCase().includes('vyhl') || b.title.toLowerCase().includes('narizeni');
-
-        let scoreA = yearA;
-        if (isVyhlaskaA && yearA >= 2023) scoreA += 10000; // Brutální priorita pro vyhlášky od 2023
-
-        let scoreB = yearB;
-        if (isVyhlaskaB && yearB >= 2023) scoreB += 10000;
-
+        let scoreA = yearA + (isVyhlaskaA && yearA >= 2023 ? 10000 : 0);
+        let scoreB = yearB + (isVyhlaskaB && yearB >= 2023 ? 10000 : 0);
         return scoreB - scoreA; 
     });
     
@@ -167,14 +186,13 @@ async function main() {
     
     currentTxt += `==================================================\n### SEKCE 1: DŮLEŽITÉ VYHLÁŠKY A DOKUMENTY\n==================================================\n\n`;
     for (const d of docs.slice(0, CURRENT_MAX_PDF_TEXT)) {
-        console.log(`📝 Analýza PDF: ${d.title}`);
         try {
             const res = await fetch(d.url);
             const pdfData = await pdfParse(Buffer.from(await res.arrayBuffer()));
             const summary = await getLlmSummary(pdfData.text, d.title);
             currentTxt += `[ZAČÁTEK DOKUMENTU]\nNÁZEV: ${d.title}\nODKAZ: ${d.url}\nOBSAH A PRAVIDLA:\n${summary}\n[KONEC DOKUMENTU]\n\n`;
             await sleep(300);
-        } catch (e) { console.log("PDF skip"); }
+        } catch (e) { }
     }
 
     currentTxt += `==================================================\n### SEKCE 2: KOMPLETNÍ OBSAH WEBU A NAVIGACE\n==================================================\n\n`;
@@ -186,9 +204,9 @@ async function main() {
     await fs.writeFile(path.join(OUT_DIR, CURRENT_FILE), currentTxt);
     await fs.writeFile(path.join(OUT_DIR, ARCHIVE_FILE), docs.map(d => `${d.title}: ${d.url}`).join("\n"));
 
-    console.log("🔄 Synchronizuji čistá data s OpenAI...");
+    console.log("🔄 Synchronizuji s OpenAI...");
     await syncWithOpenAI(path.join(OUT_DIR, CURRENT_FILE), path.join(OUT_DIR, ARCHIVE_FILE));
-    console.log("🎯 HOTOVO. ASISTENT JE PLNĚ NABITÝ ČISTÝMI DATY.");
+    console.log("🎯 HOTOVO.");
 }
 
 main().catch(console.error);
