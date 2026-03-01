@@ -3,6 +3,360 @@
     {
       "jmeno": "Zdeňka Stříbrná",
       "funkce": "Starostka",
+      "telefon": "",
+      "email": ""
+    },
+    {
+      "jmeno": "Obec Radim",
+      "funkce": "Úřad",
+      "telefon": "",
+      "email": "ou.radim@centrum.cz"
+    },
+    {
+      "jmeno": "Obec Radim",
+      "funkce": "Úřad",
+      "telefon": "+420 731 409 498",
+      "email": "urad@obec-radim.cz"
+    },
+    {
+      "jmeno": "Zdeňka Stříbrná",
+      "funkce": "starostka",
+      "telefon": "+420 731 409 498",
+      "email": "urad@obec-radim.cz"
+    },
+    {
+      "jmeno": "Jan Breuer",
+      "funkce": "člen oddílu A",
+      "telefon": "",
+      "email": ""
+    },
+    {
+      "jmeno": "Karel Stříbrný",
+      "funkce": "člen oddílu A",
+      "telefon": "",
+      "email": ""
+    },
+    {
+      "jmeno": "Pavel Míka",
+      "funkce": "člen oddílu A",
+      "telefon": "",
+      "email": ""
+    },
+    {
+      "jmeno": "Tomáš Myšík",
+      "funkce": "vedoucí týmu oddílu A",
+      "telefon": "",
+      "email": ""
+    },
+    {
+      "jmeno": "Josef Čermák",
+      "funkce": "vedoucí oddílu a týmu B",
+      "telefon": "",
+      "email": ""
+    },
+    {
+      "jmeno": "Milan Šimek",
+      "funkce": "člen oddílu B",
+      "telefon": "",
+      "email": ""
+    },
+    {
+      "jmeno": "Jiří Kalenský",
+      "funkce": "člen oddílu B",
+      "telefon": "",
+      "email": ""
+    },
+    {
+      "jmeno": "Josef Barachovský",
+      "funkce": "člen oddílu B",
+      "telefon": "",
+      "email": ""
+    },
+    {
+      "jmeno": "Dušan Vrabec",
+      "funkce": "člen oddílu B",
+      "telefon": "",
+      "email": ""
+    },
+    {
+      "jmeno": "Václav Nidrle st.",
+      "funkce": "člen oddílu B",
+      "telefon": "",
+      "email": ""
+    },
+    {
+      "jmeno": "Jaromír Šimek",
+      "funkce": "předseda",
+      "telefon": "",
+      "email": ""
+    },
+    {
+      "jmeno": "Václav Nidrle",
+      "funkce": "tajemník",
+      "telefon": "",
+      "email": ""
+    },
+    {
+      "jmeno": "Renata Odvárková",
+      "funkce": "hospodářka",
+      "telefon": "",
+      "email": ""
+    },
+    {
+      "jmeno": "Jaroslav Štál",
+      "funkce": "",
+      "telefon": "",
+      "email": ""
+    },
+    {
+      "jmeno": "Jaroslav Odvárko",
+      "funkce": "",
+      "telefon": "",
+      "email": ""
+    },
+    {
+      "jmeno": "Hana Militká",
+      "funkce": "",
+      "telefon": "",
+      "email": ""
+    },
+    {
+      "jmeno": "Jiří Militký",
+      "funkce": "",
+      "telefon": "",
+      "email": ""
+    },
+    {
+      "jmeno": "Jaroslav Šulc",
+      "funkce": "",
+      "telefon": "",
+      "email": ""
+    },
+    {
+      "jmeno": "Jaromír Šimek",
+      "funkce": "předseda",
+      "telefon": "",
+      "email": ""
+    },
+    {
+      "jmeno": "Václav Nidrle",
+      "funkce": "tajemník",
+      "telefon": "",
+      "email": ""
+    },
+    {
+      "jmeno": "Renata Odvárková",
+      "funkce": "hospodářka",
+      "telefon": "",
+      "email": ""
+    },
+    {
+      "jmeno": "Jaroslav Štál",
+      "funkce": "výbor",
+      "telefon": "",
+      "email": ""
+    },
+    {
+      "jmeno": "Jaroslav Odvárko",
+      "funkce": "výbor",
+      "telefon": "",
+      "email": ""
+    },
+    {
+      "jmeno": "Hana Militká",
+      "funkce": "výbor",
+      "telefon": "",
+      "email": ""
+    },
+    {
+      "jmeno": "Jiří Militký",
+      "funkce": "výbor",
+      "telefon": "",
+      "email": ""
+    },
+    {
+      "jmeno": "Jaroslav Šulc",
+      "funkce": "výbor",
+      "telefon": "",
+      "email": ""
+    },
+    {
+      "jmeno": "Zdeňka Stříbrná",
+      "funkce": "starostka obce",
+      "telefon": "731 409 498",
+      "email": ""
+    },
+    {
+      "jmeno": "Zdeňka Stříbrná",
+      "funkce": "starostka",
+      "telefon": "+420 731 409 498",
+      "email": "urad@obec-radim.cz"
+    },
+    {
+      "jmeno": "MUDr. Vladimír Klos",
+      "funkce": "praktický lékař",
+      "telefon": "+420 493 532 987",
+      "email": ""
+    },
+    {
+      "jmeno": "MUDr. Markéta Cvrčková",
+      "funkce": "praktický lékař",
+      "telefon": "774 673 824",
+      "email": ""
+    },
+    {
+      "jmeno": "Zdeňka Stříbrná",
+      "funkce": "starostka",
+      "telefon": "",
+      "email": ""
+    },
+    {
+      "jmeno": "Marcela Danišová",
+      "funkce": "místostarostka",
+      "telefon": "",
+      "email": ""
+    },
+    {
+      "jmeno": "Obec Radim",
+      "funkce": "Úřad",
+      "telefon": "+420 731 409 498",
+      "email": "urad@obec-radim.cz"
+    },
+    {
+      "jmeno": "Stříbrná Zdeňka",
+      "funkce": "starostka",
+      "telefon": "+420 731 409 498",
+      "email": ""
+    },
+    {
+      "jmeno": "Danišová Marcela, Mgr.",
+      "funkce": "místostarostka",
+      "telefon": "+420 775 641 950",
+      "email": ""
+    },
+    {
+      "jmeno": "Karban Lukáš",
+      "funkce": "člen zastupitelstva",
+      "telefon": "",
+      "email": ""
+    },
+    {
+      "jmeno": "Odvárko Jan",
+      "funkce": "člen zastupitelstva",
+      "telefon": "",
+      "email": ""
+    },
+    {
+      "jmeno": "Bernátová Markéta",
+      "funkce": "člen zastupitelstva",
+      "telefon": "",
+      "email": ""
+    },
+    {
+      "jmeno": "Karban Lukáš",
+      "funkce": "předseda finančního výboru",
+      "telefon": ""
+    },
+    {
+      "jmeno": "Říhová Martina",
+      "funkce": "člen finančního výboru",
+      "telefon": ""
+    },
+    {
+      "jmeno": "Odvárko Jan",
+      "funkce": "člen finančního výboru",
+      "telefon": ""
+    },
+    {
+      "jmeno": "Odvárko Jan",
+      "funkce": "předseda kontrolního výboru",
+      "telefon": ""
+    },
+    {
+      "jmeno": "Karban Lukáš",
+      "funkce": "člen kontrolního výboru",
+      "telefon": ""
+    },
+    {
+      "jmeno": "Bernátová Markéta",
+      "funkce": "člen kontrolního výboru",
+      "telefon": ""
+    },
+    {
+      "jmeno": "Bernátová Markéta",
+      "funkce": "předseda kulturního výboru",
+      "telefon": "",
+      "email": ""
+    },
+    {
+      "jmeno": "Danišová Marcela, Mgr.",
+      "funkce": "člen kulturního výboru",
+      "telefon": "+420 775641950",
+      "email": ""
+    },
+    {
+      "jmeno": "Stříbrná Zdeňka",
+      "funkce": "člen kulturního výboru",
+      "telefon": "+420 731 409 498",
+      "email": ""
+    },
+    {
+      "jmeno": "Kořínková Štěpánka",
+      "funkce": "člen kulturního výboru",
+      "telefon": "",
+      "email": ""
+    },
+    {
+      "jmeno": "Stříbrná Petra",
+      "funkce": "člen kulturního výboru",
+      "telefon": "",
+      "email": ""
+    },
+    {
+      "jmeno": "Nidrle Václav",
+      "funkce": "člen kulturního výboru",
+      "telefon": "",
+      "email": ""
+    },
+    {
+      "jmeno": "Říha Miroslav",
+      "funkce": "člen kulturního výboru",
+      "telefon": "",
+      "email": ""
+    },
+    {
+      "jmeno": "Štěpánka Kořínková",
+      "funkce": "předsedkyně",
+      "telefon": "604 238 206",
+      "email": ""
+    },
+    {
+      "jmeno": "Lukáš Karban",
+      "funkce": "místopředseda",
+      "telefon": "723 226 623",
+      "email": ""
+    },
+    {
+      "jmeno": "Martina Říhová",
+      "funkce": "pokládník",
+      "telefon": "728 860 482",
+      "email": ""
+    },
+    {
+      "jmeno": "Petra Macáková",
+      "funkce": "jednatel, správce webu",
+      "telefon": "777 255 193",
+      "email": ""
+    },
+    {
+      "jmeno": "Lukáš Karban",
+      "funkce": "správce areálu",
+      "telefon": "723 226 623",
+      "email": ""
+    },
+    {
+      "jmeno": "Obec Radim",
+      "funkce": "Úřad",
       "telefon": "+420 731 409 498",
       "email": "urad@obec-radim.cz"
     }
@@ -10,35 +364,173 @@
   "spolky_a_organizace": [
     {
       "nazev_spolku": "TJ Sokol Radim z.s.",
-      "vedeni_nebo_kontakt": "Není uvedeno",
-      "poznamka_nebo_zamereni": "Sportovní činnost, volejbal, stolní tenis"
+      "vedeni_nebo_kontakt": "Veřejnoprávní smlouva - TJ Sokol Radim z.s. 2021",
+      "poznamka": ""
+    },
+    {
+      "nazev_spolku": "TJ Sokol Radim z.s.",
+      "vedeni_nebo_kontakt": "",
+      "poznamka": ""
     },
     {
       "nazev_spolku": "Zahrádkářské sdružení Radim, z.s.",
-      "vedeni_nebo_kontakt": "Jaromír Šimek (předseda), Václav Nidrle (tajemník), Renata Odvárková (hospodářka)",
-      "poznamka_nebo_zamereni": "Pěstování ovoce a zeleniny, organizace výletů a besed"
+      "vedeni_nebo_kontakt": "Jaromír Šimek, Václav Nidrle, Renata Odvárková, Jaroslav Štál, Jaroslav Odvárko, Hana Militká, Jiří Militký, Jaroslav Šulc",
+      "poznamka": "oficiální spolek registrovaný u krajského soudu v Hradci Králové"
     },
     {
-      "nazev_spolku": "SDH Radim",
-      "vedeni_nebo_kontakt": "Není uvedeno",
-      "poznamka_nebo_zamereni": "Hasičská činnost"
+      "nazev_spolku": "TJ Sokol Radim",
+      "vedeni_nebo_kontakt": "Správce Webu",
+      "poznamka": ""
+    },
+    {
+      "nazev_spolku": "TJ Sokol Radim",
+      "vedeni_nebo_kontakt": "Jakub Andrle, mlynář z Tužína",
+      "poznamka": "První starosta"
+    },
+    {
+      "nazev_spolku": "TJ Sokol Radim z.s.",
+      "vedeni_nebo_kontakt": "tjsokolradim@seznam.cz",
+      "poznamka": "Sídlo: Radim 8, Radim 507 12, IČO: 47474254"
+    },
+    {
+      "nazev_spolku": "Sbor dobrovolných hasičů",
+      "vedeni_nebo_kontakt": "Josef Zikmund (starosta), Václav Bajer (velitel), Antonín Vindyš (velitel), Josef Krátký starší (starosta), František Vindyš (starosta), Josef Koudelka (velitel), Josef Říha (předseda), Jaroslav Sedláček mladší (velitel)",
+      "poznamka": "Historie sboru od roku 1894"
+    },
+    {
+      "nazev_spolku": "Mladí hasiči",
+      "vedeni_nebo_kontakt": "DRÁČATA",
+      "poznamka": "Kroužek pro děti ve věku od 6 do 15 let"
     }
   ],
   "sluzby_ceniky_pronajmy": [
     {
-      "sluzba_nebo_poplatek": "Pronájem hasičárny Studeňany",
-      "cena_nebo_vyse": "Není uvedeno",
-      "spravce_kontakt": "+420 731 409 498"
+      "sluzba_nebo_areal": "Praktický lékař",
+      "cena_nebo_poplatek": "",
+      "spravce_kontakt": {
+        "jmeno": "MUDr. Vladimír Klos",
+        "telefon": "+420 493 532 987",
+        "email": ""
+      }
     },
     {
-      "sluzba_nebo_poplatek": "Místní poplatek za obecní systém odpadového hospodářství",
-      "cena_nebo_vyse": "Není uvedeno",
-      "spravce_kontakt": "Není uvedeno"
+      "sluzba_nebo_areal": "hasičárna",
+      "cena_nebo_poplatek": "",
+      "spravce_kontakt": ""
     },
     {
-      "sluzba_nebo_poplatek": "Místní poplatek ze psů",
-      "cena_nebo_vyse": "Není uvedeno",
-      "spravce_kontakt": "Není uvedeno"
+      "sluzba_nebo_areal": "hasičárna Stuneňany",
+      "cena_nebo_poplatek": "",
+      "spravce_kontakt": ""
+    },
+    {
+      "sluzba_nebo_areal": "Czech POINT",
+      "cena_nebo_poplatek": "N/A",
+      "spravce_kontakt": "N/A"
+    },
+    {
+      "sluzba_nebo_areal": "výpis z Rejstříku trestů",
+      "cena_nebo_poplatek": "50 Kč",
+      "spravce_kontakt": ""
+    },
+    {
+      "sluzba_nebo_areal": "výpis z Živnostenského rejstříku",
+      "cena_nebo_poplatek": "100,- Kč (první strana), 50,- Kč (každá další strana)",
+      "spravce_kontakt": ""
+    },
+    {
+      "sluzba_nebo_areal": "Úplný výpis z Obchodního rejstříku",
+      "cena_nebo_poplatek": "100,- Kč",
+      "spravce_kontakt": ""
+    },
+    {
+      "sluzba_nebo_areal": "Každá další strana výpisu",
+      "cena_nebo_poplatek": "50,- Kč",
+      "spravce_kontakt": ""
+    },
+    {
+      "sluzba_nebo_areal": "výpis z Katastru nemovitostí",
+      "cena_nebo_poplatek": "100,- Kč (první strana), 50,- Kč (každá další strana)",
+      "spravce_kontakt": ""
+    },
+    {
+      "sluzba_nebo_areal": "výpis z bodového hodnocení řidiče",
+      "cena_nebo_poplatek": "max. 100,-Kč za první stránku, max. 50,-Kč za každou další",
+      "spravce_kontakt": ""
+    },
+    {
+      "sluzba_nebo_areal": "výpis z bodového hodnocení řidiče na Czech POINTu České pošty",
+      "cena_nebo_poplatek": "69,- Kč",
+      "spravce_kontakt": ""
+    },
+    {
+      "sluzba_nebo_areal": "hasičárna Studeňany",
+      "cena_nebo_poplatek": "výše nabízeného ročního nájemného (nebyla specifikována)",
+      "spravce_kontakt": "731 409 498"
+    },
+    {
+      "sluzba_nebo_areal": "Praktický lékař",
+      "cena_nebo_poplatek": "",
+      "spravce_kontakt": {
+        "jmeno": "MUDr. Vladimír Klos",
+        "telefon": "+420 493 532 987",
+        "email": ""
+      }
+    },
+    {
+      "sluzba_nebo_areal": "Obchod Jednota",
+      "cena_nebo_poplatek": "N/A",
+      "spravce_kontakt": "N/A"
+    },
+    {
+      "sluzba_nebo_areal": "Pošta Radim",
+      "cena_nebo_poplatek": "N/A",
+      "spravce_kontakt": "N/A"
+    },
+    {
+      "sluzba_nebo_areal": "ordinace",
+      "cena_nebo_poplatek": "",
+      "spravce_kontakt": ""
+    },
+    {
+      "sluzba_nebo_areal": "členský příspěvek aktivní",
+      "cena_nebo_poplatek": "800 Kč/rok",
+      "spravce_kontakt": ""
+    },
+    {
+      "sluzba_nebo_areal": "členský příspěvek děti a studenti",
+      "cena_nebo_poplatek": "500 Kč/rok",
+      "spravce_kontakt": ""
+    },
+    {
+      "sluzba_nebo_areal": "členský příspěvek neaktivní",
+      "cena_nebo_poplatek": "200 Kč/rok",
+      "spravce_kontakt": ""
+    },
+    {
+      "sluzba_nebo_areal": "cvičení malých dětí",
+      "cena_nebo_poplatek": "200 Kč/rok",
+      "spravce_kontakt": ""
+    },
+    {
+      "sluzba_nebo_areal": "Podpora činnosti kolektivu mladých hasičů",
+      "cena_nebo_poplatek": "22.000,- Kč",
+      "spravce_kontakt": "Královehradecký kraj"
+    },
+    {
+      "sluzba_nebo_areal": "Podpora činnosti kolektivu mladých hasičů",
+      "cena_nebo_poplatek": "44.000,- Kč",
+      "spravce_kontakt": "Královehradecký kraj"
+    },
+    {
+      "sluzba_nebo_areal": "místní poplatek za obecní systém odpadového hospodářství",
+      "cena_nebo_poplatek": "neuvedeno",
+      "spravce_kontakt": "neuvedeno"
+    },
+    {
+      "sluzba_nebo_areal": "místní poplatek ze psů",
+      "cena_nebo_poplatek": "neuvedeno",
+      "spravce_kontakt": "neuvedeno"
     }
   ]
 }

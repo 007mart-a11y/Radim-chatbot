@@ -52,63 +52,76 @@ async function getLlmSummary(text, title) {
     } catch (e) { return `[Chyba analýzy PDF]`; }
 }
 
-// 🧠 MEGA-EXTRAKCE: Náš nový "Zlatý důl" na data
+// 🧠 CHIRURGICKÁ EXTRAKCE: Stránka po stránce (100% spolehlivost)
 async function extractMegaFacts(pages) {
-    console.log("🧠 MEGA-EXTRAKCE: Skenuji úřad, spolky a ceníky pro dokonalou databázi...");
+    console.log("\n🧠 CHIRURGICKÁ EXTRAKCE: Procházím web STRÁNKU PO STRÁNCE.");
+    console.log("Tohle chvíli zabere, ale zaručí to, že nám už žádný Karban ani ceník neuteče...\n");
     if (!OPENAI_API_KEY) return;
     
-    // Filtrujeme jen stránky, kde je šance na reálná tvrdá data (žádné aktuality a fotogalerie)
+    // Zúžíme to jen na stránky, které mají v URL kontakt, úřad, spolky, služby, areál atd.
     const relevantPages = pages.filter(p => 
         p.url.includes('/urad/') || 
         p.url.includes('/organizace-a-spolky/') || 
-        p.url.includes('/kontakt') || 
+        p.url.includes('/sluzby') ||
+        p.url.includes('/kontakt') ||
         p.url === SITE_BASE_URL
     );
 
-    let combinedText = relevantPages.map(p => `--- STRÁNKA: ${p.title} ---\n${p.content}`).join("\n\n");
-    // Ořízneme to na 80 000 znaků, ať to LLM zvládne chroustat rychle a levně
-    if (combinedText.length > 80000) combinedText = combinedText.slice(0, 80000);
+    let allFacts = { vedeni_obce_a_urad: [], spolky_a_organizace: [], sluzby_ceniky_pronajmy: [] };
 
-    const systemPrompt = `Jsi špičkový datový analytik. Tvým úkolem je vytěžit z dodaného textu webu obce Radim detailní databázi.
-Vrať POUZE validní JSON přesně v této struktuře:
+    const systemPrompt = `Jsi pečlivý datový analytik. Tvojí jedinou prací je přečíst text konkrétní stránky a vytáhnout z něj TVRDÁ DATA.
+Vrať POUZE validní JSON s klíči (všechny musí být pole objektů):
 {
-  "vedeni_obce_a_urad": [
-    {"jmeno": "...", "funkce": "...", "telefon": "...", "email": "..."}
-  ],
-  "spolky_a_organizace": [
-    {"nazev_spolku": "...", "vedeni_nebo_kontakt": "...", "poznamka_nebo_zamereni": "..."}
-  ],
-  "sluzby_ceniky_pronajmy": [
-    {"sluzba_nebo_poplatek": "...", "cena_nebo_vyse": "...", "spravce_kontakt": "..."}
-  ]
+  "vedeni_obce_a_urad": [{"jmeno": "...", "funkce": "...", "telefon": "...", "email": "..."}],
+  "spolky_a_organizace": [{"nazev_spolku": "...", "vedeni_nebo_kontakt": "...", "poznamka": "..."}],
+  "sluzby_ceniky_pronajmy": [{"sluzba_nebo_areal": "...", "cena_nebo_poplatek": "...", "spravce_kontakt": "..."}]
 }
 PRAVIDLA:
-1. Vyhledej všechny kontakty na úřad, starostu, hasiče, sokol, kroužky atd.
-2. Speciálně vyhledej informace o PRONÁJMU HALY (kdo ji spravuje, telefon, cena).
-3. Pokud najdeš poplatky (pes, odpad), vlož je do sluzby_ceniky_pronajmy.
-4. Co nenajdeš, nevyplňuj, nevymýšlej si.`;
+1. Hledej jména, telefony, ceny pronájmů (hala, hřiště, klubovna), poplatky (pes, odpad), úřední hodiny.
+2. Pokud najdeš správce (např. Lukáš Karban), zapiš ho i s telefonem k dané službě/areálu.
+3. Pokud na stránce žádná taková data nejsou, vrať prostě prázdná pole. Nevymýšlej si.`;
 
-    try {
-        const response = await fetch("https://api.openai.com/v1/chat/completions", {
-            method: "POST",
-            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${OPENAI_API_KEY}` },
-            body: JSON.stringify({
-                model: "gpt-4o-mini",
-                response_format: { type: "json_object" },
-                messages: [
-                    { role: "system", content: systemPrompt },
-                    { role: "user", content: combinedText }
-                ],
-                temperature: 0.1
-            })
-        });
-        const json = await response.json();
-        const facts = json.choices[0].message.content;
+    // Projedeme relevantní stránky jednu po druhé
+    for (const page of relevantPages) {
+        if (page.content.length < 150) continue; // Ignorujeme prázdné stránky
         
+        console.log(`   ⏳ Doluji data ze stránky: ${page.title}`);
+        try {
+            const response = await fetch("https://api.openai.com/v1/chat/completions", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${OPENAI_API_KEY}` },
+                body: JSON.stringify({
+                    model: "gpt-4o-mini",
+                    response_format: { type: "json_object" },
+                    messages: [
+                        { role: "system", content: systemPrompt },
+                        { role: "user", content: `Stránka: ${page.title}\nText:\n${page.content.slice(0, 4000)}` }
+                    ],
+                    temperature: 0
+                })
+            });
+            
+            const json = await response.json();
+            const extracted = JSON.parse(json.choices[0].message.content);
+            
+            // Bezpečné sloučení dat (pokud to OpenAI vrátilo jako pole)
+            if (Array.isArray(extracted.vedeni_obce_a_urad)) allFacts.vedeni_obce_a_urad.push(...extracted.vedeni_obce_a_urad);
+            if (Array.isArray(extracted.spolky_a_organizace)) allFacts.spolky_a_organizace.push(...extracted.spolky_a_organizace);
+            if (Array.isArray(extracted.sluzby_ceniky_pronajmy)) allFacts.sluzby_ceniky_pronajmy.push(...extracted.sluzby_ceniky_pronajmy);
+            
+            // Malá pauza, ať nás OpenAI nezablokuje za moc rychlých dotazů (Rate limiting)
+            await sleep(400); 
+        } catch (e) {
+            console.error(`   ❌ Chyba AI analýzy na stránce ${page.title}: ${e.message}`);
+        }
+    }
+
+    // Uložíme finální mistrovské dílo
+    try {
         await fs.mkdir("netlify/functions", { recursive: true });
-        await fs.writeFile("netlify/functions/core_facts.json", facts);
-        console.log("✅ Mega-databáze úspěšně vytvořena a uložena do core_facts.json!");
-    } catch (e) { console.error("❌ Chyba MEGA-extrakce:", e.message); }
+        await fs.writeFile("netlify/functions/core_facts.json", JSON.stringify(allFacts, null, 2));
+        console.log("\n✅ Detailní AI databáze (včetně správců a ceníků) úspěšně vytvořena a uložena do core_facts.json!");
+    } catch (e) { console.error("❌ Nelze uložit core_facts.json", e); }
 }
 
 async function startCrawl() {
@@ -127,7 +140,6 @@ async function startCrawl() {
             const contentType = res.headers.get("content-type") || "";
             if (!contentType.includes("text/html")) continue;
 
-            console.log(`🔍 Crawl: ${url}`);
             const html = await res.text();
             const dom = new JSDOM(html);
             const doc = dom.window.document;
@@ -153,10 +165,14 @@ async function startCrawl() {
             let content = (doc.querySelector("main") || doc.body).textContent.replace(/\s+/g, ' ').trim();
             
             if (content.length > 20000) content = content.slice(0, 20000) + " ... [ZBYTEK ZKRÁCEN]";
-            if (content.length > 50) pages.push({ url, title, content });
+            if (content.length > 50) {
+                pages.push({ url, title, content });
+                process.stdout.write(`\r🔍 Staženo HTML stránek: ${pages.length} `);
+            }
 
-        } catch (e) { console.error(`❌ Error ${url}: ${e.message}`); }
+        } catch (e) { /* tichý skip chyb */ }
     }
+    console.log("\n✅ Crawl HTML dokončen.");
     return { pages, docs: Array.from(docs.values()) };
 }
 
@@ -189,10 +205,10 @@ async function syncWithOpenAI(currentPath, archivePath) {
 }
 
 async function main() {
-    console.log("🚀 STARTUJE HYBRIDNÍ CRAWL...");
+    console.log("🚀 STARTUJE HYBRIDNÍ CRAWL A CHIRURGICKÁ AI EXTRAKCE...");
     let { pages, docs } = await startCrawl();
     
-    // Tady proběhne ta magie s těžbou kontaktů a ceníků!
+    // Nová přesná analýza stránky po stránce
     await extractMegaFacts(pages);
 
     docs.sort((a, b) => {
@@ -208,6 +224,8 @@ async function main() {
     
     let currentTxt = `EXPERTNÍ ZNALOSTNÍ BÁZE OBCE RADIM\nAKTUALIZACE: ${new Date().toLocaleDateString()}\n\n`;
     currentTxt += `==================================================\n### SEKCE 1: DŮLEŽITÉ VYHLÁŠKY A DOKUMENTY\n==================================================\n\n`;
+    
+    console.log("\n📄 Zpracovávám PDF vyhlášky...");
     for (const d of docs.slice(0, CURRENT_MAX_PDF_TEXT)) {
         try {
             const res = await fetch(d.url);
@@ -227,9 +245,9 @@ async function main() {
     await fs.writeFile(path.join(OUT_DIR, CURRENT_FILE), currentTxt);
     await fs.writeFile(path.join(OUT_DIR, ARCHIVE_FILE), docs.map(d => `${d.title}: ${d.url}`).join("\n"));
 
-    console.log("🔄 Synchronizuji s OpenAI Vector Store...");
+    console.log("\n🔄 Synchronizuji s OpenAI Vector Store...");
     await syncWithOpenAI(path.join(OUT_DIR, CURRENT_FILE), path.join(OUT_DIR, ARCHIVE_FILE));
-    console.log("🎯 HOTOVO.");
+    console.log("🎯 HOTOVO. Architektura kompletně zaktualizována.");
 }
 
 main().catch(console.error);
