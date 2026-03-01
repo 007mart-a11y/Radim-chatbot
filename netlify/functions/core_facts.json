@@ -1,8 +1,44 @@
 {
-  "starosta": "Zdeňka Stříbrná",
-  "telefon_urad": "+420 731 409 498",
-  "email_urad": "urad@obec-radim.cz",
-  "uredni_hodiny": "Středa: 16:00 – 19:00",
-  "poplatek_pes": "Nenalezeno",
-  "poplatek_odpad": "Nenalezeno"
+  "vedeni_obce_a_urad": [
+    {
+      "jmeno": "Zdeňka Stříbrná",
+      "funkce": "Starostka",
+      "telefon": "+420 731 409 498",
+      "email": "urad@obec-radim.cz"
+    }
+  ],
+  "spolky_a_organizace": [
+    {
+      "nazev_spolku": "TJ Sokol Radim z.s.",
+      "vedeni_nebo_kontakt": "Není uvedeno",
+      "poznamka_nebo_zamereni": "Sportovní činnost, volejbal, stolní tenis"
+    },
+    {
+      "nazev_spolku": "Zahrádkářské sdružení Radim, z.s.",
+      "vedeni_nebo_kontakt": "Jaromír Šimek (předseda), Václav Nidrle (tajemník), Renata Odvárková (hospodářka)",
+      "poznamka_nebo_zamereni": "Pěstování ovoce a zeleniny, organizace výletů a besed"
+    },
+    {
+      "nazev_spolku": "SDH Radim",
+      "vedeni_nebo_kontakt": "Není uvedeno",
+      "poznamka_nebo_zamereni": "Hasičská činnost"
+    }
+  ],
+  "sluzby_ceniky_pronajmy": [
+    {
+      "sluzba_nebo_poplatek": "Pronájem hasičárny Studeňany",
+      "cena_nebo_vyse": "Není uvedeno",
+      "spravce_kontakt": "+420 731 409 498"
+    },
+    {
+      "sluzba_nebo_poplatek": "Místní poplatek za obecní systém odpadového hospodářství",
+      "cena_nebo_vyse": "Není uvedeno",
+      "spravce_kontakt": "Není uvedeno"
+    },
+    {
+      "sluzba_nebo_poplatek": "Místní poplatek ze psů",
+      "cena_nebo_vyse": "Není uvedeno",
+      "spravce_kontakt": "Není uvedeno"
+    }
+  ]
 }
